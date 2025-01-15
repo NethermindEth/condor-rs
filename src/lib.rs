@@ -15,6 +15,6 @@ mod tests {
     fn test_for_workflow() {
         use base64::prelude::*;
         let _ = BASE64_STANDARD.encode([1,2,3,4,5]);
-        assert_eq!(true, true)
+        assert_eq!(false, false)
     }
 }

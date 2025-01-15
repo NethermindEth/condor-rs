@@ -6,3 +6,4 @@ repository = "https://github.com/NethermindEth/falcon-nm"
 
 [dependencies]
 base64 = "0.22.1"
+crates_io_api = "0.5.0"
