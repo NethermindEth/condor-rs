@@ -12,7 +12,12 @@ mod tests {
     }
 
     #[test]
-    fn test_for_workflow() {
+    fn test_for_workflows() {
+        my_func(&"world"); // Should be a Clippy warning
         assert_eq!(true, false)
+    }
+
+    fn my_func(s: &str) {
+        println!("Hello, {s}!");
     }
 }
