@@ -9,19 +9,14 @@ on:
 env:
   CARGO_TERM_COLOR: always
 
-github-token:
-  action-input:
-    input: token
-    is-default: false
-  permissions:
-#    issues: write
-#    issues-reason: to create issues
-    checks: write
-    checks-reason: to create check
-
 jobs:
   security_audit:
     runs-on: ubuntu-latest
+    permissions:
+  #    issues: write
+  #    issues-reason: to create issues
+      checks: write
+      checks-reason: to create check
     steps:
       - uses: actions/checkout@v4
       - uses: rustsec/audit-check@v1.4.1
