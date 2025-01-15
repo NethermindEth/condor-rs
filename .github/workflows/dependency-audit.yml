@@ -13,10 +13,8 @@ jobs:
   security_audit:
     runs-on: ubuntu-latest
     permissions:
-  #    issues: write
-  #    issues-reason: to create issues
+      # issues: write
       checks: write
-      checks-reason: to create check
     steps:
       - uses: actions/checkout@v4
       - uses: rustsec/audit-check@v1.4.1
