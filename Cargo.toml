@@ -5,3 +5,4 @@ edition = "2021"
 repository = "https://github.com/NethermindEth/falcon-nm"
 
 [dependencies]
+crates_io_api = "0.5.0"
