@@ -1,8 +1,14 @@
-[package]
-name = "falcon-nm"
+[workspace.package]
 version = "0.1.0"
 edition = "2021"
-repository = "https://github.com/NethermindEth/falcon-nm"
+repository = "https://github.com/NethermindEth/pq-signatures"
 
-[dependencies]
-base64 = "0.22.1"
+[workspace]
+members = [
+    "labrador",
+]
+resolver = "2"
+default-members = ["labrador"]
+
+[workspace.dependencies]
+# None so far

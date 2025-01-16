@@ -1,0 +1,8 @@
+[package]
+name = "labrador"
+version.workspace = true
+edition.workspace = true
+repository.workspace = true
+
+[dependencies]
+base64 = "0.22.1"
