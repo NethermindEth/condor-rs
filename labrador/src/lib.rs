@@ -1,3 +1,6 @@
+#![doc = include_str!("../../doc/mainpage-doc.md")]
+
+/// Prints a "Hello, world!" message
 pub fn say_hello() {
     println!("Hello, world!");
 }
