@@ -1,0 +1,51 @@
+## Step 2 - Ajtai Commitment
+In the first step of the protocol, the prover commits to the small-norm solution vectors  `s_1,...,s_r` by computing **Ajtai commitments**. 
+The idea behind a commitment is a cryptographic equivalent to keeping some knowledge sealed in an **'envelope'**, to be revealed later.
+Specifically, the prover computes the vector `t_i = A * s_i`, where `s_i` is a vector of `n` polynomials. 
+After multiplication, this results in vectors `t_i` of `k` polynomials. 
+However, sending the vectors `t_i` directly could be costly due to its potentially large size. 
+Therefore, the prover commits to the `t_i` using another Ajtai commitment, referred to as the **outer commitment**.
+
+### Decomposition for Efficiency
+
+The components of the vector `t_i` have coefficients that are arbitrary modulo `q`. 
+This may lead to inefficiencies when transferring large numbers. To optimize the transfer and reduce the size of the values being committed, 
+the coefficients need to be decomposed into smaller parts.
+
+The decomposition is done **element-wise**. Specifically, each polynomial in `t_i` is decomposed into `t_1 >= 2` parts with respect to a small base `b_1`, 
+such that:
+
+```
+t_i = t_i^(0) + t_i^(1) * b_1 + t_i^(2) * b_1^2 + ... + t_i^(t_1-1) * b_1^(t_1-1)
+```
+
+In this decomposition, centered representatives are used, which ensures that each element of the vector lies within the range `[-b_1 / 2, b_1 / 2]`.
+Once the decomposition is complete for each `t_i`, we concatenate all the decomposition coefficients `t_i^(k)` for each `i` and `k` to form a new vector `t`. 
+The second Ajtai commitment can then be written as:
+```
+u_1 = B * t
+```
+
+### Commitment to the Garbage Polynomial
+
+The protocol also includes a polynomial referred to as the garbage polynomial, which does not depend on any challenge during the interaction and is used in the amortization part. To simplify the proof of security, this polynomial is also committed to at the beginning of the protocol. To commit to the garbage polynomial, the prover can simply include it in the commitment to `t`. 
+
+The garbage polynomial commitment is handled similarly. Given that `g_ij = <s_i, s_j>` is the inner product of the solution vectors, 
+the prover constructs a symmetric matrix of polynomials. Each element of this matrix `g_ij` is decomposed based on some base `b_2` into `t_2 >= 2` parts and then each decomposition coefficient is concateated into `g` :
+
+```
+g_ij = g_ij^(0) + g_ij^(1) * b_2 + g_ij^(2) * b_2^2 + ... + g_ij^(t_2-1) * b_2^(t_2-1)
+```
+
+Finally, the full commitment to both the vector `t` and the garbage polynomial `g` is expressed as:
+```
+u_1 = B * t + C * g
+```
+
+### Norm Constraints & Common Reference String
+- A, B, and C are matrices that serve as common references between the verifier and the prover
+- `||t|| <= γ_1`
+- `||g|| <= γ_2`
+
+(More details on choosing the bases and γ will be added soon)
+

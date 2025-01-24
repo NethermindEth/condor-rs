@@ -1,4 +1,22 @@
+// Documentation
+
+// Main Introduction
 #![doc = include_str!("../../doc/mainpage-doc.md")]
+
+// Arithmetic Circuit Translation
+#![doc = include_str!("../../doc/arithmetic_circuit_translation.md")]
+
+// Ajtai Commitment
+#![doc = include_str!("../../doc/ajtai_commitment.md")]
+
+// Projections
+#![doc = include_str!("../../doc/projections.md")]
+
+// Aggregation
+#![doc = include_str!("../../doc/aggregation.md")]
+
+// Amortization
+#![doc = include_str!("../../doc/amortization.md")]
 
 /// Prints a "Hello, world!" message
 pub fn say_hello() {

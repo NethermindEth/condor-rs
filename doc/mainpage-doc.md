@@ -16,13 +16,5 @@ The protocol, from the circuit to the final proof, can be described through the 
 4. Make the proof more compact by aggregating multiple constraints (Aggregation).  
 5. Only prove linear combinations of the commitments (Amortization).  
 
-## Step 1 - Arithmetic Circuit Translation
 
-## Step 2 - Ajtai Commitment
-
-## Step 3 - Projections (Johnson-Lindenstrauss)
-
-## Step 4 - Aggregation
-
-## Step 5 - Amortization
 
