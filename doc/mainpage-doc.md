@@ -2,7 +2,7 @@
 
 This is the code implementation of LaBRADOR, a lattice-based proof system for R1CS that achieves proof sizes of logarithmic order.  
 These notes serve as a friendly introduction to the protocol and a prototype for the documentation.  
-The main idea is to define a protocol between a prover **P** and a verifier **V**, where, given an initial arithmetic circuit, they can perform an interaction **<P, V>**. This interaction allows the prover to demonstrate knowledge of solutions to the circuit, and the verifier will output a binary result indicating whether the proof was accepted.  
+The main idea is to define a protocol between a prover $P$ and a verifier $V$, where, given an initial arithmetic circuit, they can perform an interaction $<P, V>$. This interaction allows the prover to demonstrate knowledge of solutions to the circuit, and the verifier will output a binary result indicating whether the proof was accepted.  
 Protocols of this type already exist, but LaBRADOR has the added advantage of achieving sublinear proof sizes while relying on (provably) post-quantum secure cryptographic lattice problems.
 
 *(This documentation is still under construction)*
