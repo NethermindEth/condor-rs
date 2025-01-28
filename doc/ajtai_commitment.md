@@ -26,7 +26,7 @@ $u_{1} = B * t$
 
 The protocol also includes a polynomial referred to as the garbage polynomial, which does not depend on any challenge during the interaction and is used in the amortization part. To simplify the proof of security, this polynomial is also committed to at the beginning of the protocol. To commit to the garbage polynomial, the prover can simply include it in the commitment to $t$. 
 
-The garbage polynomial commitment is handled similarly. Given that $g_ij = <s_{i}, s_{j}>$ is the inner product of the solution vectors, 
+The garbage polynomial commitment is handled similarly. Given that $g_{ij} = <s_{i}, s_{j}>$ is the inner product of the solution vectors, 
 the prover constructs a symmetric matrix of polynomials. Each element of this matrix $g_{ij}$ is decomposed based on some base $b_{2}$ into $t_{2} \geq 2$ parts and then each decomposition coefficient is concateated into $g$ :
 
 $$g_{ij} = g_{ij}\^{\(0\)} + g_{ij}^{\(1\)} * b_{2} + g_{ij}\^{\(2\)} * b_{2}\^{2} + ... + g_{ij}\^{\(t_{2}-1\)} * b_{2}\^{t_2-1}$$
