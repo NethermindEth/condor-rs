@@ -1,6 +1,23 @@
 ## Step 2 - Ajtai Commitment
+
+Many well-known computational problems, such as factoring, are considered worst-case problems, whereas cryptographic applications typically require problems that are hard on average. This is because, for hard average-case problems, any random instance is likely to be hard with a positive probability. In contrast, there is no known method for generating a hard instance of a worst-case problem. By leveraging lattice-based problems, it's possible to construct average-case problems that are as difficult as certain well-known worst-case problems.
+
+In 1996, Miklós Ajtai proposed the idea of how to generate one of these average hard instance problems. An Ajtai Commitment is a polynomial commitment scheme based on these techniques to guarantee the average hardness of this fundamental component in many cryptographic protocols.
+
+### What is an Ajtai Commitment?
+
+An Ajtai commitment scheme allows a committer to publish a value, called the commitment, which binds them to a message without revealing it. Later, they may open the commitment and reveal the committed message to a verifier, who can check that the message is consistent with the commitment. In our case, we are more interested in the compactness of the commitment in relation to the message, allowing the committer to send smaller messages, rather than the non-revealing aspect.The idea behind a commitment is a cryptographic equivalent to keeping some knowledge sealed in an **"envelope"**, to be revealed later.
+
+The fundamental problem upon which it is based is called the **Modular-SIS** problem. The Short Integer Solution (SIS) problem is based on the idea that, given a sufficiently large random matrix $ A $ and a vector $ x $, solving the linear system of equations $ A x = b $, where the solution $ x^* $ is required to have a small norm $ ||x^*|| < \beta $, is as hard as the **short basis problem** (a lattice problem that is believed to be hard on average). The **Modular** part is simply a generalization of SIS to work on a module structure.
+
+In order to perform an Ajtai Commitment Scheme, the committer would first need to be in possession of a **small-norm** vector $x$ that represents the message they want to commit to. Given a public matrix $A$, one can calculate $A x = b$ and send $b$, which is a more compact vector, making it lighter to send over restricted-size networks. Now, the verifier is in possession of both $A$ and $b$ (the "envelope"). Once the solution vector $x$ is revealed at the end by the prover, the verifier can easily check that the prover had the solution all along.
+
+The reason why $b$ is binding is due to the SIS problem. It is a hard problem to find a solution to the constraints that is also of small norm, so the prover must have had the solution all along.
+
+
+### Commitment
+The prover in the protocol has solved the dot product constraints and is in possession of small-norm solution vectors (which we will call "witness vectors").
 In the first step of the protocol, the prover commits to the small-norm solution vectors  $s_{1},...,s_{r}$ by computing **Ajtai commitments**. 
-The idea behind a commitment is a cryptographic equivalent to keeping some knowledge sealed in an **'envelope'**, to be revealed later.
 Specifically, the prover computes the vector $t_{i} = A * s_{i}$, where $s_{i}$ is a vector of $n$ polynomials. 
 After multiplication, this results in vectors $t_{i}$ of $k$ polynomials. 
 However, sending the vectors $t_{i}$ directly could be costly due to its potentially large size. 
