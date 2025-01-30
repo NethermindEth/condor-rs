@@ -53,6 +53,38 @@ $$
 This structure is particularly useful in **lattice-based cryptography** and **zero-knowledge proof systems**.
 
 
-### Binary R1CS to Dot Product Constrains
+### Binary R1CS to Dot Product Constraints
 
-### R1CS modulo $2^{d}+1$ to Dot Product Constrains
+Some problems are easier to translate into R1CS when the modulo $N$ is $2$. To translate from Binary R1CS to a Dot Product Constraint System, the first step is to solve the Binary R1CS by finding a witness $w$ such that $A w \circ B w = C w$. Then, through an interactive protocol, the prover demonstrates to the verifier that they possess the witness and that the equations hold. During the interaction, various parts involve defining dot product constraints, which are sent to the verifier. These constraints are ultimately what define the Dot Product Constraint System.
+
+Having done that, we are now in possession of a system of dot product constraints and a witness that solves them.
+
+The key steps in the translation are as follows:
+- The prover sends a commitment $t = A(\mathbf{a} || \mathbf{b} || \mathbf{c} || \mathbf{W})$, where $\mathbf{a}, \mathbf{b}, \mathbf{c}$ are polynomials with coefficients $A w, B w, C w$, all modulo $2$.
+- Next, the prover must demonstrate that the coefficients are correct: $a = A w \pmod{2}$, $b = B w \pmod{2}$, and $c = C w \pmod{2}$, where $a, b, c$ are the coefficients of $\mathbf{a}, \mathbf{b}, \mathbf{c}$, respectively.
+- Then, the prover must prove that $a$, $b$, and $c$ are binary values.
+- Finally, the prover must show that $a \circ b = c$.
+
+
+### R1CS Modulo $2^{d}+1$ to Dot Product Constraints
+
+The main challenge in translating between the R1CS modulo $2^{d}+1$ and the dot product constraint lies in the weight of sending all the information, especially when $d$ is large. The **non-adjacent form** of a number is a unique digit representation using only the elements $\[-1, 1, 0\]$. We will leverage this form to rewrite all our components, as it minimizes the Hamming weight and allows for a much more compact representation of the system. 
+
+The protocol will operate similarly to the Binary R1CS, but with the addition of committing to the encoded version. In this case, the prover will commit to:
+
+$$t = A(\text{Enc}(A_w) || \text{Enc}(B_w) || \text{Enc}(C_w) || \text{Enc}(w))$$
+
+For proving the quadratic constraints $a \circ b = c$, instead of sending the information directly, a probabilistic approach will be used. The verifier will send a collection of $l$ challenge vectors $\varphi_i$ and request the prover to demonstrate that:
+
+$$\langle \varphi_i, a \circ b - c \rangle = 0 \quad \text{for all} \quad i \in \[l\]$$
+
+Note that when a system contains both Binary R1CS and R1CS modulo $2^{d}+1$ parts, the prover can perform both proofs simultaneously by combining the commitments and committing to:
+
+$$t = A(A_{\text{bin}}w || B_{\text{bin}}w || C_{\text{bin}}w || \text{Enc}(A_w) || \text{Enc}(B_w) || \text{Enc}(C_w) || w)$$
+
+as long as $w$ is a binary R1CS witness that simultaneously encodes a witness for the R1CS modulo system.
+
+
+
+
+
