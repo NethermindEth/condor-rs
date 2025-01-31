@@ -14,7 +14,7 @@ This kind of arithmetic circuit $C$ allows us to pose problems by reducing them 
 
 ### R1CS and Dot Product Constraints
 
-Arithmetic circuits can be represented in a standard way called a **Rank-1 Constraint System (R1CS)**, where given three matrices $A, B, C$, an element $s$ all modulo $N$ is a solution if:
+Arithmetic circuits can be represented in a standard way called a **Rank-1 Constraint System (R1CS)**, where given three matrices $A, B, C$ and an element $s$ (all modulo $N$) is a solution if:
 
 $$
 (A s) \circ (B s) = C s \text{ mod } N
@@ -68,7 +68,7 @@ The key steps in the translation are as follows:
 
 ### R1CS Modulo $2^{d}+1$ to Dot Product Constraints
 
-The main challenge in translating between the R1CS modulo $2^{d}+1$ and the dot product constraint lies in the weight of sending all the information, especially when $d$ is large. The **non-adjacent form** of a number is a unique digit representation using only the elements $\[-1, 1, 0\]$. We will leverage this form to rewrite all our components, as it minimizes the Hamming weight and allows for a much more compact representation of the system. 
+The main challenge in translating between the R1CS modulo $2^{d}+1$ and the dot product constraint lies in the weight of sending all the information. The **non-adjacent form** of a number is a unique digit representation using only the elements $\[-1, 1, 0\]$. We will leverage this form to rewrite all our components, as it minimizes the Hamming weight and allows for a much more compact representation of the system. 
 
 The protocol will operate similarly to the Binary R1CS, but with the addition of committing to the encoded version. In this case, the prover will commit to:
 

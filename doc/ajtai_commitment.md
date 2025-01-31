@@ -51,10 +51,4 @@ $$g_{ij} = g_{ij}\^{\(0\)} + g_{ij}^{\(1\)} * b_{2} + g_{ij}\^{\(2\)} * b_{2}\^{
 Finally, the full commitment to both the vector $t$ and the garbage polynomial $g$ is expressed as:
 $$u_{1} = B * t + C * g$$
 
-### Norm Constraints & Common Reference String
-- $A$, $B$, and $C$ are matrices that serve as common references between the verifier and the prover
-- ||$t$|| $\leq γ_{1}$
-- ||$g$|| $\leq γ_{2}$
-
-(More details on choosing the bases and $γ$ will be added soon)
 
