@@ -3,7 +3,7 @@ The aggregation step allows the prover to compress the number of functions it ne
 
 $$f^{''\(k\)}=\sum_{l=1}\^{L}\phi_{l}\^{\(k\)}f^{'\(l)\}(s_{1},..,s_{r})+\sum_{j=1}\^{256}\omega_{j}\^{\(k\)}\(<\theta_{-1}(\pi_{i}\^{\(j\)}),s_{i}>-p_{j}\)$$
 
-And based on the fact that the functions $f^{'}$ are of the form $f^{'}(s_{1},...,s_{r}) = \sum_{i,j=1}\^{r}a_{ij}\^{'}<s_{i},s_{j}>+\sum_{i=1}\^{r}<\varphi_{i}\^{'},s_{i}>=0$. If we difine $a_{ij}\^{''} = \sum_{l=1}\^{L}\phi_{l}\^{\(k\)}a_{ij}\^{\(l\)}$ and $\varphi_{i}\^{''}= \sum_{l=1}\^{L}\phi_{l}\^{\(k\)}\varphi_{i}\^{\(l\)}+\sum_{j=1}\^{256}\omega_{j}\^{\(k\)}\theta_{-1}(\pi_{i}\^{\(j\)}) $ then we can re write the $f^{''}$ functions so that it takes the form of a dot product restriction that becomes zero under $s_{1},...,s_{r}$:
+And based on the fact that the functions $f^{'}$ are of the form $f^{'}(s_{1},...,s_{r}) = \sum_{i,j=1}\^{r}a_{ij}\^{'}<s_{i},s_{j}>+\sum_{i=1}\^{r}<\varphi_{i}\^{'},s_{i}>=0$. If we difine $a_{ij}\^{''} = \sum_{l=1}\^{L}\phi_{l}\^{\(k\)}a_{ij}\^{\(l\)}$ and $\varphi_{i}\^{''} = \sum_{l=1}\^{L}\phi_{l}\^{\(k\)}\varphi_{i}\^{\(l\)}+\sum_{j=1}\^{256}\omega_{j}\^{\(k\)}\theta_{-1}(\pi_{i}\^{\(j\)}) $ then we can re write the $f^{''}$ functions so that it takes the form of a dot product restriction that becomes zero under $s_{1},...,s_{r}$:
 
 $$0=\sum_{i,j=1}\^{r}a_{ij}\^{''}<s_{i},s_{j}>+\sum_{i=1}\^{r}<\varphi_{i}\^{''},s_{i}> - (<\omega^{\(k\)},p> + \sum_{l=1}\^{\(k\)}\phi_{l}\^{\(k\)}b_{0}\^{'\(l\)})$$
 
