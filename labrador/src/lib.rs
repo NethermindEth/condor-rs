@@ -1,5 +1,7 @@
 #![doc = include_str!("../../doc/mainpage-doc.md")]
 
+mod algebra;
+
 /// Prints a "Hello, world!" message
 pub fn say_hello() {
     println!("Hello, world!");
