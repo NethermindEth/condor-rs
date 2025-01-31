@@ -8,7 +8,7 @@ In 1996, Miklós Ajtai proposed the idea of how to generate one of these average
 
 An Ajtai commitment scheme allows a committer to publish a value, called the commitment, which binds them to a message without revealing it. Later, they may open the commitment and reveal the committed message to a verifier, who can check that the message is consistent with the commitment. In our case, we are more interested in the compactness of the commitment in relation to the message, allowing the committer to send smaller messages, rather than the non-revealing aspect. The idea behind a commitment is a cryptographic equivalent to keeping some knowledge sealed in an **"envelope"**, to be revealed later.
 
-The fundamental problem upon which it is based is called the **Modular-SIS** problem. The Short Integer Solution (SIS) problem is based on the idea that, given a sufficiently large random matrix $ A $ and a vector $ x $, solving the linear system of equations $ A x = b $, where the solution $ x^* $ is required to have a small norm $ ||x^*|| < \beta $, is as hard as the **short basis problem** (a lattice problem that is believed to be hard on average). The **Modular** part is simply a generalization of SIS to work on a module structure.
+The fundamental problem upon which it is based is called the **Modular-SIS** problem. The Short Integer Solution (SIS) problem is based on the idea that, given a sufficiently large random matrix $A$ and a vector $x$, solving the linear system of equations $Ax=b$, where the solution $x^{*}$ is required to have a small norm $||x^{*}|| < \beta$, is as hard as the **short basis problem** (a lattice problem that is believed to be hard on average). The **Modular** part is simply a generalization of SIS to work on a module structure.
 
 In order to perform an Ajtai Commitment Scheme, the committer would first need to be in possession of a **small-norm** vector $x$ that represents the message they want to commit to. Given a public matrix $A$, one can calculate $A x = b$ and send $b$, which is a more compact vector, making it lighter to send over restricted-size networks. Now, the verifier is in possession of both $A$ and $b$ (the "envelope"). Once the solution vector $x$ is revealed at the end by the prover, the verifier can easily check that the prover had the solution all along.
 
@@ -37,7 +37,7 @@ $$t_{i} = t_{i}\^{\(0\)} + t_{i}\^{1} * b_{1} + t_{i}\^{\(2\)} * b_{1}^{2} + ...
 In this decomposition, centered representatives are used, which ensures that each element of the vector lies within the range $\[\frac{-b_{1}}{2}, \frac{b_{1}}{2}\]$.
 Once the decomposition is complete for each $t_{i}$, we concatenate all the decomposition coefficients $t_{i}\^{k}$ for each $i$ and $k$ to form a new vector $t$. 
 The second Ajtai commitment can then be written as:
-$u_{1} = B * t$
+$u_{1}=B*t$
 
 ### Commitment to the Garbage Polynomial
 
@@ -46,7 +46,7 @@ The protocol also includes a polynomial referred to as the garbage polynomial, w
 The garbage polynomial commitment is handled similarly. Given that $g_{ij} = <s_{i}, s_{j}>$ is the inner product of the solution vectors, 
 the prover constructs a symmetric matrix of polynomials. Each element of this matrix $g_{ij}$ is decomposed based on some base $b_{2}$ into $t_{2} \geq 2$ parts and then each decomposition coefficient is concateated into $g$ :
 
-$$g_{ij} = g_{ij}\^{\(0\)} + g_{ij}^{\(1\)} * b_{2} + g_{ij}\^{\(2\)} * b_{2}\^{2} + ... + g_{ij}\^{\(t_{2}-1\)} * b_{2}\^{t_2-1}$$
+$$g_{ij} = g_{ij}\^{\(0\)} + g_{ij}\^{\(1\)} * b_{2} + g_{ij}\^{\(2\)} * b_{2}\^{2} + ... + g_{ij}\^{\(t_{2}-1\)} * b_{2}\^{t_2-1}$$
 
 Finally, the full commitment to both the vector $t$ and the garbage polynomial $g$ is expressed as:
 $$u_{1} = B * t + C * g$$
