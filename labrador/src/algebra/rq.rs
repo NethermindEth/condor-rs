@@ -15,6 +15,7 @@ struct Rq<const D: usize> {
 
 impl<const D: usize> Rq<D> {
     /// Creates a new polynomial with the given coefficients.
+    #[allow(dead_code)]
     pub fn new(coeffs: &[Zq]) -> Self {
         let mut raw_coeffs: [Zq; D] = [Zq::ZERO; D];
         for (i, coeff) in coeffs.iter().enumerate() {
@@ -36,8 +37,8 @@ impl<const D: usize> Add for &Rq<D> {
     fn add(self, rhs: Self) -> Self::Output {
         // iterator_try_collect is unstable, so use plain old for loop
         let mut coeffs = [Zq::ZERO; D];
-        for i in 0..D {
-            coeffs[i] = self.coeffs[i] + rhs.coeffs[i];
+        for (i, coeff) in coeffs.iter_mut().enumerate().take(D) {
+            *coeff = self.coeffs[i] + rhs.coeffs[i];
         }
         Rq { coeffs }
     }
@@ -49,8 +50,8 @@ impl<const D: usize> Sub for &Rq<D> {
     fn sub(self, rhs: Self) -> Self::Output {
         // iterator_try_collect is unstable, so use plain old for loop
         let mut coeffs = [Zq::ZERO; D];
-        for i in 0..D {
-            coeffs[i] = self.coeffs[i] - rhs.coeffs[i];
+        for (i, coeff) in coeffs.iter_mut().enumerate().take(D) {
+            *coeff = self.coeffs[i] - rhs.coeffs[i];
         }
         Rq { coeffs }
     }
@@ -111,10 +112,9 @@ impl<const D: usize> MulAssign for Rq<D> {
 impl<const D: usize> Ord for Rq<D> {
     fn cmp(&self, other: &Self) -> Ordering {
         for i in (0..D).rev() {
-            if self.coeffs[i] < other.coeffs[i] {
-                return Ordering::Less;
-            } else if self.coeffs[i] > other.coeffs[i] {
-                return Ordering::Greater;
+            match self.coeffs[i].cmp(&other.coeffs[i]) {
+                Ordering::Equal => continue,
+                non_equal => return non_equal,
             }
         }
         Ordering::Equal
@@ -170,17 +170,13 @@ mod tests {
         let mut poly1_coeffs = [Zq::ZERO; 64];
         poly1_coeffs[0] = Zq::ONE; // Constant term
         poly1_coeffs[63] = Zq::ONE; // X^63 term
-        let poly1 = Rq {
-            coeffs: poly1_coeffs,
-        };
+        let poly1 = Rq::new(&poly1_coeffs);
 
         // Initialize poly1 as X^63 + X
         let mut poly2_coeffs = [Zq::ZERO; 64];
         poly2_coeffs[1] = Zq::ONE; // X term
         poly2_coeffs[63] = Zq::ONE; // X^63 term
-        let poly2 = Rq {
-            coeffs: poly2_coeffs,
-        };
+        let poly2 = Rq::new(&poly2_coeffs);
 
         // Multiply poly1 by poly2
         let product = &poly1 * &poly2;

@@ -1,14 +1,13 @@
-use crate::algebra::{FiniteField, Ring, RingOps};
-use std::cmp::Ordering;
+use crate::algebra::{Ring, RingOps};
 use std::fmt::{Debug, Display, Formatter};
 use std::ops::{Add, AddAssign, Mul, MulAssign, Sub, SubAssign};
 
 type ValueType = u64;
 
-/// A finite field `Z_q` of integers mod `q`.
+/// A quotient ring `Z_q` of integers mod `q`.
 /// Q is hardcoded to 2^32.
 // TODO: Should we use a field from the crate ark_ff? Note that they are mostly focusing on prime fields
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Zq {
     pub value: ValueType,
 }
@@ -95,18 +94,6 @@ impl MulAssign for Zq {
     }
 }
 
-impl Ord for Zq {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.value.cmp(&other.value)
-    }
-}
-
-impl PartialOrd for Zq {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        self.value.partial_cmp(&other.value)
-    }
-}
-
 impl Debug for Zq {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         // No need for special formatting, just use Display
@@ -120,12 +107,6 @@ impl RingOps<Zq> for &Zq {}
 impl Ring for Zq {
     const ZERO: Self = Zq { value: 0 };
     const ONE: Self = Zq { value: 1 };
-}
-
-impl FiniteField for Zq {
-    fn inverse(&self) -> Self {
-        todo!()
-    }
 }
 
 #[cfg(test)]

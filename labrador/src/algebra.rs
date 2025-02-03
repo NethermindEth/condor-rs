@@ -2,7 +2,7 @@ pub mod rq;
 pub mod zq;
 
 use std::fmt::Debug;
-use std::ops::{Add, AddAssign, Div, Mul, MulAssign, Rem, Sub, SubAssign};
+use std::ops::{Add, AddAssign, Mul, MulAssign, Sub, SubAssign};
 
 // TODO: Do we also need operators for Rhs=Base?
 pub trait RingOps<Output>:
@@ -17,11 +17,4 @@ where
 {
     const ZERO: Self;
     const ONE: Self;
-}
-
-pub trait FiniteField: Ring
-where
-    for<'a> &'a Self: RingOps<Self>,
-{
-    fn inverse(&self) -> Self;
 }
