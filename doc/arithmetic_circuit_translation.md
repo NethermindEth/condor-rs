@@ -44,7 +44,7 @@ $$
 f(s) = \sum_{1 \leq i,j \leq r} \mathbf{a_{ij}} \langle \mathbf{\bar{s_{i}}}, \mathbf{\bar{s_{j}}} \rangle + \sum_{i=1}^{r} \langle \mathbf{\bar{\varphi_{i}}}, \mathbf{\bar{s_{i}}} \rangle + \mathbf{b}
 $$
 
-where both the variables $\mathbf{\bar{s}}$ and the constants $\mathbf{a_{ij}}, \mathbf{\bar{\varphi_i}}, \mathbf{b}$ are **polynomials (or vectors of polynomials) over a cyclotomic ring**:
+where both the variables $\mathbf{\bar{s}}$ and the constants $\mathbf{a_{ij}}, \mathbf{\bar{\varphi_i}}, \mathbf{b}$ are **polynomials (or vectors of polynomials) over a polynomial ring modulo an ideal**:
 
 $$
 Z_{q}\[x\] / (x^d + 1)
