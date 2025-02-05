@@ -1,4 +1,4 @@
-name: Clippy check
+name: Linter check
 
 on: push
 
@@ -8,9 +8,16 @@ env:
   RUSTFLAGS: "-Dwarnings"
 
 jobs:
-  clippy_check:
+  linter_check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Run Fmt
+        run: cargo fmt --all -- --check
+
       - name: Run Clippy
         run: cargo clippy --all-targets --all-features
+
+      - name: Check typos
+        uses: crate-ci/typos@master
+      

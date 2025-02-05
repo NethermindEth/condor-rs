@@ -35,6 +35,6 @@ jobs:
           restore-keys: ${{ runner.os }}-cargo-
 
       - name: Run audit-check action
-        uses: rustsec/audit-check@v1.4.1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cargo install cargo-deny
+          cargo deny check
