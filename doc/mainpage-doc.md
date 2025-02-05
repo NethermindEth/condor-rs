@@ -15,4 +15,5 @@ The protocol, from the circuit to the final proof, can be described through the 
 5. Only prove linear combinations of the commitments (Amortization).  
 
 
-
+## Notation
+We will use an upper bar $\bar{s}$ for vectors, lowercase $s$ for scalars, uppercase $S$ for matrices, and boldface letters for elements $\mathbf{s} \in \mathbb{Z}_q\[x\] / (x^d + 1)$, unless explicitly noted.
