@@ -1,0 +1,34 @@
+#!/bin/sh
+set -e pipefail 
+
+# Dependency audit
+cargo deny check || {
+    echo "❌ Critical: Vulnerable dependencies detected (run 'cargo deny check')"
+    exit 1
+}
+
+# Formatting check
+cargo fmt --all -- --check || {
+    echo "❌ Formatting issues (run 'cargo fmt --all')"
+    exit 2
+}
+
+# Typo check
+typos || {
+    echo "❌ Spelling mistakes found (run 'typos --write-changes')"
+    exit 3
+}
+
+# Linting
+cargo clippy --all-targets --all-features -- -D warnings || {
+    echo "❌ Clippy violations (check warnings above)"
+    exit 4
+}
+
+# Tests
+cargo test --workspace --verbose || {
+    echo "❌ Test failures detected"
+    exit 5
+}
+
+echo "✅ All checks passed!"

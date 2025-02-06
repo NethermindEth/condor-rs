@@ -20,14 +20,5 @@ git config commit.gpgsign true
 Create a pre-push git hook with the contents:
 
 ```sh
-touch .git/hooks/pre-push
-chmod +x .git/hooks/pre-push
-cat >.git/hooks/pre-push <<EOL
-#!/bin/sh
-cargo deny check
-cargo fmt --all -- --check
-typos
-cargo clippy --all-targets --all-features
-cargo test --workspace --verbose
-EOL
+git config core.hooksPath .githooks
 ```

@@ -11,6 +11,7 @@ env:
 
 jobs:
   security_audit:
+    timeout-minutes: 5
     runs-on: ubuntu-latest
     permissions:
       contents: read
