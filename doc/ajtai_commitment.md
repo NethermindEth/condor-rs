@@ -35,7 +35,7 @@ such that:
 
 $$\mathbf{\bar{t_{i}}} = \mathbf{\bar{t_{i}}}\^{\(0\)} + \mathbf{\bar{t_{i}}}\^{\(1\)} * b_{1} + \mathbf{\bar{t_{i}}}\^{\(2\)} * b_{1}^{2} + \dots + \mathbf{\bar{t_{i}}}^{\(t_{1}-1\)} * b_{1}^{t_{1}-1}$$
 
-In this decomposition, centered representatives modulo $b_{1}$ are used, which means $\lVert \mathbf{\bar{t_{i}}}\^{\(k\)} \rVert_{\infty}$
+In this decomposition, centered representatives modulo $b_{1}$ are used, which means $\lVert \mathbf{\bar{t_{i}}}\^{\(k\)} \rVert_{\infty}. Centered representatives modulo b1 are used to minimize the magnitude of coefficients, ensuring compactness. This means that \mathbf{\bar{t_{i}}}\^{\(k\)} \rVert_{\infty} is kept as small as possible.$
 Once the decomposition is complete for each $\mathbf{\bar{t_{i}}}$, we concatenate all the decomposition coefficients $\mathbf{\bar{t_{i}}}\^{k}$ for each $i$ and $k$ to form a new vector $\mathbf{\bar{t}}$. 
 The second Ajtai commitment can then be written as:
 $\mathbf{\bar{u_{1}}}=B*\mathbf{\bar{t}}$
