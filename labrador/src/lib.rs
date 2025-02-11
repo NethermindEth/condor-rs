@@ -1,6 +1,10 @@
+
 // Documentation
 
 // Main Introduction
+
+#![forbid(unsafe_code)]
+
 #![doc = include_str!("../../doc/mainpage-doc.md")]
 
 // Arithmetic Circuit Translation
@@ -35,7 +39,7 @@ mod tests {
     #[test]
     fn test_for_workflow() {
         use base64::prelude::*;
-        let _ = BASE64_STANDARD.encode([1,2,3,4,5]);
+        let _ = BASE64_STANDARD.encode([1, 2, 3, 4, 5]);
         assert_eq!(true, true)
     }
 }
