@@ -1,10 +1,8 @@
-
 // Documentation
 
 // Main Introduction
 
 #![forbid(unsafe_code)]
-
 #![doc = include_str!("../../doc/mainpage-doc.md")]
 // Arithmetic Circuit Translation
 #![doc = include_str!("../../doc/arithmetic_circuit_translation.md")]
