@@ -22,3 +22,11 @@ Create a pre-push git hook with the contents:
 ```sh
 git config core.hooksPath .githooks
 ```
+## Running the Rust Documentation Locally
+After cloning the repository, follow the instructions below to run the documentation locally:
+```sh
+cargo doc
+```
+```sh
+RUSTDOCFLAGS="--html-in-header katex-header.html" cargo doc --no-deps --open
+```

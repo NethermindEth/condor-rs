@@ -75,7 +75,7 @@ The protocol will operate similarly to the Binary R1CS, but with the addition of
 
 $t = A(\text{Enc}(A \bar{w}) \parallel \text{Enc}(B \bar{w}) \parallel \text{Enc}(C \bar{w})) \parallel \text{Enc}(\bar{w})$
 
-For proving the quadratic constraints $\bar{a} \circ \bar{b} = \bar{c}$, instead of sending the information directly, a probabilistic approach will be used. The verifier will send a collection of $l$ challenge vectors $\bar{\varphi_i}$ and request the prover to demonstrate that:
+For proving the quadratic constraints $\bar{a} \circ \bar{b} = \bar{c}$, instead of sending the information directly, a probabilistic approach will be used. The verifier will send a collection of $l$ challenge vectors $\bar{\varphi_i}$,  which, through linear combinations, allow probabilistic verification, reducing the need to send the full data. Now, the prover needs to demonstrate that:
 
 $$\langle \bar{\varphi_i}, \bar{a} \circ \bar{b} - \bar{c} \rangle = 0 \quad \text{for all} \quad i \in \[l\]$$
 
