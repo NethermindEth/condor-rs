@@ -12,7 +12,7 @@ The protocol, from the circuit to the final proof, can be described through the 
 2. Apply an Ajtai commitment to the solutions of the dot product constraints.  
 3. Prove the norm requirements on the solution using projections (Modular Johnson-Lindenstrauss Lemma).  
 4. Make the proof more compact by aggregating multiple constraints (Aggregation).  
-5. Only prove linear combinations of the commitments (Amortization).  
+5. Only prove linear combinations of the commitments (Amortization).  Instead of proving all commitments directly, prove linear combinations of them. This recursive amortization process reduces the witness size in each iteration.
 
 
 ## Notation
