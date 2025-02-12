@@ -1,5 +1,8 @@
 use labrador::say_hello;
 
+mod poly_ring;
+use poly_ring::Poly;
+
 fn main() {
     say_hello();
     // Example poly_ring
