@@ -17,4 +17,3 @@ fn main() {
     println!("sum: {:?}", sum);
     println!("dot: {:?}", dot);
 }
-
