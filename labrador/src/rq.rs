@@ -2,15 +2,18 @@
 //
 //
 // Currently implemented functions include:
-// - Polynomial addition:         +
-// - Polynomial multiplication:   *
-// - inner_product/ Dot product:  inner_product()
-// - Polynomial subtraction:      -
-// - Polynomial negation:         neg()
-// - Scalar multiplication:       scalar_mul()
-// - Polynomial evaluation:       eval()
-// - Zero check:                  is_zero()
-// - Polynomial equality check:   is_equal()
+// - Polynomial addition:          +
+// - Polynomial multiplication:    *
+// - inner_product/ Dot product:   inner_product()
+// - Polynomial subtraction:       -
+// - Polynomial negation:          neg()
+// - Scalar multiplication:        scalar_mul()
+// - Polynomial evaluation:        eval()
+// - Zero check:                   is_zero()
+// - Polynomial equality check:    is_equal()
+// - Get the Coefficients:         get_coefficients()
+// - Random small norm vector:     random_small_vector()
+// - Squared norm of coefficients: compute_norm_squared()
 //
 // Further operations and optimizations will be added in future versions.
 
@@ -19,6 +22,7 @@ use crate::zq::Zq;
 use core::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 use rand::distr::{Distribution, Uniform};
 use rand::{CryptoRng, Rng};
+use std::iter::Sum;
 
 /// This module provides implementations for various operations
 /// in the polynomial ring R = Z_q\[X\] / (X^d + 1).
@@ -31,6 +35,10 @@ impl<const D: usize> Rq<D> {
     /// Constructor for the polynomial ring
     pub const fn new(coeffs: [Zq; D]) -> Self {
         Rq { coeffs }
+    }
+    /// Get the coefficients as a vector
+    pub fn get_coefficients(&self) -> Vec<Zq> {
+        self.coeffs.to_vec()
     }
 
     /// Polynomial addition
@@ -148,6 +156,34 @@ impl<const D: usize> Rq<D> {
         Rq::new(coeffs)
     }
 
+    /// TEMPORARY FUNCTION (TO BE REPLACED FOR RANDOM TERNARY)
+    pub fn random_small() -> Self {
+        let mut rng = rand::rng();
+        let mut coeffs = [Zq::ZERO; D];
+
+        for coeff in coeffs.iter_mut() {
+            // Explicitly sample from {-1, 0, 1} with equal probability
+            let val = match rng.random_range(0..3) {
+                0 => Zq::Q.wrapping_sub(1), // -1 mod q
+                1 => 0,                     // 0
+                2 => 1,                     // 1
+                _ => unreachable!(),
+            };
+            *coeff = Zq::new(val);
+        }
+
+        Rq::new(coeffs)
+    }    
+
+    /// Generate a vector of random small polynomial for commitments of size n
+    pub fn random_small_vector(n: usize) -> Vec<Self> {
+        let mut v: Vec<Self> = Vec::new();
+        for _ in 0..n {
+            v.push(Self::random_small());
+        }
+        v
+    }
+
     /// Encode message into polynomial with small coefficients.
     ///
     /// # Arguments
@@ -185,6 +221,15 @@ impl<const D: usize> Rq<D> {
 
     pub const fn zero() -> Self {
         Self::new([Zq::ZERO; D])
+    }
+
+    // Compute the squared norm of a vector of polynomials
+    pub fn compute_norm_squared(polynomials: &[Rq<D>]) -> Zq {
+        polynomials
+            .iter()
+            .flat_map(|poly| poly.get_coefficients()) // Collect coefficients from all polynomials
+            .map(|coeff| coeff * coeff)
+            .sum()
     }
 }
 
@@ -226,6 +271,17 @@ impl<const D: usize> From<Vec<Zq>> for Rq<D> {
             }
         }
         Rq::new(temp)
+    }
+}
+
+
+impl Sum for Zq {
+    // Accumulate using the addition operator
+    fn sum<I>(iter: I) -> Self
+    where
+        I: Iterator<Item = Zq>,
+    {
+        iter.fold(Zq::ZERO, |acc, x| acc + x)
     }
 }
 
@@ -477,4 +533,31 @@ mod tests {
         let encoded_empty = Rq::<4>::encode_message(&empty_message).unwrap();
         assert!(encoded_empty.is_zero());
     }
+
+    // Test coefficient extraction
+    #[test]
+    fn test_get_coefficient() {
+        let poly: Rq<4> = vec![Zq::new(1), Zq::zero(), Zq::new(5), Zq::MAX].into();
+        let vec = vec![Zq::new(1), Zq::zero(), Zq::new(5), Zq::MAX];
+        assert!(poly.get_coefficients() == vec);
+
+        let poly_zero: Rq<4> = vec![Zq::zero(), Zq::zero(), Zq::zero(), Zq::zero()].into();
+        let vec_zero = vec![Zq::zero(), Zq::zero(), Zq::zero(), Zq::zero()];
+        assert!(poly_zero.get_coefficients() == vec_zero);
+    }
+
+    // Test the square of the norm
+    #[test]
+    fn test_norm() {
+        let poly: Rq<4> = vec![Zq::new(1), Zq::zero(), Zq::new(5), Zq::MAX].into();
+        let result = Zq::new(27);
+        assert!(Rq::compute_norm_squared(&[poly]).value() == result.value());
+
+        let poly2: Rq<4> = vec![Zq::new(5), Zq::new(1), Zq::MAX, Zq::zero()].into();
+        assert!(Rq::compute_norm_squared(&[poly2]).value() == result.value());
+
+        let poly_zero: Rq<4> = vec![Zq::zero(), Zq::zero(), Zq::zero(), Zq::zero()].into();
+        let result_zero = Zq::zero();
+        assert!(Rq::compute_norm_squared(&[poly_zero]).value() == result_zero.value());
+    }    
 }
