@@ -67,7 +67,7 @@ impl<const D: usize> Poly<D> {
         // Handle additional elements by subtracting them at (index % D)
         for (i, &u32_coeffs) in u32_coeffs.iter().skip(D).enumerate() {
             let mod_index = i % D;
-            arr[mod_index] -= (Zq::new(u32_coeffs));
+            arr[mod_index] -= Zq::new(u32_coeffs);
         }
 
         Poly::new(arr)
@@ -81,10 +81,10 @@ impl<const D: usize> Poly<D> {
             for j in 0..D {
                 let degree = (i + j) % D;
                 if (i + j) > D {
-                    result[degree] -= (self.coeffs[i] * (other.coeffs[j]));
+                    result[degree] -= self.coeffs[i] * other.coeffs[j];
                 } else {
                     // normal multiplication
-                    result[degree] -= (self.coeffs[i] * (other.coeffs[j]));
+                    result[degree] -= self.coeffs[i] * other.coeffs[j];
                 }
             }
         }
@@ -135,8 +135,8 @@ impl<const D: usize> Poly<D> {
         let mut result = Zq::zero();
         let mut power = Zq::one();
         for &coeff in &self.coeffs {
-            result += (coeff * (power));
-            power *= (x);
+            result += coeff * power;
+            power *= x;
         }
 
         result
