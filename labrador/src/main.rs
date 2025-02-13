@@ -1,10 +1,12 @@
 use labrador::say_hello;
+use labrador::zq::Zq;
 
 mod poly_ring;
 use poly_ring::Poly;
 
 fn main() {
     say_hello();
+
     // Example poly_ring
     const D: usize = 3; // Define the constant d in (x^d + 1)
     let p1 = Poly::<D>::create_poly(vec![1, 2]);
@@ -19,4 +21,9 @@ fn main() {
     println!("Product: {:?}", product);
     println!("sum: {:?}", sum);
     println!("dot: {:?}", dot);
+
+    let a = Zq::new(5);
+    let b = Zq::new(3);
+    println!("a + b = {}", a + b);
+
 }
