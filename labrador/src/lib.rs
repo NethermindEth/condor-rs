@@ -15,6 +15,8 @@
 // Amortization
 #![doc = include_str!("../../doc/amortization.md")]
 
+pub mod zq;
+
 /// Prints a "Hello, world!" message
 pub fn say_hello() {
     println!("Hello, world!");
