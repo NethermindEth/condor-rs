@@ -2,15 +2,15 @@ use labrador::say_hello;
 use labrador::zq::Zq;
 
 mod poly_ring;
-use poly_ring::Poly;
+use poly_ring::Rq;
 
 fn main() {
     say_hello();
 
     // Example poly_ring
     const D: usize = 3; // Define the constant d in (x^d + 1)
-    let p1 = Poly::<D>::create_poly(vec![1, 2]);
-    let p2 = Poly::<D>::create_poly(vec![1]);
+    let p1 = Rq::<D>::create_poly(vec![1, 2]);
+    let p2 = Rq::<D>::create_poly(vec![1]);
     // Perform polynomial multiplication
     let product = p1.mul(&p2);
 
