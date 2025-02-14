@@ -3,6 +3,7 @@
 // Main Introduction
 
 #![forbid(unsafe_code)]
+#![deny(clippy::as_conversions)]
 #![doc = include_str!("../../doc/mainpage-doc.md")]
 // Arithmetic Circuit Translation
 #![doc = include_str!("../../doc/arithmetic_circuit_translation.md")]
