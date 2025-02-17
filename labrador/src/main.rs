@@ -28,9 +28,6 @@ fn main() {
     // Perform scalar multiplication
     let scalar_multiplication = p1.scalar_mul(Zq::new(2));
 
-    // Perform division by a monomial
-    let monomial_division = p1.div_by_monomial(2);
-
     // Evaluate the polynomial at x = 2
     let evaluation = p1.eval(Zq::new(2));
 
@@ -47,7 +44,6 @@ fn main() {
     println!("Dot product: {:?}", dot);
     println!("Negation: {:?}", negation);
     println!("Scalar multiplication: {:?}", scalar_multiplication);
-    println!("Monomial division: {:?}", monomial_division);
     println!("Evaluation at x=2: {:?}", evaluation);
     println!("Is zero polynomial: {:?}", zero_check);
     println!("Are polynomials equal: {:?}", are_equal);

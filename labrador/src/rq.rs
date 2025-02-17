@@ -10,7 +10,6 @@
 // - Polynomial subtraction:      -
 // - Polynomial negation:         neg()
 // - Scalar multiplication:       scalar_mul()
-// - Division by monomials:       div_by_monomial()
 // - Polynomial evaluation:       eval()
 // - Zero check:                  is_zero()
 // - Polynomial equality check:   is_equal()
@@ -256,17 +255,6 @@ mod tests {
         assert_eq!(
             result.coeffs,
             [Zq::new(2), Zq::new(4), Zq::new(6), Zq::new(8)]
-        );
-    }
-
-    // Test division by monomials
-    #[test]
-    fn test_div_by_monomial() {
-        let poly: Rq<4> = vec![Zq::new(1), Zq::new(2), Zq::new(3), Zq::new(4)].into();
-        let result = poly.div_by_monomial(2);
-        assert_eq!(
-            result.coeffs,
-            [Zq::new(3), Zq::new(4), Zq::new(1), Zq::new(2)]
         );
     }
 
