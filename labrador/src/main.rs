@@ -1,7 +1,6 @@
 use labrador::say_hello;
 use labrador::zq::Zq;
 
-
 mod rq;
 use rq::Rq;
 
@@ -48,7 +47,7 @@ fn main() {
     println!("Evaluation at x=2: {:?}", evaluation);
     println!("Is zero polynomial: {:?}", zero_check);
     println!("Are polynomials equal: {:?}", are_equal);
-  
+
     let a = Zq::new(5);
     let b = Zq::new(3);
     println!("a + b = {}", a + b);
