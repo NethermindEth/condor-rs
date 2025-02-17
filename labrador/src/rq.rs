@@ -56,41 +56,20 @@ impl<const D: usize> Rq<D> {
         Rq::new(result)
     }
 
-    // Create a Polynomial from a vector
-    pub fn create_poly(coeffs: Vec<i32>) -> Rq<D> {
-        let mut arr = [Zq::zero(); D];
-        let u32_coeffs: Vec<u32> = coeffs.iter().map(|&coeff| coeff as u32).collect();
-        // First D elements are assigned directly
-        for (i, &u32_coeffs) in u32_coeffs.iter().take(D).enumerate() {
-            arr[i] = Zq::new(u32_coeffs);
-        }
 
-        // Handle additional elements by subtracting them at (index % D)
-        for (i, &u32_coeffs) in u32_coeffs.iter().skip(D).enumerate() {
-            let mod_index = i % D;
-            arr[mod_index] -= Zq::new(u32_coeffs);
-        }
-
-        Rq::new(arr)
-    }
 
     // Polynomial multiplication modulo x^D + 1
     pub fn _mul(&self, other: &Self) -> Self {
-        let mut result = [Zq::zero(); D];
-
+        // Replace conditional subtraction with full reduction:
+        let mut temp = vec![Zq::zero(); 2 * D - 1];
         for i in 0..D {
             for j in 0..D {
-                let degree = (i + j) % D;
-                if (i + j) > D {
-                    result[degree] -= self.coeffs[i] * other.coeffs[j];
-                } else {
-                    // normal multiplication
-                    result[degree] -= self.coeffs[i] * other.coeffs[j];
-                }
+                temp[i + j] += self.coeffs[i] * other.coeffs[j];
             }
         }
+        let result: Rq<D> = temp.into();
 
-        Rq::new(result)
+        result
     }
 
     // Dot product between coefficients
@@ -120,16 +99,7 @@ impl<const D: usize> Rq<D> {
         Rq::new(result)
     }
 
-    // (Division by monomial) X^k | performing a cyclic right shift
-    pub fn div_by_monomial(&self, k: usize) -> Self {
-        let mut result = [Zq::zero(); D];
-        for (i, &coeff) in self.coeffs.iter().enumerate() {
-            // (k-shift)
-            let new_index = (i + k) % D;
-            result[new_index] = coeff;
-        }
-        Rq::new(result)
-    }
+
 
     // Evaluate the polynomial at a specific point
     pub fn eval(&self, x: Zq) -> Zq {
@@ -160,14 +130,14 @@ macro_rules! impl_arithmetic {
             type Output = Self;
 
             fn $method(self, rhs: Self) -> Self::Output {
-                self.$op_method(&rhs) // Pass rhs by value
+                self.$op_method(&rhs)
             }
         }
 
         impl<const D: usize> $assign_trait for Rq<{ D }> {
             fn $assign_method(&mut self, rhs: Self) {
-                let result = self.$op_method(&rhs); // Use your custom method
-                self.coeffs = result.coeffs; // Assign the resulting coefficients
+                let result = self.$op_method(&rhs); 
+                self.coeffs = result.coeffs;
             }
         }
     };
@@ -182,7 +152,7 @@ impl<const D: usize> From<Vec<Zq>> for Rq<D> {
     fn from(vec: Vec<Zq>) -> Self {
         let mut temp = [Zq::zero(); D];
         // Process excess terms with sign adjustment
-        for i in (D..vec.len()).rev() {
+        for i in (0..vec.len()).rev() {
             let m = i / D;
             let r = i % D;
             let sign = if m % 2 == 0 { 1 } else { -1 };
@@ -192,8 +162,7 @@ impl<const D: usize> From<Vec<Zq>> for Rq<D> {
                 temp[r] -= vec[i];
             }
         }
-        let coeffs = temp[0..D].try_into().unwrap();
-        Rq::new(coeffs)
+        Rq::new(temp)
     }
 }
 
@@ -211,32 +180,21 @@ mod tests {
         );
 
         // Positive coefficients
-        let poly_from_vec = Rq::<4>::create_poly(vec![1, 2, 3, 4]);
+        let poly_from_vec: Rq<4> = vec![Zq::new(1), Zq::new(2), Zq::new(3), Zq::new(4)].into();
         assert_eq!(
             poly_from_vec.coeffs,
             [Zq::new(1), Zq::new(2), Zq::new(3), Zq::new(4)]
         );
 
-        // Negative coefficients
-        let poly_from_vec_negative = Rq::<4>::create_poly(vec![-1, -2, -3, -4]);
-        let u32_max = u32::MAX;
-        assert_eq!(
-            poly_from_vec_negative.coeffs,
-            [
-                Zq::new(u32_max),
-                Zq::new(u32_max - 1),
-                Zq::new(u32_max - 2),
-                Zq::new(u32_max - 3)
-            ]
-        );
+
     }
 
     // Test addition of polynomials
     #[test]
     fn test_add() {
         // within bounds
-        let poly1 = Rq::<4>::create_poly(vec![1, 2, 3, 4]);
-        let poly2 = Rq::<4>::create_poly(vec![4, 3, 2, 1]);
+        let poly1: Rq<4> = vec![Zq::new(1), Zq::new(2), Zq::new(3), Zq::new(4)].into();
+        let poly2: Rq<4> = vec![Zq::new(4), Zq::new(3), Zq::new(2), Zq::new(1)].into();
         let result = poly1 + poly2;
         assert_eq!(
             result.coeffs,
@@ -244,7 +202,7 @@ mod tests {
         );
 
         // Outside of bounds
-        let poly3 = Rq::<4>::create_poly(vec![1, 2, 3, 4]);
+        let poly3: Rq<4> = vec![Zq::new(1), Zq::new(2), Zq::new(3), Zq::new(4)].into();
         let poly4 = Rq::<4>::new([Zq::new(u32::MAX), Zq::new(3), Zq::new(u32::MAX), Zq::new(1)]);
         let result2 = poly3 + poly4;
         assert_eq!(
@@ -257,8 +215,8 @@ mod tests {
     #[test]
     fn test_sub() {
         // within bounds
-        let poly1 = Rq::<4>::create_poly(vec![5, 10, 15, 20]);
-        let poly2 = Rq::<4>::create_poly(vec![2, 4, 6, 8]);
+        let poly1: Rq<4> = vec![Zq::new(5), Zq::new(10), Zq::new(15), Zq::new(20)].into();
+        let poly2: Rq<4> = vec![Zq::new(2), Zq::new(4), Zq::new(6), Zq::new(8)].into();
         let result = poly1 - poly2;
         assert_eq!(
             result.coeffs,
@@ -266,8 +224,8 @@ mod tests {
         );
 
         // Outside of bounds
-        let poly3 = Rq::<4>::create_poly(vec![1, 1, 3, 2]);
-        let poly4 = Rq::<4>::create_poly(vec![2, 4, 6, 8]);
+        let poly3: Rq<4> = vec![Zq::new(1), Zq::new(1), Zq::new(3), Zq::new(2)].into();
+        let poly4: Rq<4> = vec![Zq::new(2), Zq::new(4), Zq::new(6), Zq::new(8)].into();
         let result2 = poly3 - poly4;
         assert_eq!(
             result2.coeffs,
@@ -283,7 +241,7 @@ mod tests {
     // Test negation of polynomial
     #[test]
     fn test_neg() {
-        let poly = Rq::<4>::create_poly(vec![1, 2, 3, 4]);
+        let poly: Rq<4> = vec![Zq::new(1), Zq::new(2), Zq::new(3), Zq::new(4)].into();
         let result = poly.neg();
         assert_eq!(
             result.coeffs,
@@ -299,7 +257,7 @@ mod tests {
     // Test scalar multiplication
     #[test]
     fn test_scalar_mul() {
-        let poly = Rq::<4>::create_poly(vec![1, 2, 3, 4]);
+        let poly: Rq<4> = vec![Zq::new(1), Zq::new(2), Zq::new(3), Zq::new(4)].into();
         let result = poly.scalar_mul(Zq::new(2));
         assert_eq!(
             result.coeffs,
@@ -310,7 +268,7 @@ mod tests {
     // Test division by monomials
     #[test]
     fn test_div_by_monomial() {
-        let poly = Rq::<4>::create_poly(vec![1, 2, 3, 4]);
+        let poly: Rq<4> = vec![Zq::new(1), Zq::new(2), Zq::new(3), Zq::new(4)].into();
         let result = poly.div_by_monomial(2);
         assert_eq!(
             result.coeffs,
@@ -321,7 +279,7 @@ mod tests {
     // Test polynomial evaluation
     #[test]
     fn test_eval() {
-        let poly = Rq::<4>::create_poly(vec![1, 2, 3, 4]);
+        let poly: Rq<4> = vec![Zq::new(1), Zq::new(2), Zq::new(3), Zq::new(4)].into();
         let result = poly.eval(Zq::new(2));
         assert_eq!(result, Zq::new(49));
     }
@@ -329,9 +287,9 @@ mod tests {
     // Test equality check
     #[test]
     fn test_is_equal() {
-        let poly1 = Rq::<4>::create_poly(vec![1, 2, 3, 4]);
-        let poly2 = Rq::<4>::create_poly(vec![1, 2, 3, 4]);
-        let poly3 = Rq::<4>::create_poly(vec![4, 3, 2, 1]);
+        let poly1: Rq<4> = vec![Zq::new(1), Zq::new(2), Zq::new(3), Zq::new(4)].into();
+        let poly2: Rq<4> = vec![Zq::new(1), Zq::new(2), Zq::new(3), Zq::new(4)].into();
+        let poly3: Rq<4> = vec![Zq::new(4), Zq::new(3), Zq::new(2), Zq::new(1)].into();
         assert!(poly1.is_equal(&poly2));
         assert!(!poly1.is_equal(&poly3));
     }
@@ -339,8 +297,8 @@ mod tests {
     // Test zero polynomial check
     #[test]
     fn test_is_zero_poly() {
-        let zero_poly = Rq::<4>::create_poly(vec![0, 0, 0, 0]);
-        let non_zero_poly = Rq::<4>::create_poly(vec![1, 0, 0, 0]);
+        let zero_poly: Rq<4> = vec![Zq::zero();4].into();
+        let non_zero_poly: Rq<4> = vec![Zq::new(1), Zq::zero(), Zq::zero(), Zq::zero()].into();
         assert!(zero_poly.is_zero());
         assert!(!non_zero_poly.is_zero());
     }

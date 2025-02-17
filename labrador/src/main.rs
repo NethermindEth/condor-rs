@@ -8,9 +8,8 @@ fn main() {
     say_hello();
 
     // Example poly_ring
-    const D: usize = 3; // Define the constant d in (x^d + 1)
-    let p1 = Rq::<D>::create_poly(vec![1, 2]);
-    let p2 = Rq::<D>::create_poly(vec![1]);
+    let p1: Rq<2> = vec![Zq::new(1), Zq::new(2)].into();
+    let p2: Rq<2> = vec![Zq::new(1), Zq::new(1)].into();
     // Perform polynomial multiplication
     let product = p1 * p2;
 
