@@ -56,8 +56,6 @@ impl<const D: usize> Rq<D> {
         Rq::new(result)
     }
 
-
-
     // Polynomial multiplication modulo x^D + 1
     pub fn _mul(&self, other: &Self) -> Self {
         // Replace conditional subtraction with full reduction:
@@ -99,8 +97,6 @@ impl<const D: usize> Rq<D> {
         Rq::new(result)
     }
 
-
-
     // Evaluate the polynomial at a specific point
     pub fn eval(&self, x: Zq) -> Zq {
         let mut result = Zq::zero();
@@ -136,7 +132,7 @@ macro_rules! impl_arithmetic {
 
         impl<const D: usize> $assign_trait for Rq<{ D }> {
             fn $assign_method(&mut self, rhs: Self) {
-                let result = self.$op_method(&rhs); 
+                let result = self.$op_method(&rhs);
                 self.coeffs = result.coeffs;
             }
         }
@@ -185,8 +181,6 @@ mod tests {
             poly_from_vec.coeffs,
             [Zq::new(1), Zq::new(2), Zq::new(3), Zq::new(4)]
         );
-
-
     }
 
     // Test addition of polynomials
@@ -297,7 +291,7 @@ mod tests {
     // Test zero polynomial check
     #[test]
     fn test_is_zero_poly() {
-        let zero_poly: Rq<4> = vec![Zq::zero();4].into();
+        let zero_poly: Rq<4> = vec![Zq::zero(); 4].into();
         let non_zero_poly: Rq<4> = vec![Zq::new(1), Zq::zero(), Zq::zero(), Zq::zero()].into();
         assert!(zero_poly.is_zero());
         assert!(!non_zero_poly.is_zero());
