@@ -1,8 +1,8 @@
 use labrador::say_hello;
 use labrador::zq::Zq;
 
-mod poly_ring;
-use poly_ring::Rq;
+mod rq;
+use rq::Rq;
 
 fn main() {
     say_hello();
@@ -12,13 +12,13 @@ fn main() {
     let p1 = Rq::<D>::create_poly(vec![1, 2]);
     let p2 = Rq::<D>::create_poly(vec![1]);
     // Perform polynomial multiplication
-    let product = p1.mul(&p2);
+    let product = p1 * p2;
 
     // Perform polynomial addition
-    let sum = p1.add(&p2);
+    let sum = p1 + p2;
 
     // Perform polynomial subtraction
-    let sub = p1.sub(&p2);
+    let sub = p1 - p2;
 
     // Compute the dot product between the polynomial coefficients
     let dot = p1.inner_product(&p2);
