@@ -233,7 +233,7 @@ mod tests {
             result3.coeffs,
             [Zq::new(1), Zq::new(2), Zq::new(3), Zq::new(4)]
         );
-        // Addition with high coefficeints
+        // Addition with high coefficients
         let poly7: Rq<4> = vec![Zq::new(1), Zq::new(2), Zq::new(3), Zq::new(u32::MAX)].into();
         let poly8: Rq<4> = vec![
             Zq::new(u32::MAX),
