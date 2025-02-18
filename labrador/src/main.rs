@@ -8,8 +8,8 @@ fn main() {
     say_hello();
 
     // Example poly_ring
-    let p1: Rq<2> = vec![Zq::new(1), Zq::new(2)].into();
-    let p2: Rq<2> = vec![Zq::new(1), Zq::new(1)].into();
+    let p1: Rq<2> = vec![Zq::new(1)].into();
+    let p2: Rq<2> = vec![Zq::new(2), Zq::new(1), Zq::new(1)].into();
     // Perform polynomial multiplication
     let product = p1 * p2;
 
