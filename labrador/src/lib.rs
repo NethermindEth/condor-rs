@@ -16,6 +16,8 @@
 // Amortization
 #![doc = include_str!("../../doc/amortization.md")]
 
+pub mod rq;
+
 pub mod zq;
 
 /// Prints a "Hello, world!" message

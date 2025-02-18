@@ -1,8 +1,6 @@
+use labrador::rq::Rq;
 use labrador::say_hello;
 use labrador::zq::Zq;
-
-mod rq;
-use rq::Rq;
 
 fn main() {
     say_hello();

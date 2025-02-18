@@ -1,7 +1,5 @@
 // This file is part of the polynomial ring operations module.
 //
-// This module provides implementations for various operations
-// in the polynomial ring R = Z_q[X] / (X^d + 1).
 //
 // Currently implemented functions include:
 // - Polynomial addition:         +
@@ -17,9 +15,10 @@
 // Further operations and optimizations will be added in future versions.
 
 // We use the Zq ring
-use labrador::zq::Zq;
+use crate::zq::Zq;
 use std::ops::{Add, AddAssign, Mul, MulAssign, Sub, SubAssign};
-
+/// This module provides implementations for various operations
+/// in the polynomial ring R = Z_q\[X\] / (X^d + 1).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Rq<const D: usize> {
     coeffs: [Zq; D],
