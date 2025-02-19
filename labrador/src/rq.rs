@@ -19,7 +19,7 @@ use crate::zq::Zq;
 use std::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 /// This module provides implementations for various operations
 /// in the polynomial ring R = Z_q\[X\] / (X^d + 1).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Rq<const D: usize> {
     coeffs: [Zq; D],
 }
@@ -325,8 +325,8 @@ mod tests {
         // Subtraction with zero polynomial
         let poly5: Rq<4> = vec![Zq::new(1), Zq::new(2), Zq::new(3), Zq::new(4)].into();
         let poly6: Rq<4> = vec![Zq::zero()].into();
-        let result3 = poly6 - poly5;
-        let result4 = poly5 - poly6;
+        let result3 = poly6.clone() - poly5.clone();
+        let result4 = poly5.clone() - poly6.clone();
         assert_eq!(
             result3.coeffs,
             [

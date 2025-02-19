@@ -9,19 +9,19 @@ fn main() {
     let p1: Rq<2> = vec![Zq::new(1)].into();
     let p2: Rq<2> = vec![Zq::new(2), Zq::new(1), Zq::new(1)].into();
     // Perform polynomial multiplication
-    let product = p1 * p2;
+    let product = p1.clone() * p2.clone();
 
     // Perform polynomial addition
-    let sum = p1 + p2;
+    let sum = p1.clone() + p2.clone();
 
     // Perform polynomial subtraction
-    let sub = p1 - p2;
+    let sub = p1.clone() - p2.clone();
 
     // Compute the dot product between the polynomial coefficients
-    let dot = p1.inner_product(&p2);
+    let dot = p1.clone().inner_product(&p2);
 
     // Negate the polynomial
-    let negation = -p1;
+    let negation = -p1.clone();
 
     // Perform scalar multiplication
     let scalar_multiplication = p1.scalar_mul(Zq::new(2));
