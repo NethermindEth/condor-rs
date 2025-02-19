@@ -31,7 +31,7 @@ impl<const D: usize> Rq<D> {
     }
 
     /// Polynomial addition
-    pub fn _add(&self, other: &Self) -> Self {
+    fn addition(&self, other: &Self) -> Self {
         let mut result = [Zq::zero(); D];
         for (r, (a, b)) in result
             .iter_mut()
@@ -43,7 +43,7 @@ impl<const D: usize> Rq<D> {
     }
 
     /// Polynomial subtraction
-    pub fn _sub(&self, other: &Self) -> Self {
+    fn subtraction(&self, other: &Self) -> Self {
         let mut result = [Zq::zero(); D];
         for (r, (a, b)) in result
             .iter_mut()
@@ -55,14 +55,30 @@ impl<const D: usize> Rq<D> {
     }
 
     /// Polynomial multiplication modulo x^D + 1
-    pub fn _mul(&self, other: &Self) -> Self {
-        let mut result: Vec<Zq> = vec![Zq::zero(); 2 * D - 1];
+    fn multiplication(&self, other: &Self) -> Self {
+        let mut result = [Zq::zero(); D];
+        let mut out_of_field = [Zq::zero(); D];
         for (i, &self_coeff) in self.coeffs.iter().enumerate() {
             for (j, &other_coeff) in other.coeffs.iter().enumerate() {
-                result[i + j] += self_coeff * other_coeff;
+                if i + j < D {
+                    result[i + j] += self_coeff * other_coeff;
+                } else {
+                    out_of_field[(i + j) % D] += self_coeff * other_coeff;
+                }
             }
         }
-        result.into()
+        // Process excess terms with sign adjustment
+        for i in (0..D).rev() {
+            let m = i + D / D;
+            let r = i + D % D;
+            let sign = if m % 2 == 0 { 1 } else { -1 };
+            if sign == 1 {
+                result[r] += out_of_field[i];
+            } else {
+                result[r] -= out_of_field[i];
+            }
+        }
+        Rq::new(result)
     }
 
     /// Dot product between coefficients
@@ -95,10 +111,8 @@ impl<const D: usize> Rq<D> {
     /// Evaluate the polynomial at a specific point
     pub fn eval(&self, x: Zq) -> Zq {
         let mut result = Zq::zero();
-        let mut power = Zq::one();
-        for &coeff in &self.coeffs {
-            result += coeff * power;
-            power *= x;
+        for coeff in self.coeffs.iter().rev() {
+            result = result * x + *coeff;
         }
 
         result
@@ -134,9 +148,9 @@ macro_rules! impl_arithmetic {
     };
 }
 
-impl_arithmetic!(Add, AddAssign, add, add_assign, _add);
-impl_arithmetic!(Sub, SubAssign, sub, sub_assign, _sub);
-impl_arithmetic!(Mul, MulAssign, mul, mul_assign, _mul);
+impl_arithmetic!(Add, AddAssign, add, add_assign, addition);
+impl_arithmetic!(Sub, SubAssign, sub, sub_assign, subtraction);
+impl_arithmetic!(Mul, MulAssign, mul, mul_assign, multiplication);
 
 impl<const D: usize> From<Vec<Zq>> for Rq<D> {
     fn from(vec: Vec<Zq>) -> Self {

@@ -27,7 +27,7 @@ fn main() {
     let scalar_multiplication = p1.scalar_mul(Zq::new(2));
 
     // Evaluate the polynomial at x = 2
-    let evaluation = p1.eval(Zq::new(2));
+    let evaluation = p2.eval(Zq::new(2));
 
     // Check if the polynomial is the zero polynomial
     let zero_check = p1.is_zero();
