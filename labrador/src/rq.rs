@@ -71,7 +71,7 @@ impl<const D: usize> Rq<D> {
         for i in (0..D).rev() {
             let m = i / D;
             let r = i % D;
-            let sign = if m + 1 % 2 == 0 { 1 } else { -1 };
+            let sign = if (m + 1) % 2 == 0 { 1 } else { -1 };
             if sign == 1 {
                 result[r] += out_of_field[i];
             } else {
