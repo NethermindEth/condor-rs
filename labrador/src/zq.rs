@@ -1,5 +1,7 @@
+use core::ops::{Add, AddAssign, Mul, MulAssign, Sub, SubAssign};
+use rand::distr::uniform::{Error, SampleBorrow, SampleUniform, UniformInt, UniformSampler};
+use rand::prelude::*;
 use std::fmt;
-use std::ops::{Add, AddAssign, Mul, MulAssign, Sub, SubAssign};
 /// Represents an element in the ring Z/qZ where q = 2^32.
 /// Uses native u32 operations with automatic modulo reduction through wrapping arithmetic.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -11,26 +13,26 @@ pub struct Zq {
 impl Zq {
     /// Modulus q = 2^32 (stored as 0 in u32 due to wrapping behavior)
     pub const Q: u32 = u32::MAX.wrapping_add(1);
+    /// Zero element (additive identity)
+    pub const ZERO: Self = Self::new(0);
+    /// Multiplicative identity
+    pub const ONE: Self = Self::new(1);
+    /// Maximum element
+    pub const MAX: Self = Self::new(u32::MAX);
 
     /// Creates a new Zq element from a raw u32 value.
     /// No explicit modulo needed as u32 automatically wraps
-    pub fn new(value: u32) -> Self {
+    pub const fn new(value: u32) -> Self {
         Self { value }
     }
 
-    /// Zero element (additive identity)
-    pub fn zero() -> Self {
-        Self { value: 0 }
-    }
-
-    /// Multiplicative identity
-    pub fn one() -> Self {
-        Self { value: 1 }
-    }
-
     /// Returns the raw u32 value. Use with caution as it's modulo q.
-    pub fn value(&self) -> u32 {
+    pub const fn value(&self) -> u32 {
         self.value
+    }
+
+    pub const fn is_zero(&self) -> bool {
+        self.value == 0
     }
 }
 
@@ -70,6 +72,35 @@ impl fmt::Display for Zq {
     }
 }
 
+#[derive(Clone, Copy, Debug)]
+pub struct UniformZq(UniformInt<u32>);
+
+impl UniformSampler for UniformZq {
+    type X = Zq;
+
+    fn new<B1, B2>(low: B1, high: B2) -> Result<Self, Error>
+    where
+        B1: SampleBorrow<Self::X> + Sized,
+        B2: SampleBorrow<Self::X> + Sized,
+    {
+        UniformInt::<u32>::new(low.borrow().value(), high.borrow().value()).map(UniformZq)
+    }
+    fn new_inclusive<B1, B2>(low: B1, high: B2) -> Result<Self, Error>
+    where
+        B1: SampleBorrow<Self::X> + Sized,
+        B2: SampleBorrow<Self::X> + Sized,
+    {
+        UniformInt::<u32>::new_inclusive(low.borrow().value(), high.borrow().value()).map(UniformZq)
+    }
+    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> Self::X {
+        self.0.sample(rng).into()
+    }
+}
+
+impl SampleUniform for Zq {
+    type Sampler = UniformZq;
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -89,8 +120,8 @@ mod tests {
 
     #[test]
     fn test_wrapping_arithmetic() {
-        let a = Zq::new(u32::MAX);
-        let b = Zq::new(1);
+        let a = Zq::MAX;
+        let b = Zq::ONE;
 
         assert_eq!((a + b).value(), 0, "u32::MAX + 1 should wrap to 0");
         assert_eq!(
@@ -102,8 +133,8 @@ mod tests {
 
     #[test]
     fn test_subtraction_edge_cases() {
-        let max = Zq::new(u32::MAX);
-        let one = Zq::new(1);
+        let max = Zq::MAX;
+        let one = Zq::ONE;
         let two = Zq::new(2);
 
         assert_eq!((one - max).value(), 2);
@@ -160,7 +191,7 @@ mod tests {
         assert_eq!(x.value(), u32::MAX - 4, "10 -= 15 should wrap to 2^32 - 5");
 
         // Test negative equivalent value in multiplication
-        let a = Zq::new(u32::MAX); // Represents -1 in mod 2^32 arithmetic
+        let a = Zq::MAX; // Represents -1 in mod 2^32 arithmetic
         let b = Zq::new(2);
         assert_eq!(
             (a * b).value(),
@@ -172,9 +203,14 @@ mod tests {
     #[test]
     fn test_display_implementation() {
         let a = Zq::new(5);
-        let max = Zq::new(u32::MAX);
+        let max = Zq::MAX;
 
         assert_eq!(format!("{}", a), "5 (mod 2^32)");
         assert_eq!(format!("{}", max), "4294967295 (mod 2^32)");
+    }
+
+    #[test]
+    fn test_maximum_element() {
+        assert_eq!(Zq::MAX, Zq::ZERO - Zq::ONE);
     }
 }
