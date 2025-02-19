@@ -21,7 +21,7 @@ fn main() {
     let dot = p1.inner_product(&p2);
 
     // Negate the polynomial
-    let negation = p1.neg();
+    let negation = -p1;
 
     // Perform scalar multiplication
     let scalar_multiplication = p1.scalar_mul(Zq::new(2));

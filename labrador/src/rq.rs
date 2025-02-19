@@ -16,7 +16,7 @@
 
 // We use the Zq ring
 use crate::zq::Zq;
-use std::ops::{Add, AddAssign, Mul, MulAssign, Sub, SubAssign};
+use std::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 /// This module provides implementations for various operations
 /// in the polynomial ring R = Z_q\[X\] / (X^d + 1).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -90,15 +90,6 @@ impl<const D: usize> Rq<D> {
             .fold(Zq::zero(), |acc, x| acc + x)
     }
 
-    /// Polynomial negation
-    pub fn neg(&self) -> Self {
-        let mut result = [Zq::zero(); D];
-        for (i, &coeff) in self.coeffs.iter().enumerate() {
-            result[i] = Zq::zero() - coeff;
-        }
-        Rq::new(result)
-    }
-
     /// Scalar multiplication
     pub fn scalar_mul(&self, s: Zq) -> Self {
         let mut result = [Zq::zero(); D];
@@ -167,6 +158,20 @@ impl<const D: usize> From<Vec<Zq>> for Rq<D> {
             }
         }
         Rq::new(temp)
+    }
+}
+
+// Implementing the Neg trait
+impl<const D: usize> Neg for Rq<D> {
+    type Output = Self;
+
+    // Polynomial negation
+    fn neg(self) -> Self {
+        let mut result = [Zq::zero(); D];
+        for (i, &coeff) in self.coeffs.iter().enumerate() {
+            result[i] = Zq::zero() - coeff;
+        }
+        Rq::new(result)
     }
 }
 
@@ -341,7 +346,7 @@ mod tests {
     #[test]
     fn test_neg() {
         let poly: Rq<4> = vec![Zq::new(1), Zq::new(2), Zq::new(3), Zq::new(4)].into();
-        let result = poly.neg();
+        let result = -poly;
         assert_eq!(
             result.coeffs,
             [
