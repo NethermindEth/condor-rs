@@ -69,9 +69,9 @@ impl<const D: usize> Rq<D> {
         }
         // Process excess terms with sign adjustment
         for i in (0..D).rev() {
-            let m = i + D / D;
-            let r = i + D % D;
-            let sign = if m % 2 == 0 { 1 } else { -1 };
+            let m = i / D;
+            let r = i % D;
+            let sign = if m + 1 % 2 == 0 { 1 } else { -1 };
             if sign == 1 {
                 result[r] += out_of_field[i];
             } else {
@@ -268,17 +268,28 @@ mod tests {
     }
     // Test multiplication of polynomials
     #[test]
-    // Multiplication with wrapping
+
     fn test_mul() {
+        // Multiplication with wrapping
         let poly1: Rq<3> = vec![Zq::new(1), Zq::new(1), Zq::new(2)].into();
         let poly2: Rq<3> = vec![Zq::new(1), Zq::new(1)].into();
         let result = poly1 * poly2;
         assert_eq!(result.coeffs, [Zq::new(u32::MAX), Zq::new(2), Zq::new(3)]);
+
         // Multiplication with zero polynomial
         let poly3: Rq<3> = vec![Zq::new(1), Zq::new(1), Zq::new(2)].into();
         let poly4: Rq<3> = vec![Zq::zero()].into();
         let result2 = poly3 * poly4;
         assert_eq!(result2.coeffs, [Zq::zero(), Zq::zero(), Zq::zero()]);
+
+        // Multiplication with wrapping higher order
+        let poly5: Rq<3> = vec![Zq::new(1), Zq::new(1), Zq::new(2)].into();
+        let poly6: Rq<3> = vec![Zq::new(1), Zq::new(1), Zq::new(7), Zq::new(5)].into();
+        let result3 = poly5 * poly6;
+        assert_eq!(
+            result3.coeffs,
+            [Zq::new(u32::MAX - 12), Zq::new(u32::MAX - 16), Zq::zero()]
+        );
     }
 
     // Test subtraction of polynomials
