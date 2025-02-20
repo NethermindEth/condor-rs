@@ -86,7 +86,7 @@ impl<const D: usize> Rq<D> {
         self.coeffs
             .iter()
             .zip(other.coeffs.iter())
-            .map(|(&a, &b)| a * (b))
+            .map(|(&a, &b)| a * b)
             .fold(Zq::zero(), |acc, x| acc + x)
     }
 
@@ -165,7 +165,7 @@ impl<const D: usize> From<Vec<Zq>> for Rq<D> {
 impl<const D: usize> Neg for Rq<D> {
     type Output = Self;
 
-    // Polynomial negation
+    /// Polynomial negation
     fn neg(self) -> Self {
         let mut result = [Zq::zero(); D];
         for (i, &coeff) in self.coeffs.iter().enumerate() {
