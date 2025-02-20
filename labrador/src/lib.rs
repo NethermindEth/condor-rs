@@ -4,17 +4,17 @@
 
 #![forbid(unsafe_code)]
 #![deny(clippy::as_conversions)]
-#![doc = include_str!("../../doc/mainpage-doc.md")]
+#![doc = include_str!("../doc/mainpage-doc.md")]
 // Arithmetic Circuit Translation
-#![doc = include_str!("../../doc/arithmetic_circuit_translation.md")]
+#![doc = include_str!("../doc/arithmetic_circuit_translation.md")]
 // Ajtai Commitment
-#![doc = include_str!("../../doc/ajtai_commitment.md")]
+#![doc = include_str!("../doc/ajtai_commitment.md")]
 // Projections
-#![doc = include_str!("../../doc/projections.md")]
+#![doc = include_str!("../doc/projections.md")]
 // Aggregation
-#![doc = include_str!("../../doc/aggregation.md")]
+#![doc = include_str!("../doc/aggregation.md")]
 // Amortization
-#![doc = include_str!("../../doc/amortization.md")]
+#![doc = include_str!("../doc/amortization.md")]
 
 pub mod zq;
 
