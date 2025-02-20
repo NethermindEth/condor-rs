@@ -6,7 +6,7 @@ use rand::prelude::*;
 
 /// Projection matrix with values in {1,0,-1}
 pub struct ProjectionMatrix {
-    matrix: Vec<Vec<Zq>>, // 256 x nd matrix, entries -1 or 1 in Zq
+    matrix: Vec<Vec<Zq>>, // 256 x (nxd) matrix, entries -1 or 1 in Zq
 }
 
 impl ProjectionMatrix {
