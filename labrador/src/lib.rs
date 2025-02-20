@@ -16,8 +16,8 @@
 // Amortization
 #![doc = include_str!("../../doc/amortization.md")]
 
+pub mod jl;
 pub mod rq;
-
 pub mod zq;
 
 #[cfg(test)]

@@ -18,6 +18,10 @@ impl Zq {
         Self { value }
     }
 
+    pub fn to_f64(&self) -> f64 {
+        self.value as f64 // Correctly access the 'value' field
+    }
+
     /// Zero element (additive identity)
     pub fn zero() -> Self {
         Self { value: 0 }

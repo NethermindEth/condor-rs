@@ -29,6 +29,10 @@ impl<const D: usize> Rq<D> {
     pub fn new(coeffs: [Zq; D]) -> Self {
         Rq { coeffs }
     }
+    /// Function to get the coefficients as a slice of Zq
+    pub fn get_coefficients(&self) -> Vec<Zq> {
+        self.coeffs.to_vec()
+    }
 
     /// Polynomial addition
     fn addition(&self, other: &Self) -> Self {
@@ -158,6 +162,17 @@ impl<const D: usize> From<Vec<Zq>> for Rq<D> {
             }
         }
         Rq::new(temp)
+    }
+}
+use std::iter::Sum;
+
+impl Sum for Zq {
+    // Accumulate using the addition operator
+    fn sum<I>(iter: I) -> Self
+    where
+        I: Iterator<Item = Zq>,
+    {
+        iter.fold(Zq::zero(), |acc, x| acc + x)
     }
 }
 
