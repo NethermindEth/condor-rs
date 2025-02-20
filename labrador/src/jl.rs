@@ -11,8 +11,8 @@ pub struct ProjectionMatrix {
 
 impl ProjectionMatrix {
     /// Defines a matrix of size 256xnd
-    pub fn new(nd: usize) -> Self {
-        let mut matrix = vec![vec![Zq::zero(); nd]; 256];
+    pub fn new(N: usize) -> Self {
+        let mut matrix = vec![vec![Zq::zero(); N]; 256];
         let mut rng = rng();
         // Fill the matrix with random values from {-1, 0, 1}
         for row in matrix.iter_mut() {
