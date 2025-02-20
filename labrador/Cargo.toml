@@ -6,4 +6,3 @@ repository.workspace = true
 license.workspace = true
 
 [dependencies]
-base64 = "0.22.1"
