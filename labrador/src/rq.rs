@@ -11,6 +11,7 @@
 // - Polynomial evaluation:       eval()
 // - Zero check:                  is_zero()
 // - Polynomial equality check:   is_equal()
+// - Get the Coefficients:        get_coefficients()
 //
 // Further operations and optimizations will be added in future versions.
 
@@ -29,7 +30,7 @@ impl<const D: usize> Rq<D> {
     pub fn new(coeffs: [Zq; D]) -> Self {
         Rq { coeffs }
     }
-    /// Function to get the coefficients as a slice of Zq
+    /// Get the coefficients as a vector
     pub fn get_coefficients(&self) -> Vec<Zq> {
         self.coeffs.to_vec()
     }

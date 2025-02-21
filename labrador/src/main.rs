@@ -1,3 +1,4 @@
+use labrador::jl::compute_norm;
 use labrador::jl::generate_random_polynomials;
 use labrador::jl::ProjectionMatrix;
 use labrador::jl::ProjectionVector;
@@ -6,8 +7,8 @@ use labrador::zq::Zq;
 use rand::rngs::ThreadRng; // Import ThreadRng
 
 const D: usize = 4; // Degree of polynomials (you can change this to the required degree)
-const N: usize = 5; // Number of polynomials (you can adjust this as needed)
-const BETA: f64 = 50.0;
+const N: usize = 3; // Number of polynomials (you can adjust this as needed)
+const BETA: f64 = 500.0;
 
 fn main() {
     // Example poly_ring
@@ -58,18 +59,23 @@ fn main() {
     // Johnson Linderstrauss Projections
     // Example parameters
 
-    let mut rng = rand::rngs::ThreadRng::default(); // Corrected RNG instantiation
-
     // Generate the random polynomials
+    let mut rng = rand::rngs::ThreadRng::default();
     let polynomials = generate_random_polynomials::<ThreadRng, D>(N, &mut rng, BETA);
     let matrix = ProjectionMatrix::new(D * N);
     let projection = ProjectionVector::new(&matrix, &polynomials);
-    // Print the generated polynomials
-    for (i, poly) in polynomials.iter().enumerate() {
-        println!("Polynomial {}: {:?}", i + 1, poly);
-    }
-    println!("Projection: {:?}", projection);
-    // cqalcualte the norm of a vector of zq elements
-    // compare norms
-    // norms verification
+
+    // Print the generated polynomial Norms
+    println!(
+        "beta = {} | Polynomial Norm = {} | sqrt(128) * norm polynomials = {} | Projection Norm  = {}",BETA,
+        compute_norm(&polynomials),128.0_f64.sqrt() * compute_norm(&polynomials),projection.norm()
+    );
+
+    // Show Polynomials S_i
+    //for (i, poly) in polynomials.iter().enumerate() {
+    //    println!("polynomial {} = {:?}", i, poly);
+    //}
+
+    // Show projection elements
+    //println!("elements = {:?}", projection.get_projection())
 }

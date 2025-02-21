@@ -17,9 +17,9 @@ impl Zq {
     pub fn new(value: u32) -> Self {
         Self { value }
     }
-
+    /// Converts the internal value of Zq to an f64 value
     pub fn to_f64(&self) -> f64 {
-        self.value as f64 // Correctly access the 'value' field
+        self.value as f64
     }
 
     /// Zero element (additive identity)

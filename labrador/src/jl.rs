@@ -1,18 +1,17 @@
 use crate::rq::Rq;
 use crate::zq::Zq;
-use rand::rng;
-//use labrador::rq::Rq;
 use rand::prelude::*;
+use rand::rng;
 
-/// Projection matrix with values in {1,0,-1}
+/// Projection matrix with values in {1,0,-1} mod q
 pub struct ProjectionMatrix {
-    matrix: Vec<Vec<Zq>>, // 256 x (nxd) matrix, entries -1 or 1 in Zq
+    matrix: Vec<Vec<Zq>>,
 }
 
 impl ProjectionMatrix {
-    /// Defines a matrix of size 256xnd
-    pub fn new(N: usize) -> Self {
-        let mut matrix = vec![vec![Zq::zero(); N]; 256];
+    /// Defines a matrix of size 256xn
+    pub fn new(n: usize) -> Self {
+        let mut matrix = vec![vec![Zq::zero(); n]; 256];
         let mut rng = rng();
         // Fill the matrix with random values from {-1, 0, 1}
         for row in matrix.iter_mut() {
@@ -49,10 +48,18 @@ impl<const D: usize> ProjectionVector<D> {
         // Iterate over each Rq, extracting the coefficients and concatenating them
         for rq in rqs {
             let coeffs = rq.get_coefficients();
-            concatenated_coeffs.extend_from_slice(&coeffs); // Extend the Vec with the coefficients
+            concatenated_coeffs.extend_from_slice(&coeffs);
         }
 
         concatenated_coeffs
+    }
+    // Euclidean norm
+    pub fn norm(&self) -> f64 {
+        self.projection
+            .iter()
+            .map(|coeff| coeff.to_f64().powi(2))
+            .sum::<f64>()
+            .sqrt()
     }
 
     /// Calculates Projection  
@@ -74,12 +81,11 @@ impl<const D: usize> ProjectionVector<D> {
     }
 }
 
-/// Function to generate a random polynomial
-/// Returns a vector of `n` random polynomials, each of degree `d`
+/// Returns a vector of `n` random polynomials, each of degree `d`, for testing purposes.
 pub fn generate_random_polynomials<R: Rng, const D: usize>(
     n: usize,
     rng: &mut R,
-    beta: f64,
+    beta: f64, // vector norm bound
 ) -> Vec<Rq<D>> {
     let mut polynomials = Vec::with_capacity(n);
 
@@ -87,21 +93,18 @@ pub fn generate_random_polynomials<R: Rng, const D: usize>(
         loop {
             // Generate random coefficients
             let coeffs: [Zq; D] = std::array::from_fn(|_| {
-                let small_value: u32 = rng.random_range(0..100 as u32); // random value between 0 and 100 (as u322)
-                match small_value.try_into() {
-                    Ok(value) => Zq::new(value),
-                    Err(_) => {
-                        eprintln!("Failed to convert value: {}", small_value);
-                        Zq::new(0) // Default value in case of failure
-                    }
-                }
+                // Small values so we get a vector of 'small norm'
+                let small_value: u32 = rng.random_range(0..100);
+                Zq::new(small_value)
             });
 
             // Create the polynomial
             let polynomial = Rq::new(coeffs);
 
-            // Check the norm of the polynomial (assuming norm is some value you can compute)
-            let norm = compute_norm(&polynomial); // This function should compute the norm of the polynomial
+            // Compute the norm of all polynomials including the new one
+            let mut all_polynomials = polynomials.clone();
+            all_polynomials.push(polynomial.clone());
+            let norm = compute_norm(&all_polynomials);
 
             // If the norm is smaller than beta, add the polynomial to the list
             if norm < beta {
@@ -116,10 +119,67 @@ pub fn generate_random_polynomials<R: Rng, const D: usize>(
 }
 
 // Helper function to compute the norm of the polynomial
-fn compute_norm<const D: usize>(polynomial: &Rq<D>) -> f64 {
-    polynomial
-        .get_coefficients()
+pub fn compute_norm<const D: usize>(polynomials: &Vec<Rq<D>>) -> f64 {
+    polynomials
         .iter()
-        .map(|&coeff| coeff.to_f64())
-        .sum()
+        .flat_map(|poly| poly.get_coefficients()) // Collect coefficients from all polynomials
+        .map(|coeff| coeff.to_f64().powi(2))
+        .sum::<f64>()
+        .sqrt()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rand::rngs::ThreadRng;
+    use rand::Rng;
+
+    // Norm size error
+    #[test]
+    fn norm_distance() {
+        for _ in 0..5 {
+            let mut rng = rand::rngs::ThreadRng::default();
+
+            // Generate random values for n and beta at runtime
+            const D: usize = 4;
+            let n: usize = rng.random_range(3..5); // Random vector size between 3 and 10
+            let beta: f64 = rng.random_range(200..500) as f64; // 'Small' Random value for beta
+
+            // Generate random polynomials using d and n as runtime values
+            let polynomials = generate_random_polynomials::<ThreadRng, D>(n, &mut rng, beta);
+            let matrix = ProjectionMatrix::new(D * n);
+            let projection = ProjectionVector::new(&matrix, &polynomials);
+
+            assert!(
+                projection.norm() > 128.0_f64.sqrt() * compute_norm(&polynomials),
+                "This error message implies the Modular Johnson-Lindenstrauss Lemma is working"
+            );
+        }
+    }
+    // Average of norms error
+    #[test]
+    fn average_norm_distance() {
+        let mut rng = rand::rngs::ThreadRng::default();
+        const D: usize = 4;
+        let n: usize = 3;
+        let beta: f64 = 500 as f64;
+        let polynomials = generate_random_polynomials::<ThreadRng, D>(n, &mut rng, beta);
+        let mut norm_sum = 0.0;
+
+        for _ in 0..50 {
+            // Generate random projections
+            let matrix = ProjectionMatrix::new(D * n);
+            let projection = ProjectionVector::new(&matrix, &polynomials);
+            // Sum up the norms
+            norm_sum += projection.norm();
+        }
+
+        // Compute the average of the norms
+        let average_norm = norm_sum / 50.0;
+        // Assert that the average norm is greater than the expected value
+        assert!(
+            average_norm > 128.0_f64.sqrt() * compute_norm(&polynomials),
+            "This error message implies the Modular Johnson-Lindenstrauss Lemma is working"
+        );
+    }
 }
