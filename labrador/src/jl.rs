@@ -63,15 +63,15 @@ impl<const D: usize> ProjectionVector<D> {
     }
 
     /// Calculates Projection  
-    pub fn new(matrix: &ProjectionMatrix, s_i: &Vec<Rq<D>>) -> Self {
+    pub fn new(matrix: &ProjectionMatrix, s_i: &[Rq<D>]) -> Self {
         let mut projection = vec![Zq::zero(); 256];
-        let coefficients = Self::concatenate_coefficients(s_i.clone());
-        for i in 0..256 {
-            projection[i] = matrix.get_matrix()[i]
+        let coefficients = Self::concatenate_coefficients(s_i.to_vec());
+        for (i, item) in projection.iter_mut().enumerate().take(256) {
+            *item = matrix.get_matrix()[i]
                 .iter()
                 .zip(coefficients.iter())
                 .map(|(m, s)| *m * *s)
-                .sum();
+                .sum::<Zq>();
         }
         ProjectionVector { projection }
     }
@@ -119,7 +119,7 @@ pub fn generate_random_polynomials<R: Rng, const D: usize>(
 }
 
 // Helper function to compute the norm of the polynomial
-pub fn compute_norm<const D: usize>(polynomials: &Vec<Rq<D>>) -> f64 {
+pub fn compute_norm<const D: usize>(polynomials: &[Rq<D>]) -> f64 {
     polynomials
         .iter()
         .flat_map(|poly| poly.get_coefficients()) // Collect coefficients from all polynomials
@@ -143,7 +143,7 @@ mod tests {
             // Generate random values for n and beta at runtime
             const D: usize = 4;
             let n: usize = rng.random_range(3..5); // Random vector size between 3 and 10
-            let beta: f64 = rng.random_range(200..500) as f64; // 'Small' Random value for beta
+            let beta: f64 = rng.random_range(200.0..500.0); // 'Small' Random value for beta
 
             // Generate random polynomials using d and n as runtime values
             let polynomials = generate_random_polynomials::<ThreadRng, D>(n, &mut rng, beta);
@@ -162,7 +162,7 @@ mod tests {
         let mut rng = rand::rngs::ThreadRng::default();
         const D: usize = 4;
         let n: usize = 3;
-        let beta: f64 = 500 as f64;
+        let beta: f64 = 500_f64;
         let polynomials = generate_random_polynomials::<ThreadRng, D>(n, &mut rng, beta);
         let mut norm_sum = 0.0;
 
