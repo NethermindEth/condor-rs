@@ -1,0 +1,41 @@
+name: Rust CI 
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  # TODO remove docs publishing, when crate is published to crates.io
+  docs:
+    permissions:
+        contents: write
+    name: Documentation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Build documentation
+        run: RUSTDOCFLAGS="--html-in-header katex-header.html" cargo doc --no-deps -p labrador
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: target/doc
+
+  publish-docs:
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: docs
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

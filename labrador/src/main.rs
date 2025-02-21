@@ -1,8 +1,6 @@
 use labrador::rq::Rq;
-use labrador::say_hello;
 use labrador::zq::Zq;
 fn main() {
-    say_hello();
 
     // Example poly_ring
     let p1: Rq<2> = vec![Zq::new(1)].into();

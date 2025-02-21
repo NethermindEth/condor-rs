@@ -1,5 +1,9 @@
 # Condor-rs - post-quantum proof schemes and signatures
 
+## Crates
+
+* [Labrador](https://nethermindeth.github.io/condor-rs/labrador/) post-quantum proof system
+
 
 ## Development
 
@@ -17,16 +21,25 @@ git config commit.gpgsign true
 
 ### Code quality assurance
 
-Create a pre-push git hook with the contents:
+Install a pre-push git hook:
 
 ```sh
 git config core.hooksPath .githooks
 ```
-## Running the Rust Documentation Locally
+
+### Running the Rust Documentation Locally
 After cloning the repository, follow the instructions below to run the documentation locally:
+
 ```sh
 cargo doc
 ```
+
+Docs for `labrador`:
+
 ```sh
-RUSTDOCFLAGS="--html-in-header katex-header.html" cargo doc --no-deps --open
+RUSTDOCFLAGS="--html-in-header katex-header.html" cargo doc --no-deps -p labrador --open
 ```
+
+## License
+
+Apache 2.0
