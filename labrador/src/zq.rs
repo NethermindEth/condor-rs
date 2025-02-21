@@ -19,7 +19,7 @@ impl Zq {
     }
     /// Converts the internal value of Zq to an f64 value
     pub fn to_f64(&self) -> f64 {
-        self.value as f64
+        f64::from(self.value)
     }
 
     /// Zero element (additive identity)
