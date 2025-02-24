@@ -54,12 +54,12 @@ impl<const D: usize> ProjectionVector<D> {
         concatenated_coeffs
     }
     // Euclidean norm
-    pub fn norm(&self) -> f64 {
+    pub fn norm(&self) -> Zq {
         self.projection
             .iter()
-            .map(|coeff| coeff.to_f64().powi(2))
-            .sum::<f64>()
-            .sqrt()
+            .map(|coeff| *coeff * *coeff)
+            .sum()
+            
     }
 
     /// Calculates Projection  
@@ -85,7 +85,7 @@ impl<const D: usize> ProjectionVector<D> {
 pub fn generate_random_polynomials<R: Rng, const D: usize>(
     n: usize,
     rng: &mut R,
-    beta: f64, // vector norm bound
+    beta: Zq, // vector norm bound
 ) -> Vec<Rq<D>> {
     let mut polynomials = Vec::with_capacity(n);
 
@@ -107,7 +107,7 @@ pub fn generate_random_polynomials<R: Rng, const D: usize>(
             let norm = compute_norm(&all_polynomials);
 
             // If the norm is smaller than beta, add the polynomial to the list
-            if norm < beta {
+            if norm.value() < beta.value() {
                 polynomials.push(polynomial);
                 break; // Exit the loop as the polynomial is valid
             }
@@ -119,13 +119,12 @@ pub fn generate_random_polynomials<R: Rng, const D: usize>(
 }
 
 // Helper function to compute the norm of the polynomial
-pub fn compute_norm<const D: usize>(polynomials: &[Rq<D>]) -> f64 {
+pub fn compute_norm<const D: usize>(polynomials: &[Rq<D>]) -> Zq {
     polynomials
         .iter()
         .flat_map(|poly| poly.get_coefficients()) // Collect coefficients from all polynomials
-        .map(|coeff| coeff.to_f64().powi(2))
-        .sum::<f64>()
-        .sqrt()
+        .map(|coeff| coeff * coeff)
+        .sum()
 }
 
 #[cfg(test)]
@@ -143,7 +142,7 @@ mod tests {
             // Generate random values for n and beta at runtime
             const D: usize = 4;
             let n: usize = rng.random_range(3..5); // Random vector size between 3 and 10
-            let beta: f64 = rng.random_range(200.0..500.0); // 'Small' Random value for beta
+            let beta: Zq = Zq::new(rng.random_range(200..500)); // 'Small' Random value for beta
 
             // Generate random polynomials using d and n as runtime values
             let polynomials = generate_random_polynomials::<ThreadRng, D>(n, &mut rng, beta);
@@ -151,7 +150,7 @@ mod tests {
             let projection = ProjectionVector::new(&matrix, &polynomials);
 
             assert!(
-                projection.norm() > 128.0_f64.sqrt() * compute_norm(&polynomials),
+                projection.norm().value() < (Zq::new(128) * compute_norm(&polynomials)).value(),
                 "This error message implies the Modular Johnson-Lindenstrauss Lemma is working"
             );
         }
@@ -162,23 +161,24 @@ mod tests {
         let mut rng = rand::rngs::ThreadRng::default();
         const D: usize = 4;
         let n: usize = 3;
-        let beta: f64 = 500_f64;
+        let beta: Zq = Zq::new(500);
         let polynomials = generate_random_polynomials::<ThreadRng, D>(n, &mut rng, beta);
-        let mut norm_sum = 0.0;
+        let mut norm_sum: u32 = 0;
 
         for _ in 0..50 {
             // Generate random projections
             let matrix = ProjectionMatrix::new(D * n);
             let projection = ProjectionVector::new(&matrix, &polynomials);
             // Sum up the norms
-            norm_sum += projection.norm();
+            norm_sum += projection.norm().value();
         }
 
         // Compute the average of the norms
-        let average_norm = norm_sum / 50.0;
+        let amount: u32 = 50;
+        let average_norm = norm_sum / amount;
         // Assert that the average norm is greater than the expected value
         assert!(
-            average_norm > 128.0_f64.sqrt() * compute_norm(&polynomials),
+            average_norm < (Zq::new(128) * compute_norm(&polynomials)).value(),
             "This error message implies the Modular Johnson-Lindenstrauss Lemma is working"
         );
     }

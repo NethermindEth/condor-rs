@@ -8,7 +8,7 @@ use rand::rngs::ThreadRng; // Import ThreadRng
 
 const D: usize = 4; // Degree of polynomials (you can change this to the required degree)
 const N: usize = 3; // Number of polynomials (you can adjust this as needed)
-const BETA: f64 = 500.0;
+
 
 fn main() {
     // Example poly_ring
@@ -60,15 +60,16 @@ fn main() {
     // Example parameters
 
     // Generate the random polynomials
+    let beta: Zq = Zq::new(500);
     let mut rng = rand::rngs::ThreadRng::default();
-    let polynomials = generate_random_polynomials::<ThreadRng, D>(N, &mut rng, BETA);
+    let polynomials = generate_random_polynomials::<ThreadRng, D>(N, &mut rng, beta);
     let matrix = ProjectionMatrix::new(D * N);
     let projection = ProjectionVector::new(&matrix, &polynomials);
 
     // Print the generated polynomial Norms
     println!(
-        "beta = {} | Polynomial Norm = {} | sqrt(128) * norm polynomials = {} | Projection Norm  = {}",BETA,
-        compute_norm(&polynomials),128.0_f64.sqrt() * compute_norm(&polynomials),projection.norm()
+        "beta = {} | Polynomial Norm = {} | sqrt(128) * norm polynomials = {} | Projection Norm  = {}",beta,
+        compute_norm(&polynomials),Zq::new(128) * compute_norm(&polynomials),projection.norm()
     );
 
     // Show Polynomials S_i
