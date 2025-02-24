@@ -138,7 +138,7 @@ mod tests {
             // Generate random values for n and beta at runtime
             const D: usize = 4;
             let n: usize = rng.random_range(3..5); // Random vector size between 3 and 10
-            let beta: Zq = Zq::new(rng.random_range(200..500)); // 'Small' Random value for beta
+            let beta: Zq = Zq::new(rng.random_range(500..1000)); // 'Small' Random value for beta
 
             // Generate random polynomials using d and n as runtime values
             let polynomials = generate_random_polynomials::<ThreadRng, D>(n, &mut rng, beta);
