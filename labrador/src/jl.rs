@@ -55,11 +55,7 @@ impl<const D: usize> ProjectionVector<D> {
     }
     // Euclidean norm
     pub fn norm(&self) -> Zq {
-        self.projection
-            .iter()
-            .map(|coeff| *coeff * *coeff)
-            .sum()
-            
+        self.projection.iter().map(|coeff| *coeff * *coeff).sum()
     }
 
     /// Calculates Projection  

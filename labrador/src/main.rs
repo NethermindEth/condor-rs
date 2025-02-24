@@ -9,7 +9,6 @@ use rand::rngs::ThreadRng; // Import ThreadRng
 const D: usize = 4; // Degree of polynomials (you can change this to the required degree)
 const N: usize = 3; // Number of polynomials (you can adjust this as needed)
 
-
 fn main() {
     // Example poly_ring
     let p1: Rq<2> = vec![Zq::new(1)].into();
