@@ -2,22 +2,26 @@
 //
 //
 // Currently implemented functions include:
-// - Polynomial addition:         +
-// - Polynomial multiplication:   *
-// - inner_product/ Dot product:  inner_product()
-// - Polynomial subtraction:      -
-// - Polynomial negation:         neg()
-// - Scalar multiplication:       scalar_mul()
-// - Polynomial evaluation:       eval()
-// - Zero check:                  is_zero()
-// - Polynomial equality check:   is_equal()
-// - Get the Coefficients:        get_coefficients()
+// - Polynomial addition:          +
+// - Polynomial multiplication:    *
+// - inner_product/ Dot product:   inner_product()
+// - Polynomial subtraction:       -
+// - Polynomial negation:          neg()
+// - Scalar multiplication:        scalar_mul()
+// - Polynomial evaluation:        eval()
+// - Zero check:                   is_zero()
+// - Polynomial equality check:    is_equal()
+// - Get the Coefficients:         get_coefficients()
+// - Random small norm vector:     random_small_vector()
+// - Squared norm of coefficients: compute_norm_squared()
 //
 // Further operations and optimizations will be added in future versions.
 
 // We use the Zq ring
 use crate::zq::Zq;
+use rand::Rng;
 use std::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
+
 /// This module provides implementations for various operations
 /// in the polynomial ring R = Z_q\[X\] / (X^d + 1).
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -34,7 +38,6 @@ impl<const D: usize> Rq<D> {
     pub fn get_coefficients(&self) -> Vec<Zq> {
         self.coeffs.to_vec()
     }
-
     /// Polynomial addition
     fn addition(&self, other: &Self) -> Self {
         let mut result = [Zq::zero(); D];
@@ -122,6 +125,86 @@ impl<const D: usize> Rq<D> {
     /// Check if two polynomials are equal
     pub fn is_equal(&self, other: &Self) -> bool {
         self.coeffs == other.coeffs
+    }
+
+    /// Generate random small polynomial for commitments
+    pub fn random_small() -> Self {
+        let mut rng = rand::rng();
+        let mut coeffs = [Zq::zero(); D];
+
+        for coeff in coeffs.iter_mut() {
+            // Explicitly sample from {-1, 0, 1} with equal probability
+            let val = match rng.random_range(0..3) {
+                0 => Zq::Q.wrapping_sub(1), // -1 mod q
+                1 => 0,                     // 0
+                2 => 1,                     // 1
+                _ => unreachable!(),
+            };
+            *coeff = Zq::new(val);
+        }
+
+        Rq::new(coeffs)
+    }
+    /// Generate a vector of random small polynomial for commitments of size n
+    pub fn random_small_vector(n: usize) -> Vec<Self> {
+        let mut v: Vec<Self> = Vec::new();
+        for _ in 0..n {
+            v.push(Self::random_small());
+        }
+        v
+    }
+
+    /// Encode message into polynomial with small coefficients.
+    ///
+    /// # Arguments
+    /// * `message` - A slice of booleans representing a binary message
+    ///
+    /// # Returns
+    /// * `Some(Rq)` - A polynomial where each coefficient is 0 or 1 based on the message bits
+    /// * `None` - If the message length exceeds the polynomial degree D
+    ///
+    /// # Format
+    /// * Each boolean is encoded as a coefficient: false -> 0, true -> 1
+    /// * Message bits are mapped to coefficients in order (index 0 -> constant term)
+    /// * Remaining coefficients (if message is shorter than D) are set to 0
+    pub fn encode_message(message: &[bool]) -> Option<Self> {
+        if message.len() > D {
+            return None;
+        }
+
+        let mut coeffs = [Zq::zero(); D];
+        for (i, &bit) in message.iter().enumerate() {
+            coeffs[i] = Zq::new(u32::from(bit));
+        }
+        Some(Rq::new(coeffs))
+    }
+
+    /// Iterator over coefficients
+    pub fn iter(&self) -> std::slice::Iter<'_, Zq> {
+        self.coeffs.iter()
+    }
+
+    /// Check if polynomial coefficients are within bounds
+    pub fn check_bounds(&self, bound: Zq) -> bool {
+        self.iter().all(|coeff| {
+            let val = coeff.value();
+            // Check if value is within [-bound, bound]
+            val <= bound.value() || val >= Zq::Q.wrapping_sub(bound.value())
+        })
+    }
+
+    /// Zero polynomial
+    pub fn zero() -> Self {
+        Self::new([Zq::zero(); D])
+    }
+
+    // Compute the squared norm of a vector of polynomials
+    pub fn compute_norm_squared(polynomials: &[Rq<D>]) -> Zq {
+        polynomials
+            .iter()
+            .flat_map(|poly| poly.get_coefficients()) // Collect coefficients from all polynomials
+            .map(|coeff| coeff * coeff)
+            .sum()
     }
 }
 
