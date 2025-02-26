@@ -1,4 +1,6 @@
 use crate::rq::Rq;
+use crate::rq_vector::RqVector;
+use std::ops::Mul;
 
 /// Matrix of polynomials in Rq
 #[derive(Debug, Clone)]
@@ -7,28 +9,38 @@ pub struct RqMatrix<const M: usize, const N: usize, const D: usize> {
 }
 
 impl<const M: usize, const N: usize, const D: usize> RqMatrix<M, N, D> {
-    /// Create a random matrix of polynomials
+    /// Create a random matrix of polynomials with small coefficients
     pub fn random() -> Self {
         let matrix = std::array::from_fn(|_| std::array::from_fn(|_| Rq::random_small()));
         Self { elements: matrix }
     }
 
-    /// Matrix-vector multiplication
+    /// Matrix-vector multiplication that returns an array
     pub fn mul_vec(&self, vec: &[Rq<D>; N]) -> [Rq<D>; M] {
-        let mut result = std::array::from_fn(|_| Rq::zero());
+        (self * &RqVector::from(vec.clone())).into_array()
+    }
+}
 
-        // TODO: Needs benchmarking with and without chunking for different
-        // matrix sizes and degrees ⁠D to confirm if it provides a tangible
-        // performance benefit in the target use cases.  Micro-benchmarking
-        // might be helpful here.
+// Implement matrix-vector multiplication for reference to matrix
+impl<const M: usize, const N: usize, const D: usize> Mul<&RqVector<N, D>> for &RqMatrix<M, N, D> {
+    type Output = RqVector<M, D>;
+
+    fn mul(self, rhs: &RqVector<N, D>) -> Self::Output {
+        let mut result = RqVector::zero();
+
         for (i, row) in self.elements.iter().enumerate() {
-            result[i] = row
-                .iter()
-                .zip(vec.iter())
-                .map(|(a, b)| a.clone() * b.clone())
-                .fold(Rq::zero(), |acc, x| acc + x);
+            result[i] = &RqVector::from(row.clone()) * rhs;
         }
 
         result
+    }
+}
+
+// Implement matrix-vector multiplication for owned matrix by delegating to reference implementation
+impl<const M: usize, const N: usize, const D: usize> Mul<&RqVector<N, D>> for RqMatrix<M, N, D> {
+    type Output = RqVector<M, D>;
+
+    fn mul(self, rhs: &RqVector<N, D>) -> Self::Output {
+        &self * rhs
     }
 }

@@ -23,3 +23,5 @@ pub mod zq;
 pub mod ajtai_commitment;
 
 pub mod rq_matrix;
+
+pub mod rq_vector;
