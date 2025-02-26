@@ -37,6 +37,16 @@ impl AjtaiParameters {
             witness_bound,
         })
     }
+
+    /// Returns the beta value
+    pub fn beta(&self) -> Zq {
+        self.beta
+    }
+
+    /// Returns the witness bound
+    pub fn witness_bound(&self) -> Zq {
+        self.witness_bound
+    }
 }
 
 impl Default for AjtaiParameters {
@@ -59,6 +69,13 @@ pub struct AjtaiCommitment<const M: usize, const N: usize, const D: usize> {
 #[derive(Clone, Debug)]
 pub struct Opening<const N: usize, const D: usize> {
     pub witness: [Rq<D>; N],
+}
+
+impl<const N: usize, const D: usize> Opening<N, D> {
+    /// Creates a new opening from a witness
+    pub fn new(witness: [Rq<D>; N]) -> Self {
+        Self { witness }
+    }
 }
 
 // Implement Default trait for more idiomatic Rust
@@ -86,14 +103,14 @@ impl<const M: usize, const N: usize, const D: usize> AjtaiCommitment<M, N, D> {
         }
 
         let commitment = self.matrix_a.mul_vec(&witness);
+        let opening = Opening::new(witness);
 
-        Ok((commitment, Opening { witness }))
+        Ok((commitment, opening))
     }
 
     /// Verifies commitment against opening information
     pub fn verify(&self, commitment: &[Rq<D>; M], opening: &Opening<N, D>) -> bool {
         let bounds_valid = Self::check_bounds(&opening.witness, self.witness_bound);
-
         bounds_valid && self.verify_commitment_calculation(commitment, opening)
     }
 
@@ -119,31 +136,33 @@ impl<const M: usize, const N: usize, const D: usize> AjtaiCommitment<M, N, D> {
     /// - m is the commitment output length
     /// - q is the modulus of the underlying ring
     fn verify_security_relation(beta: u32, m: u128) -> Result<(), ParameterError> {
-        // Internal implementation detail - calculate q from Zq properties
+        // Calculate q from Zq properties
         let q_val = (Zq::zero() - Zq::one()).value();
         let q = u128::from(q_val) + 1;
 
-        // Internal implementation detail - convert all values to u128 for calculation
-        let beta = u128::from(beta);
+        // Optimize calculations to avoid unnecessary checked operations
+        // Calculate beta²
+        let beta_squared = u128::from(beta)
+            .checked_pow(2)
+            .ok_or(ParameterError::SecurityBoundViolation)?;
+
+        // Calculate m³
         let m_cubed = m
             .checked_pow(3)
             .ok_or(ParameterError::SecurityBoundViolation)?;
-        let beta_squared = beta
-            .checked_pow(2)
-            .ok_or(ParameterError::SecurityBoundViolation)?;
+
+        // Calculate q²
         let q_squared = q
             .checked_pow(2)
             .ok_or(ParameterError::SecurityBoundViolation)?;
 
-        if beta_squared
-            .checked_mul(m_cubed)
-            .map(|left| left >= q_squared)
-            .unwrap_or(true)
-        {
-            Err(ParameterError::SecurityBoundViolation)
-        } else {
-            Ok(())
+        // Check if beta² * m³ < q²
+        // Use division instead of multiplication to avoid potential overflow
+        if beta_squared >= q_squared.checked_div(m_cubed).unwrap_or(0) {
+            return Err(ParameterError::SecurityBoundViolation);
         }
+
+        Ok(())
     }
 
     /// Checks polynomial coefficients against specified bound
@@ -159,6 +178,16 @@ impl<const M: usize, const N: usize, const D: usize> AjtaiCommitment<M, N, D> {
     ) -> bool {
         let recomputed = self.matrix_a.mul_vec(&opening.witness);
         commitment == &recomputed
+    }
+
+    /// Returns a reference to the internal matrix
+    pub fn matrix(&self) -> &RqMatrix<M, N, D> {
+        &self.matrix_a
+    }
+
+    /// Returns the witness bound
+    pub fn witness_bound(&self) -> Zq {
+        self.witness_bound
     }
 }
 
@@ -176,7 +205,7 @@ mod tests {
         use super::*;
 
         pub fn valid_witness(scheme: &TestAjtai) -> [Rq<TEST_D>; TEST_N] {
-            std::array::from_fn(|_| Rq::new(std::array::from_fn(|_| scheme.witness_bound)))
+            std::array::from_fn(|_| Rq::new(std::array::from_fn(|_| scheme.witness_bound())))
         }
 
         pub fn random_valid_witness() -> [Rq<TEST_D>; TEST_N] {
@@ -197,7 +226,7 @@ mod tests {
     #[test]
     fn initializes_with_correct_bounds() {
         let scheme = TestAjtai::default();
-        assert_eq!(scheme.witness_bound.value(), 1);
+        assert_eq!(scheme.witness_bound().value(), 1);
     }
 
     #[test]
