@@ -16,7 +16,7 @@
 
 // We use the Zq ring
 use crate::zq::Zq;
-use rand::Rng;
+use rand::{CryptoRng, Rng};
 use std::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 /// This module provides implementations for various operations
 /// in the polynomial ring R = Z_q\[X\] / (X^d + 1).
@@ -123,6 +123,11 @@ impl<const D: usize> Rq<D> {
     /// Generate random small polynomial for commitments
     pub fn random_small() -> Self {
         let mut rng = rand::rng();
+        Self::random_small_with_rng(&mut rng)
+    }
+
+    /// Generate random small polynomial with a provided cryptographically secure RNG
+    pub fn random_small_with_rng<R: Rng + CryptoRng>(rng: &mut R) -> Self {
         let mut coeffs = [Zq::zero(); D];
 
         for coeff in coeffs.iter_mut() {
