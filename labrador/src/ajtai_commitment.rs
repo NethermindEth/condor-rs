@@ -102,11 +102,7 @@ impl<const M: usize, const N: usize, const D: usize> AjtaiCommitment<M, N, D> {
             return Err(ParameterError::ZeroParameter);
         }
 
-        Self::verify_security_relation(
-            params.beta.value(),
-            u128::try_from(M).unwrap(),
-            Self::modulus_u128(),
-        )
+        Self::verify_security_relation(params.beta.value(), u128::try_from(M).unwrap())
     }
 
     /// Verifies the security relation β²m³ < q² required for Ajtai's commitment scheme.
@@ -121,7 +117,12 @@ impl<const M: usize, const N: usize, const D: usize> AjtaiCommitment<M, N, D> {
     /// - β bounds the size of randomness/witness coefficients
     /// - m is the commitment output length
     /// - q is the modulus of the underlying ring
-    fn verify_security_relation(beta: u32, m: u128, q: u128) -> Result<(), ParameterError> {
+    fn verify_security_relation(beta: u32, m: u128) -> Result<(), ParameterError> {
+        // Internal implementation detail - calculate q from Zq properties
+        let q_val = (Zq::zero() - Zq::one()).value();
+        let q = u128::from(q_val) + 1;
+
+        // Internal implementation detail - convert all values to u128 for calculation
         let beta = u128::from(beta);
         let m_cubed = m
             .checked_pow(3)
@@ -157,11 +158,6 @@ impl<const M: usize, const N: usize, const D: usize> AjtaiCommitment<M, N, D> {
     ) -> bool {
         let recomputed = self.matrix_a.mul_vec(&opening.witness);
         commitment == &recomputed
-    }
-
-    fn modulus_u128() -> u128 {
-        let q_val = (Zq::zero() - Zq::one()).value();
-        u128::from(q_val) + 1
     }
 }
 
