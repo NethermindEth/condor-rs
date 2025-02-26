@@ -60,6 +60,13 @@ pub struct Opening<const N: usize, const D: usize> {
     pub witness: [Rq<D>; N],
 }
 
+// Implement Default trait for more idiomatic Rust
+impl<const M: usize, const N: usize, const D: usize> Default for AjtaiCommitment<M, N, D> {
+    fn default() -> Self {
+        Self::new(AjtaiParameters::ternary()).expect("Default parameters should always be valid")
+    }
+}
+
 // Core implementation with security checks
 impl<const M: usize, const N: usize, const D: usize> AjtaiCommitment<M, N, D> {
     /// Creates new commitment scheme with validated parameters
@@ -69,11 +76,6 @@ impl<const M: usize, const N: usize, const D: usize> AjtaiCommitment<M, N, D> {
             matrix_a: RqMatrix::random(),
             witness_bound: params.witness_bound,
         })
-    }
-
-    /// Creates scheme with default ternary distribution bounds
-    pub fn setup() -> Result<Self, ParameterError> {
-        Self::new(AjtaiParameters::ternary())
     }
 
     /// Generates commitment and opening information with bounds checking
@@ -197,7 +199,7 @@ mod tests {
 
     #[test]
     fn initializes_with_correct_bounds() {
-        let scheme = TestAjtai::setup().unwrap();
+        let scheme = TestAjtai::default();
         assert_eq!(scheme.witness_bound.value(), 1);
     }
 
@@ -244,7 +246,7 @@ mod tests {
 
     #[test]
     fn stress_test() {
-        let scheme = TestAjtai::setup().unwrap();
+        let scheme = TestAjtai::default();
 
         (0..100).for_each(|_| {
             let witness = test_utils::valid_witness(&scheme);
