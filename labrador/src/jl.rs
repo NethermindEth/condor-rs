@@ -123,7 +123,7 @@ fn _smaller_than_128b<const D: usize>(n: usize) -> bool {
     // Generate Projection
     let projection = ProjectionVector::new(&matrix, &polynomials);
     // Check if the norm of the projection is smaller than 128 * (projection of the random polynomial)
-    projection.norm().value() < (Zq::new(128) * Rq::compute_norm_squared(&polynomials)).value();
+    projection.norm().value() < (Zq::new(128) * Rq::compute_norm_squared(&polynomials)).value()
 }
 
 #[cfg(test)]
