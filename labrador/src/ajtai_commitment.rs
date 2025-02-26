@@ -8,16 +8,14 @@ pub enum ParameterError {
     ZeroParameter,
     #[error("security bound β·m^(3/2) must be less than q")]
     SecurityBoundViolation,
-    #[error("invalid bounds specified")]
-    InvalidBounds,
+    #[error("invalid witness bounds specified")]
+    InvalidWitnessBounds,
 }
 
 #[derive(Debug, Error)]
 pub enum CommitError {
     #[error("witness coefficients exceed bound")]
     WitnessBoundViolation,
-    #[error("randomness coefficients exceed bound")]
-    RandomnessBoundViolation,
 }
 
 /// Configuration parameters for Ajtai commitment scheme with validation invariants
@@ -25,20 +23,18 @@ pub enum CommitError {
 pub struct AjtaiParameters {
     beta: Zq,
     witness_bound: Zq,
-    randomness_bound: Zq,
 }
 
 impl AjtaiParameters {
     /// Creates new parameters with validation
-    pub fn new(beta: Zq, witness_bound: Zq, randomness_bound: Zq) -> Result<Self, ParameterError> {
-        if witness_bound.is_zero() || randomness_bound.is_zero() {
-            return Err(ParameterError::InvalidBounds);
+    pub fn new(beta: Zq, witness_bound: Zq) -> Result<Self, ParameterError> {
+        if witness_bound.is_zero() {
+            return Err(ParameterError::InvalidWitnessBounds);
         }
 
         Ok(Self {
             beta,
             witness_bound,
-            randomness_bound,
         })
     }
 
@@ -47,7 +43,6 @@ impl AjtaiParameters {
         Self {
             beta: Zq::one(),
             witness_bound: Zq::one(),
-            randomness_bound: Zq::one(),
         }
     }
 }
@@ -57,14 +52,12 @@ impl AjtaiParameters {
 pub struct AjtaiCommitment<const M: usize, const N: usize, const D: usize> {
     matrix_a: RqMatrix<M, N, D>,
     witness_bound: Zq,
-    randomness_bound: Zq,
 }
 
-/// Cryptographic opening containing witness and randomness
+/// Cryptographic opening containing witness
 #[derive(Clone, Debug)]
-pub struct Opening<const N: usize, const M: usize, const D: usize> {
+pub struct Opening<const N: usize, const D: usize> {
     pub witness: [Rq<D>; N],
-    pub randomness: [Rq<D>; M],
 }
 
 // Core implementation with security checks
@@ -75,7 +68,6 @@ impl<const M: usize, const N: usize, const D: usize> AjtaiCommitment<M, N, D> {
         Ok(Self {
             matrix_a: RqMatrix::random(),
             witness_bound: params.witness_bound,
-            randomness_bound: params.randomness_bound,
         })
     }
 
@@ -88,29 +80,24 @@ impl<const M: usize, const N: usize, const D: usize> AjtaiCommitment<M, N, D> {
     pub fn commit(
         &self,
         witness: [Rq<D>; N],
-    ) -> Result<([Rq<D>; M], Opening<N, M, D>), CommitError> {
+    ) -> Result<([Rq<D>; M], Opening<N, D>), CommitError> {
         if !Self::check_bounds(&witness, self.witness_bound) {
             return Err(CommitError::WitnessBoundViolation);
         }
 
-        let randomness = self.generate_bounded_randomness()?;
-
-        let mut commitment = self.matrix_a.mul_vec(&witness);
-        Self::add_randomness(&mut commitment, &randomness);
+        let commitment = self.matrix_a.mul_vec(&witness);
 
         Ok((
             commitment,
             Opening {
                 witness,
-                randomness,
             },
         ))
     }
 
     /// Verifies commitment against opening information
-    pub fn verify(&self, commitment: &[Rq<D>; M], opening: &Opening<N, M, D>) -> bool {
-        let bounds_valid = Self::check_bounds(&opening.witness, self.witness_bound)
-            && Self::check_bounds(&opening.randomness, self.randomness_bound);
+    pub fn verify(&self, commitment: &[Rq<D>; M], opening: &Opening<N, D>) -> bool {
+        let bounds_valid = Self::check_bounds(&opening.witness, self.witness_bound);
 
         bounds_valid && self.verify_commitment_calculation(commitment, opening)
     }
@@ -168,33 +155,14 @@ impl<const M: usize, const N: usize, const D: usize> AjtaiCommitment<M, N, D> {
         polynomials.iter().all(|p| p.check_bounds(bound))
     }
 
-    /// Generates randomness with proper bounds checking
-    fn generate_bounded_randomness(&self) -> Result<[Rq<D>; M], CommitError> {
-        let randomness = std::array::from_fn(|_| Rq::random_small());
-        if !Self::check_bounds(&randomness, self.randomness_bound) {
-            Err(CommitError::RandomnessBoundViolation)
-        } else {
-            Ok(randomness)
-        }
-    }
-
     /// Recomputes commitment from opening and verifies match
     fn verify_commitment_calculation(
         &self,
         commitment: &[Rq<D>; M],
-        opening: &Opening<N, M, D>,
+        opening: &Opening<N, D>,
     ) -> bool {
-        let mut recomputed = self.matrix_a.mul_vec(&opening.witness);
-        Self::add_randomness(&mut recomputed, &opening.randomness);
+        let recomputed = self.matrix_a.mul_vec(&opening.witness);
         commitment == &recomputed
-    }
-
-    /// Adds randomness to commitment in-place
-    fn add_randomness(commitment: &mut [Rq<D>; M], randomness: &[Rq<D>; M]) {
-        commitment
-            .iter_mut()
-            .zip(randomness)
-            .for_each(|(c, r)| *c += r.clone());
     }
 
     fn modulus_u128() -> u128 {
@@ -220,15 +188,19 @@ mod tests {
             std::array::from_fn(|_| Rq::new(std::array::from_fn(|_| scheme.witness_bound)))
         }
 
+        pub fn random_valid_witness() -> [Rq<TEST_D>; TEST_N] {
+            std::array::from_fn(|_| Rq::random_small())
+        }
+
         pub fn setup_scheme() -> TestAjtai {
-            TestAjtai::new(AjtaiParameters::new(Zq::one(), Zq::new(1), Zq::new(1)).unwrap())
+            TestAjtai::new(AjtaiParameters::new(Zq::one(), Zq::one()).unwrap())
                 .unwrap()
         }
     }
 
     #[test]
     fn rejects_invalid_parameters() {
-        assert!(AjtaiParameters::new(Zq::one(), Zq::zero(), Zq::one()).is_err());
+        assert!(AjtaiParameters::new(Zq::one(), Zq::zero()).is_err());
         let _ = test_utils::setup_scheme(); // Will panic if setup fails
     }
 
@@ -236,7 +208,6 @@ mod tests {
     fn initializes_with_correct_bounds() {
         let scheme = TestAjtai::setup().unwrap();
         assert_eq!(scheme.witness_bound.value(), 1);
-        assert_eq!(scheme.randomness_bound.value(), 1);
     }
 
     #[test]
@@ -255,10 +226,16 @@ mod tests {
     #[test]
     fn maintains_security_properties() {
         let scheme = test_utils::setup_scheme();
-        let witness = test_utils::valid_witness(&scheme);
 
-        let (c1, _) = scheme.commit(witness).unwrap();
-        let (c2, _) = scheme.commit(test_utils::valid_witness(&scheme)).unwrap();
+        // Use random witnesses to ensure they're different
+        let witness1 = test_utils::random_valid_witness();
+        let witness2 = test_utils::random_valid_witness();
+
+        // Ensure the witnesses are actually different
+        assert_ne!(witness1, witness2, "Test requires different witnesses");
+
+        let (c1, _) = scheme.commit(witness1).unwrap();
+        let (c2, _) = scheme.commit(witness2).unwrap();
         assert_ne!(
             c1, c2,
             "Different witnesses should produce different commitments"
