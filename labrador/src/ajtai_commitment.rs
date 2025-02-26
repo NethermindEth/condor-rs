@@ -77,22 +77,14 @@ impl<const M: usize, const N: usize, const D: usize> AjtaiCommitment<M, N, D> {
     }
 
     /// Generates commitment and opening information with bounds checking
-    pub fn commit(
-        &self,
-        witness: [Rq<D>; N],
-    ) -> Result<([Rq<D>; M], Opening<N, D>), CommitError> {
+    pub fn commit(&self, witness: [Rq<D>; N]) -> Result<([Rq<D>; M], Opening<N, D>), CommitError> {
         if !Self::check_bounds(&witness, self.witness_bound) {
             return Err(CommitError::WitnessBoundViolation);
         }
 
         let commitment = self.matrix_a.mul_vec(&witness);
 
-        Ok((
-            commitment,
-            Opening {
-                witness,
-            },
-        ))
+        Ok((commitment, Opening { witness }))
     }
 
     /// Verifies commitment against opening information
@@ -193,8 +185,7 @@ mod tests {
         }
 
         pub fn setup_scheme() -> TestAjtai {
-            TestAjtai::new(AjtaiParameters::new(Zq::one(), Zq::one()).unwrap())
-                .unwrap()
+            TestAjtai::new(AjtaiParameters::ternary()).unwrap()
         }
     }
 
