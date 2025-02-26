@@ -60,7 +60,7 @@ fn main() {
     let matrix = ProjectionMatrix::new(n);
     // Calculate projection
     let projection = ProjectionVector::new(&matrix, &polynomials);
-    // Whithin bounds with probability 1/2
+    // Within bounds with probability 1/2
     let result =
         projection.norm().value() < (Zq::new(128) * Rq::compute_norm_squared(&polynomials)).value();
     println!("{}", result);

@@ -156,7 +156,7 @@ mod tests {
 
     #[test]
 
-    // on averge the projected norm squared is the same as 128 * vector norm squared
+    // on average the projected norm squared is the same as 128 * vector norm squared
     fn average_value() {
         let trials: u32 = 5000;
         let n = 5;
