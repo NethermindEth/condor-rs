@@ -37,9 +37,10 @@ impl AjtaiParameters {
             witness_bound,
         })
     }
+}
 
-    /// Default parameters for ternary distribution {-1, 0, 1}
-    pub fn ternary() -> Self {
+impl Default for AjtaiParameters {
+    fn default() -> Self {
         Self {
             beta: Zq::one(),
             witness_bound: Zq::one(),
@@ -63,7 +64,7 @@ pub struct Opening<const N: usize, const D: usize> {
 // Implement Default trait for more idiomatic Rust
 impl<const M: usize, const N: usize, const D: usize> Default for AjtaiCommitment<M, N, D> {
     fn default() -> Self {
-        Self::new(AjtaiParameters::ternary()).expect("Default parameters should always be valid")
+        Self::new(AjtaiParameters::default()).expect("Default parameters should always be valid")
     }
 }
 
@@ -183,7 +184,7 @@ mod tests {
         }
 
         pub fn setup_scheme() -> TestAjtai {
-            TestAjtai::new(AjtaiParameters::ternary()).unwrap()
+            TestAjtai::new(AjtaiParameters::default()).unwrap()
         }
     }
 
