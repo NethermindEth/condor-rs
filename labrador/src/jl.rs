@@ -55,7 +55,7 @@ impl<const D: usize> ProjectionVector<D> {
         concatenated_coeffs
     }
     /// Euclidean norm
-    pub fn norm(&self) -> Zq {
+    pub fn norm_squared(&self) -> Zq {
         self.projection.iter().map(|coeff| *coeff * *coeff).sum()
     }
 
@@ -123,7 +123,8 @@ fn _smaller_than_128b<const D: usize>(n: usize) -> bool {
     // Generate Projection
     let projection = ProjectionVector::new(&matrix, &polynomials);
     // Check if the norm of the projection is smaller than 128 * (projection of the random polynomial)
-    projection.norm().value() < (Zq::new(128) * Rq::compute_norm_squared(&polynomials)).value()
+    projection.norm_squared().value()
+        < (Zq::new(128) * Rq::compute_norm_squared(&polynomials)).value()
 }
 
 #[cfg(test)]
@@ -161,13 +162,13 @@ mod tests {
         let polynomials = Rq::<64>::random_small_vector(n);
         let mut matrix = ProjectionMatrix::new(n);
         let mut projection = ProjectionVector::new(&matrix, &polynomials);
-        let mut norm_sum = projection.norm();
+        let mut norm_sum = projection.norm_squared();
         let norm_value = (Zq::new(128) * Rq::compute_norm_squared(&polynomials)).value();
         // Run the test multiple times to simulate the probability
         for _ in 0..trials {
             matrix = ProjectionMatrix::new(n);
             projection = ProjectionVector::new(&matrix, &polynomials);
-            norm_sum += projection.norm();
+            norm_sum += projection.norm_squared();
         }
 
         // Calculate the observed probability
