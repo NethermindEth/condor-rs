@@ -335,8 +335,7 @@ mod tests {
 
         // Outside of bounds
         let poly3: Rq<4> = vec![Zq::new(1), Zq::new(2), Zq::new(3), Zq::new(4)].into();
-        let poly4: Rq<4> =
-            vec![Zq::new(u32::MAX), Zq::new(3), Zq::new(u32::MAX), Zq::new(1)].into();
+        let poly4: Rq<4> = vec![Zq::MAX, Zq::new(3), Zq::MAX, Zq::new(1)].into();
         let result2 = poly3 + poly4;
         assert_eq!(
             result2.coeffs,
@@ -351,23 +350,12 @@ mod tests {
             [Zq::new(1), Zq::new(2), Zq::new(3), Zq::new(4)]
         );
         // Addition with high coefficients
-        let poly7: Rq<4> = vec![Zq::new(1), Zq::new(2), Zq::new(3), Zq::new(u32::MAX)].into();
-        let poly8: Rq<4> = vec![
-            Zq::new(u32::MAX),
-            Zq::new(u32::MAX),
-            Zq::new(u32::MAX),
-            Zq::new(u32::MAX),
-        ]
-        .into();
+        let poly7: Rq<4> = vec![Zq::new(1), Zq::new(2), Zq::new(3), Zq::MAX].into();
+        let poly8: Rq<4> = vec![Zq::MAX, Zq::MAX, Zq::MAX, Zq::MAX].into();
         let result3 = poly7 + poly8;
         assert_eq!(
             result3.coeffs,
-            [
-                Zq::new(0),
-                Zq::new(1),
-                Zq::new(2),
-                Zq::new(u32::MAX.wrapping_add(u32::MAX))
-            ]
+            [Zq::new(0), Zq::new(1), Zq::new(2), Zq::MAX + Zq::MAX]
         );
     }
     // Test multiplication of polynomials
@@ -378,7 +366,7 @@ mod tests {
         let poly1: Rq<3> = vec![Zq::new(1), Zq::new(1), Zq::new(2)].into();
         let poly2: Rq<3> = vec![Zq::new(1), Zq::new(1)].into();
         let result = poly1 * poly2;
-        assert_eq!(result.coeffs, [Zq::new(u32::MAX), Zq::new(2), Zq::new(3)]);
+        assert_eq!(result.coeffs, [Zq::MAX, Zq::new(2), Zq::new(3)]);
 
         // Multiplication with zero polynomial
         let poly3: Rq<3> = vec![Zq::new(1), Zq::new(1), Zq::new(2)].into();
@@ -392,7 +380,7 @@ mod tests {
         let result3 = poly5 * poly6;
         assert_eq!(
             result3.coeffs,
-            [Zq::new(u32::MAX - 12), Zq::new(u32::MAX - 16), Zq::zero()]
+            [Zq::MAX - Zq::new(12), Zq::MAX - Zq::new(16), Zq::zero()]
         );
     }
 
@@ -415,10 +403,10 @@ mod tests {
         assert_eq!(
             result2.coeffs,
             [
-                Zq::new(u32::MAX),
-                Zq::new(u32::MAX - 2),
-                Zq::new(u32::MAX - 2),
-                Zq::new(u32::MAX - 5)
+                Zq::MAX,
+                Zq::MAX - Zq::new(2),
+                Zq::MAX - Zq::new(2),
+                Zq::MAX - Zq::new(5)
             ]
         );
         // Subtraction with zero polynomial
@@ -429,10 +417,10 @@ mod tests {
         assert_eq!(
             result3.coeffs,
             [
-                Zq::new(u32::MAX),
-                Zq::new(u32::MAX - 1),
-                Zq::new(u32::MAX - 2),
-                Zq::new(u32::MAX - 3)
+                Zq::MAX,
+                Zq::MAX - Zq::new(1),
+                Zq::MAX - Zq::new(2),
+                Zq::MAX - Zq::new(3)
             ]
         );
         assert_eq!(
@@ -449,10 +437,10 @@ mod tests {
         assert_eq!(
             result.coeffs,
             [
-                Zq::new(u32::MAX),
-                Zq::new(u32::MAX - 1),
-                Zq::new(u32::MAX - 2),
-                Zq::new(u32::MAX - 3)
+                Zq::MAX,
+                Zq::MAX - Zq::new(1),
+                Zq::MAX - Zq::new(2),
+                Zq::MAX - Zq::new(3)
             ]
         );
     }

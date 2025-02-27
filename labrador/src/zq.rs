@@ -32,6 +32,7 @@ impl Zq {
     pub fn value(&self) -> u32 {
         self.value
     }
+    pub const MAX: Self = Zq { value: u32::MAX };
 }
 
 // Macro to generate arithmetic trait implementations
@@ -89,7 +90,7 @@ mod tests {
 
     #[test]
     fn test_wrapping_arithmetic() {
-        let a = Zq::new(u32::MAX);
+        let a = Zq::MAX;
         let b = Zq::new(1);
 
         assert_eq!((a + b).value(), 0, "u32::MAX + 1 should wrap to 0");
@@ -102,7 +103,7 @@ mod tests {
 
     #[test]
     fn test_subtraction_edge_cases() {
-        let max = Zq::new(u32::MAX);
+        let max = Zq::MAX;
         let one = Zq::new(1);
         let two = Zq::new(2);
 
@@ -160,7 +161,7 @@ mod tests {
         assert_eq!(x.value(), u32::MAX - 4, "10 -= 15 should wrap to 2^32 - 5");
 
         // Test negative equivalent value in multiplication
-        let a = Zq::new(u32::MAX); // Represents -1 in mod 2^32 arithmetic
+        let a = Zq::MAX; // Represents -1 in mod 2^32 arithmetic
         let b = Zq::new(2);
         assert_eq!(
             (a * b).value(),
@@ -172,7 +173,7 @@ mod tests {
     #[test]
     fn test_display_implementation() {
         let a = Zq::new(5);
-        let max = Zq::new(u32::MAX);
+        let max = Zq::MAX;
 
         assert_eq!(format!("{}", a), "5 (mod 2^32)");
         assert_eq!(format!("{}", max), "4294967295 (mod 2^32)");
