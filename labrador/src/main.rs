@@ -1,3 +1,4 @@
+use labrador::jl::verify_upper_bound;
 use labrador::jl::ProjectionMatrix;
 use labrador::jl::ProjectionVector;
 use labrador::rq::Rq;
@@ -61,7 +62,6 @@ fn main() {
     // Calculate projection
     let projection = ProjectionVector::new(&matrix, &polynomials);
     // Within bounds with probability 1/2
-    let result = projection.norm_squared().value()
-        < (Zq::new(128) * Rq::compute_norm_squared(&polynomials)).value();
-    println!("{}", result);
+    let beta = Rq::compute_norm_squared(&polynomials);
+    println!("{}", verify_upper_bound(projection, beta));
 }

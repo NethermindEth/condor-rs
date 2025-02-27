@@ -54,6 +54,7 @@ impl<const D: usize> ProjectionVector<D> {
 
         concatenated_coeffs
     }
+
     /// Euclidean norm
     pub fn norm_squared(&self) -> Zq {
         self.projection.iter().map(|coeff| *coeff * *coeff).sum()
@@ -72,59 +73,26 @@ impl<const D: usize> ProjectionVector<D> {
         }
         ProjectionVector { projection }
     }
+
     /// Obtain projection
     pub fn get_projection(&self) -> &[Zq; 256] {
         &self.projection
     }
 }
 
-/// Returns a vector of `n` random polynomials, each of degree `d`, for testing purposes.
-pub fn generate_random_polynomials<R: Rng, const D: usize>(
-    n: usize,
-    rng: &mut R,
-    beta: Zq, // vector norm bound
-) -> Vec<Rq<D>> {
-    let mut polynomials = Vec::with_capacity(n);
-
-    for _ in 0..n {
-        loop {
-            // Generate random coefficients
-            let coeffs: [Zq; D] = std::array::from_fn(|_| {
-                // Small values so we get a vector of 'small norm'
-                let small_value: u32 = rng.random_range(0..100);
-                Zq::new(small_value)
-            });
-
-            // Create the polynomial
-            let polynomial = Rq::new(coeffs);
-
-            // Compute the norm of all polynomials including the new one
-            let mut all_polynomials = polynomials.clone();
-            all_polynomials.push(polynomial.clone());
-            let norm = Rq::compute_norm_squared(&all_polynomials);
-
-            // If the norm is smaller than beta, add the polynomial to the list
-            if norm.value() < beta.value() {
-                polynomials.push(polynomial);
-                break;
-            }
-        }
-    }
-
-    polynomials
+// Function to verify upper bound of projection
+pub fn verify_upper_bound<const D: usize>(
+    projection: ProjectionVector<D>,
+    beta_squared: Zq,
+) -> bool {
+    projection.norm_squared().value() < (Zq::new(128) * beta_squared).value()
 }
-
-/// Returns a boolean if the norm of the projection is smaller than 128 for a random polynomial
-fn _smaller_than_128b<const D: usize>(n: usize) -> bool {
-    // Generate the random polynomials
-    let polynomials = Rq::<D>::random_small_vector(n);
-    // Generate projection matrix
-    let matrix = ProjectionMatrix::new(n);
-    // Generate Projection
-    let projection = ProjectionVector::new(&matrix, &polynomials);
-    // Check if the norm of the projection is smaller than 128 * (projection of the random polynomial)
-    projection.norm_squared().value()
-        < (Zq::new(128) * Rq::compute_norm_squared(&polynomials)).value()
+// Function to verify lower bound of projection
+pub fn verify_lower_bound<const D: usize>(
+    projection: ProjectionVector<D>,
+    beta_squared: Zq,
+) -> bool {
+    projection.norm_squared().value() > (Zq::new(30) * beta_squared).value()
 }
 
 #[cfg(test)]
@@ -136,8 +104,18 @@ mod tests {
     fn test_probability_is_close_to_half() {
         let trials: f64 = 1000.0;
         let mut success_count: f64 = 0.0;
+        let n = 5;
         for _ in 0..1000 {
-            if _smaller_than_128b::<64>(5) {
+            // Generate the random polynomials
+            let polynomials = Rq::<64>::random_small_vector(n);
+            // Generate projection matrix
+            let matrix = ProjectionMatrix::new(n);
+            // Generate Projection
+            let projection = ProjectionVector::new(&matrix, &polynomials);
+            let beta = Rq::compute_norm_squared(&polynomials);
+            // Check if the norm of the projection is smaller than 128 * (squared norm of the projection of the random polynomial)
+            let test: bool = verify_upper_bound(projection, beta);
+            if test {
                 success_count += 1.0;
             }
         }
@@ -190,7 +168,19 @@ mod tests {
             abs_difference
         );
     }
-}
 
-// define the dot product function
-// implement verification of norm bounds for a guiven polynomial vector
+    #[test]
+    // Test lower bound verification
+    fn test_lower_bound() {
+        let n = 5;
+        // Generate random vector of polynomials of small norm
+        let polynomials = Rq::<64>::random_small_vector(n);
+        // Generate projection matrix
+        let matrix = ProjectionMatrix::new(n);
+        // Generate Projection
+        let projection = ProjectionVector::new(&matrix, &polynomials);
+        let beta = Rq::compute_norm_squared(&polynomials);
+        // Check if the norm of the projection is bigger than 30 * (squared norm of the projection of the random polynomial)
+        assert!(verify_lower_bound(projection, beta));
+    }
+}
