@@ -18,6 +18,14 @@ pub enum CommitError {
     WitnessBoundViolation,
 }
 
+#[derive(Debug, Error)]
+pub enum VerificationError {
+    #[error("witness coefficients exceed bound")]
+    WitnessBoundViolation,
+    #[error("commitment does not match opening")]
+    CommitmentMismatch,
+}
+
 /// Configuration parameters for Ajtai commitment scheme with validation invariants
 #[derive(Debug, Clone)]
 pub struct AjtaiParameters {
@@ -109,9 +117,17 @@ impl<const M: usize, const N: usize, const D: usize> AjtaiCommitment<M, N, D> {
     }
 
     /// Verifies commitment against opening information
-    pub fn verify(&self, commitment: &[Rq<D>; M], opening: &Opening<N, D>) -> bool {
+    pub fn verify(&self, commitment: &[Rq<D>; M], opening: &Opening<N, D>) -> Result<(), VerificationError> {
         let bounds_valid = Self::check_bounds(&opening.witness, self.witness_bound);
-        bounds_valid && self.verify_commitment_calculation(commitment, opening)
+        if !bounds_valid {
+            return Err(VerificationError::WitnessBoundViolation);
+        }
+
+        if !self.verify_commitment_calculation(commitment, opening) {
+            return Err(VerificationError::CommitmentMismatch);
+        }
+
+        Ok(())
     }
 
     /// Validates scheme parameters against cryptographic security requirements
@@ -235,11 +251,11 @@ mod tests {
         let witness = test_utils::valid_witness(&scheme);
 
         let (commitment, opening) = scheme.commit(witness).unwrap();
-        assert!(scheme.verify(&commitment, &opening));
+        assert!(scheme.verify(&commitment, &opening).is_ok());
 
         let mut bad_opening = opening.clone();
         bad_opening.witness[0] = Rq::random_small();
-        assert!(!scheme.verify(&commitment, &bad_opening));
+        assert!(scheme.verify(&commitment, &bad_opening).is_err());
     }
 
     #[test]
@@ -277,7 +293,7 @@ mod tests {
         (0..100).for_each(|_| {
             let witness = test_utils::valid_witness(&scheme);
             let (commitment, opening) = scheme.commit(witness).unwrap();
-            assert!(scheme.verify(&commitment, &opening));
+            assert!(scheme.verify(&commitment, &opening).is_ok());
         });
     }
 }
