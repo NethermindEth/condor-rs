@@ -5,14 +5,21 @@ use std::ops::Mul;
 /// Matrix of polynomials in Rq
 #[derive(Debug, Clone)]
 pub struct RqMatrix<const M: usize, const N: usize, const D: usize> {
-    elements: [[Rq<D>; N]; M],
+    elements: Vec<Vec<Rq<D>>>,
 }
 
 impl<const M: usize, const N: usize, const D: usize> RqMatrix<M, N, D> {
     /// Create a random matrix of polynomials with small coefficients
     pub fn random() -> Self {
-        let matrix = std::array::from_fn(|_| std::array::from_fn(|_| Rq::random_small()));
-        Self { elements: matrix }
+        let mut elements = Vec::with_capacity(M);
+        for _ in 0..M {
+            let mut row = Vec::with_capacity(N);
+            for _ in 0..N {
+                row.push(Rq::random_small());
+            }
+            elements.push(row);
+        }
+        Self { elements }
     }
 
     /// Matrix-vector multiplication that returns an array
@@ -29,7 +36,7 @@ impl<const M: usize, const N: usize, const D: usize> Mul<&RqVector<N, D>> for &R
         let mut result = RqVector::zero();
 
         for (i, row) in self.elements.iter().enumerate() {
-            result[i] = &RqVector::from(row.clone()) * rhs;
+            result[i] = &RqVector::from_vec(row.clone()) * rhs;
         }
 
         result
@@ -42,5 +49,15 @@ impl<const M: usize, const N: usize, const D: usize> Mul<&RqVector<N, D>> for Rq
 
     fn mul(self, rhs: &RqVector<N, D>) -> Self::Output {
         &self * rhs
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rqmatrix_fits_stack() {
+        let _: RqMatrix<256, { 1 << 10 }, 64> = RqMatrix::random();
     }
 }

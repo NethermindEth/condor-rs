@@ -4,37 +4,51 @@ use std::ops::{Index, IndexMut, Mul};
 /// Vector of polynomials in Rq
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RqVector<const N: usize, const D: usize> {
-    elements: [Rq<D>; N],
+    elements: Vec<Rq<D>>,
 }
 
 impl<const N: usize, const D: usize> RqVector<N, D> {
     /// Create a new vector from an array of elements
     pub fn new(elements: [Rq<D>; N]) -> Self {
+        Self {
+            elements: elements.to_vec(),
+        }
+    }
+
+    /// Create a new vector from a Vec of elements
+    pub fn from_vec(elements: Vec<Rq<D>>) -> Self {
+        assert_eq!(elements.len(), N, "Vector length must match N");
         Self { elements }
     }
 
     /// Create a zero vector
     pub fn zero() -> Self {
-        Self {
-            elements: std::array::from_fn(|_| Rq::zero()),
+        let mut elements = Vec::with_capacity(N);
+        for _ in 0..N {
+            elements.push(Rq::zero());
         }
+        Self { elements }
     }
 
     /// Create a random small vector
     pub fn random_small() -> Self {
-        Self {
-            elements: std::array::from_fn(|_| Rq::random_small()),
+        let mut elements = Vec::with_capacity(N);
+        for _ in 0..N {
+            elements.push(Rq::random_small());
         }
+        Self { elements }
     }
 
-    /// Get the underlying array
-    pub fn as_array(&self) -> &[Rq<D>; N] {
+    /// Get the underlying vector as slice
+    pub fn as_slice(&self) -> &[Rq<D>] {
         &self.elements
     }
 
-    /// Convert into the underlying array
+    /// Convert into array
     pub fn into_array(self) -> [Rq<D>; N] {
         self.elements
+            .try_into()
+            .unwrap_or_else(|_| panic!("Vector length mismatch"))
     }
 }
 
