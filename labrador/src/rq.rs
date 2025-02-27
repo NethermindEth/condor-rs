@@ -123,11 +123,34 @@ impl<const D: usize> Rq<D> {
     /// Generate random small polynomial for commitments
     pub fn random_small() -> Self {
         let mut rng = rand::rng();
-        Self::random_small_with_rng(&mut rng)
+        Self::random_small_with_secure_rng(&mut rng)
+    }
+
+    /// Generate random small polynomial with a provided seed
+    pub fn random_small_with_seed(seed: u64) -> Self {
+        use rand::rngs::StdRng;
+        use rand::SeedableRng;
+        let mut rng = StdRng::seed_from_u64(seed);
+        Self::random_small_with_any_rng(&mut rng)
+    }
+
+    /// Generate random small polynomial with a custom seeded RNG
+    ///
+    /// This function provides maximum flexibility for different contexts:
+    /// - For no-std environments, use a no-std compatible RNG
+    /// - For extra security, use a stronger cryptographic RNG
+    /// - For testing, use a simple deterministic RNG
+    pub fn random_small_with_seeded_rng<R: Rng + rand::SeedableRng>(mut rng: R) -> Self {
+        Self::random_small_with_any_rng(&mut rng)
     }
 
     /// Generate random small polynomial with a provided cryptographically secure RNG
-    pub fn random_small_with_rng<R: Rng + CryptoRng>(rng: &mut R) -> Self {
+    pub fn random_small_with_secure_rng<R: Rng + CryptoRng>(rng: &mut R) -> Self {
+        Self::random_small_with_any_rng(rng)
+    }
+
+    /// Generate random small polynomial with any RNG implementation
+    pub fn random_small_with_any_rng<R: Rng>(rng: &mut R) -> Self {
         let mut coeffs = [Zq::zero(); D];
 
         for coeff in coeffs.iter_mut() {
