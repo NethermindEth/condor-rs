@@ -1,7 +1,7 @@
 use crate::{rq::Rq, rq_matrix::RqMatrix, zq::Zq};
 use thiserror::Error;
 
-// Error types with clear documentation
+// Error types with documentation
 #[derive(Debug, Error)]
 pub enum ParameterError {
     #[error("parameters must be positive")]
@@ -66,13 +66,6 @@ impl Default for AjtaiParameters {
     }
 }
 
-/// Ajtai commitment scheme implementation with matrix-based operations
-#[derive(Debug)]
-pub struct AjtaiCommitment<const M: usize, const N: usize, const D: usize> {
-    matrix_a: RqMatrix<M, N, D>,
-    witness_bound: Zq,
-}
-
 /// Cryptographic opening containing witness
 #[derive(Clone, Debug)]
 pub struct Opening<const N: usize, const D: usize> {
@@ -86,7 +79,13 @@ impl<const N: usize, const D: usize> Opening<N, D> {
     }
 }
 
-// Implement Default trait for more idiomatic Rust
+/// Ajtai commitment scheme implementation with matrix-based operations
+#[derive(Debug)]
+pub struct AjtaiCommitment<const M: usize, const N: usize, const D: usize> {
+    matrix_a: RqMatrix<M, N, D>,
+    witness_bound: Zq,
+}
+
 impl<const M: usize, const N: usize, const D: usize> Default for AjtaiCommitment<M, N, D> {
     fn default() -> Self {
         Self::new(AjtaiParameters::default()).expect("Default parameters should always be valid")
@@ -98,6 +97,7 @@ impl<const M: usize, const N: usize, const D: usize> AjtaiCommitment<M, N, D> {
     /// Creates new commitment scheme with validated parameters
     pub fn new(params: AjtaiParameters) -> Result<Self, ParameterError> {
         Self::validate_parameters(&params)?;
+
         Ok(Self {
             matrix_a: RqMatrix::random(),
             witness_bound: params.witness_bound,
@@ -117,13 +117,17 @@ impl<const M: usize, const N: usize, const D: usize> AjtaiCommitment<M, N, D> {
     }
 
     /// Verifies commitment against opening information
-    pub fn verify(&self, commitment: &[Rq<D>; M], opening: &Opening<N, D>) -> Result<(), VerificationError> {
-        let bounds_valid = Self::check_bounds(&opening.witness, self.witness_bound);
-        if !bounds_valid {
+    pub fn verify(
+        &self,
+        commitment: &[Rq<D>; M],
+        opening: &Opening<N, D>,
+    ) -> Result<(), VerificationError> {
+        if !Self::check_bounds(&opening.witness, self.witness_bound) {
             return Err(VerificationError::WitnessBoundViolation);
         }
 
-        if !self.verify_commitment_calculation(commitment, opening) {
+        let recomputed = self.matrix_a.mul_vec(&opening.witness);
+        if commitment != &recomputed {
             return Err(VerificationError::CommitmentMismatch);
         }
 
@@ -148,7 +152,7 @@ impl<const M: usize, const N: usize, const D: usize> AjtaiCommitment<M, N, D> {
     ///
     /// The relation β²m³ < q² is a necessary condition derived from the security
     /// proof of Ajtai's commitment scheme, where:
-    /// - β bounds the size of randomness/witness coefficients
+    /// - β bounds the size of witness coefficients
     /// - m is the commitment output length
     /// - q is the modulus of the underlying ring
     fn verify_security_relation(beta: u32, m: u128) -> Result<(), ParameterError> {
@@ -156,7 +160,6 @@ impl<const M: usize, const N: usize, const D: usize> AjtaiCommitment<M, N, D> {
         let q_val = (Zq::zero() - Zq::one()).value();
         let q = u128::from(q_val) + 1;
 
-        // Optimize calculations to avoid unnecessary checked operations
         // Calculate beta²
         let beta_squared = u128::from(beta)
             .checked_pow(2)
@@ -184,16 +187,6 @@ impl<const M: usize, const N: usize, const D: usize> AjtaiCommitment<M, N, D> {
     /// Checks polynomial coefficients against specified bound
     fn check_bounds<const SIZE: usize>(polynomials: &[Rq<D>; SIZE], bound: Zq) -> bool {
         polynomials.iter().all(|p| p.check_bounds(bound))
-    }
-
-    /// Recomputes commitment from opening and verifies match
-    fn verify_commitment_calculation(
-        &self,
-        commitment: &[Rq<D>; M],
-        opening: &Opening<N, D>,
-    ) -> bool {
-        let recomputed = self.matrix_a.mul_vec(&opening.witness);
-        commitment == &recomputed
     }
 
     /// Returns a reference to the internal matrix
