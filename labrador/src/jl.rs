@@ -128,22 +128,22 @@ mod tests {
     fn test_random_distribution_matrix() {
         let n = 1000;
         let matrix = ProjectionMatrix::<4>::new(n);
-        let mut counts = [0, 0, 0]; // -1, 0, 1
+        let mut counts = [0.0, 0.0, 0.0]; // -1, 0, 1
         for row in matrix.matrix.iter() {
             for &elem in row.iter() {
                 if elem == Zq::MAX {
-                    counts[0] += 1;
+                    counts[0] += 1.0;
                 } else if elem == Zq::zero() {
-                    counts[1] += 1;
+                    counts[1] += 1.0;
                 } else if elem == Zq::one() {
-                    counts[2] += 1;
+                    counts[2] += 1.0;
                 }
             }
         }
-        let total = (256 * n * 4) as f64;
+        let total: f64 = 1024000;
         let expected = [0.25, 0.5, 0.25];
         for i in 0..3 {
-            let actual = counts[i] as f64 / total;
+            let actual = counts[i] / total;
             println!("This is the actual value {}", actual);
             assert!(
                 (actual - expected[i]).abs() < 0.05,
