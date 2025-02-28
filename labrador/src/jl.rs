@@ -140,7 +140,7 @@ mod tests {
                 }
             }
         }
-        let total: f64 = 1024000;
+        let total: f64 = 1024000.0;
         let expected = [0.25, 0.5, 0.25];
         for i in 0..3 {
             let actual = counts[i] / total;
