@@ -29,7 +29,7 @@ jobs:
         run: RUSTDOCFLAGS="--html-in-header katex-header.html" cargo doc --no-deps -p labrador
 
       - name: Add redirect
-        run: echo '<meta http-equiv="refresh" content="0;url=aoc/index.html">' > target/doc/index.html
+        run: echo '<meta http-equiv="refresh" content="0;url=index.html">' > target/doc/index.html
 
       - name: Remove lock file
         run: rm target/doc/.lock
