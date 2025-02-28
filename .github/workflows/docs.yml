@@ -39,11 +39,6 @@ jobs:
         with:
           path: target/doc
 
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: target/doc
-
   publish-docs:
     permissions:
       pages: write
