@@ -2,7 +2,7 @@ name: Rust CI
 
 on:
   push:
-    branches: [ fix/ghpages ]
+    branches: [ main ]
 
 jobs:
   # TODO remove docs publishing, when crate is published to crates.io
