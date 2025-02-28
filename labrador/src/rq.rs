@@ -482,4 +482,31 @@ mod tests {
         assert!(zero_poly.is_zero());
         assert!(!non_zero_poly.is_zero());
     }
+
+    // Test coefficient extraction
+    #[test]
+    fn test_get_coefficient() {
+        let poly: Rq<4> = vec![Zq::new(1), Zq::zero(), Zq::new(5), Zq::MAX].into();
+        let vec = vec![Zq::new(1), Zq::zero(), Zq::new(5), Zq::MAX];
+        assert!(poly.get_coefficients() == vec);
+
+        let poly_zero: Rq<4> = vec![Zq::zero(), Zq::zero(), Zq::zero(), Zq::zero()].into();
+        let vec_zero = vec![Zq::zero(), Zq::zero(), Zq::zero(), Zq::zero()];
+        assert!(poly_zero.get_coefficients() == vec_zero);
+    }
+
+    // Test the square of the norm
+    #[test]
+    fn test_norm() {
+        let poly: Rq<4> = vec![Zq::new(1), Zq::zero(), Zq::new(5), Zq::MAX].into();
+        let result = Zq::new(27);
+        assert!(Rq::compute_norm_squared(&[poly]).value() == result.value());
+
+        let poly2: Rq<4> = vec![Zq::new(5), Zq::new(1), Zq::MAX, Zq::zero()].into();
+        assert!(Rq::compute_norm_squared(&[poly2]).value() == result.value());
+
+        let poly_zero: Rq<4> = vec![Zq::zero(), Zq::zero(), Zq::zero(), Zq::zero()].into();
+        let result_zero = Zq::zero();
+        assert!(Rq::compute_norm_squared(&[poly_zero]).value() == result_zero.value());
+    }
 }

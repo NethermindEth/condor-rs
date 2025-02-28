@@ -19,7 +19,7 @@ impl<const D: usize> ProjectionMatrix<D> {
             for elem in row.iter_mut() {
                 let rand_val: f64 = rng.random();
                 *elem = if rand_val < 0.25 {
-                    Zq::new(u32::MAX) // -1 in Zq
+                    Zq::MAX // -1 in Zq
                 } else if rand_val < 0.75 {
                     Zq::zero()
                 } else {
@@ -99,8 +99,81 @@ pub fn verify_lower_bound<const D: usize>(
 mod tests {
     use super::*;
 
+    // Test Size correctness of projection matrix
     #[test]
+    fn test_size_projection_matrix() {
+        let n = 10;
+        let matrix = ProjectionMatrix::<4>::new(n);
+
+        assert_eq!(matrix.matrix.len(), 256, "Matrix should have 256 rows");
+        assert_eq!(
+            matrix.matrix[0].len(),
+            n * 4,
+            "Matrix should have n * D columns"
+        );
+
+        let n2 = 1;
+        let matrix = ProjectionMatrix::<4>::new(n2); // Assuming D=3 for this test
+
+        assert_eq!(matrix.matrix.len(), 256, "Matrix should have 256 rows");
+        assert_eq!(
+            matrix.matrix[0].len(),
+            n2 * 4,
+            "Matrix should have n * D columns"
+        );
+    }
+
+    // Test the distribution of values in the random matrix
+    #[test]
+    fn test_random_distribution_matrix() {
+        let n = 1000;
+        let matrix = ProjectionMatrix::<4>::new(n);
+        let mut counts = [0, 0, 0]; // -1, 0, 1
+        for row in matrix.matrix.iter() {
+            for &elem in row.iter() {
+                if elem == Zq::MAX {
+                    counts[0] += 1;
+                } else if elem == Zq::zero() {
+                    counts[1] += 1;
+                } else if elem == Zq::one() {
+                    counts[2] += 1;
+                }
+            }
+        }
+        let total = (256 * n * 4) as f64;
+        let expected = [0.25, 0.5, 0.25];
+        for i in 0..3 {
+            let actual = counts[i] as f64 / total;
+            println!("This is the actual value {}", actual);
+            assert!(
+                (actual - expected[i]).abs() < 0.05,
+                "Values are not within expected proportions"
+            ); // we allow some tolerance
+        }
+    }
+
+    // Test vector concatenation
+    #[test]
+    fn test_vector_concatenation() {
+        let polynomials = vec![
+            vec![Zq::new(1), Zq::zero(), Zq::zero(), Zq::MAX].into(),
+            vec![Zq::new(6), Zq::zero(), Zq::new(5), Zq::new(3)].into(),
+        ];
+        let vector = vec![
+            Zq::new(1),
+            Zq::zero(),
+            Zq::zero(),
+            Zq::MAX,
+            Zq::new(6),
+            Zq::zero(),
+            Zq::new(5),
+            Zq::new(3),
+        ];
+        assert!(ProjectionVector::<4>::concatenate_coefficients(polynomials) == vector);
+    }
+
     // Test that the probability of the inequality being true is close to 1/2
+    #[test]
     fn test_probability_is_close_to_half() {
         let trials: f64 = 1000.0;
         let mut success_count: f64 = 0.0;
@@ -131,9 +204,8 @@ mod tests {
         );
     }
 
+    // On average the projected norm squared is the same as 128 * vector norm squared
     #[test]
-
-    // on average the projected norm squared is the same as 128 * vector norm squared
     fn average_value() {
         let trials: u32 = 5000;
         let n = 5;
@@ -169,8 +241,8 @@ mod tests {
         );
     }
 
-    #[test]
     // Test lower bound verification
+    #[test]
     fn test_lower_bound() {
         let n = 5;
         // Generate random vector of polynomials of small norm
