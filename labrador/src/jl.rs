@@ -42,24 +42,6 @@ pub struct ProjectionVector<const D: usize> {
 }
 
 impl<const D: usize> ProjectionVector<D> {
-    /// Function to concatenate coefficients from multiple Rq into a Vec<Zq>
-    fn concatenate_coefficients(rqs: Vec<Rq<D>>) -> Vec<Zq> {
-        let mut concatenated_coeffs: Vec<Zq> = Vec::new();
-
-        // Iterate over each Rq, extracting the coefficients and concatenating them
-        for rq in rqs {
-            let coeffs = rq.get_coefficients();
-            concatenated_coeffs.extend_from_slice(&coeffs);
-        }
-
-        concatenated_coeffs
-    }
-
-    /// Euclidean norm
-    pub fn norm_squared(&self) -> Zq {
-        self.projection.iter().map(|coeff| *coeff * *coeff).sum()
-    }
-
     /// Calculates Projection  
     pub fn new(matrix: &ProjectionMatrix<D>, s_i: &[Rq<D>]) -> Self {
         let mut projection = [Zq::zero(); 256];
@@ -77,6 +59,24 @@ impl<const D: usize> ProjectionVector<D> {
     /// Obtain projection
     pub fn get_projection(&self) -> &[Zq; 256] {
         &self.projection
+    }
+
+    /// Function to concatenate coefficients from multiple Rq into a Vec<Zq>
+    fn concatenate_coefficients(rqvect: Vec<Rq<D>>) -> Vec<Zq> {
+        let mut concatenated_coeffs: Vec<Zq> = Vec::new();
+
+        // Iterate over each Rq, extracting the coefficients and concatenating them
+        for rq in rqvect {
+            let coeffs = rq.get_coefficients();
+            concatenated_coeffs.extend_from_slice(&coeffs);
+        }
+
+        concatenated_coeffs
+    }
+
+    /// Euclidean norm
+    pub fn norm_squared(&self) -> Zq {
+        self.projection.iter().map(|coeff| *coeff * *coeff).sum()
     }
 }
 
@@ -113,7 +113,7 @@ mod tests {
         );
 
         let n2 = 1;
-        let matrix = ProjectionMatrix::<4>::new(n2); // Assuming D=3 for this test
+        let matrix = ProjectionMatrix::<4>::new(n2);
 
         assert_eq!(matrix.matrix.len(), 256, "Matrix should have 256 rows");
         assert_eq!(
