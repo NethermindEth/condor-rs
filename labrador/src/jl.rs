@@ -45,8 +45,8 @@ impl<const D: usize> ProjectionVector<D> {
     /// Calculates Projection  
     pub fn new(matrix: &ProjectionMatrix<D>, s_i: &[Rq<D>]) -> Self {
         let mut projection = [Zq::zero(); 256];
-        let coefficients = Self::concatenate_coefficients(s_i.to_vec());
-        for (i, item) in projection.iter_mut().enumerate().take(256) {
+        let coefficients = Self::concatenate_coefficients(s_i);
+        for (i, item) in projection.iter_mut().enumerate() {
             *item = matrix.get_matrix()[i]
                 .iter()
                 .zip(coefficients.iter())
@@ -62,7 +62,7 @@ impl<const D: usize> ProjectionVector<D> {
     }
 
     /// Function to concatenate coefficients from multiple Rq into a Vec<Zq>
-    fn concatenate_coefficients(rqvect: Vec<Rq<D>>) -> Vec<Zq> {
+    fn concatenate_coefficients(rqvect: &[Rq<D>]) -> Vec<Zq> {
         let mut concatenated_coeffs: Vec<Zq> = Vec::new();
 
         // Iterate over each Rq, extracting the coefficients and concatenating them
@@ -169,7 +169,7 @@ mod tests {
             Zq::new(5),
             Zq::new(3),
         ];
-        assert!(ProjectionVector::<4>::concatenate_coefficients(polynomials) == vector);
+        assert!(ProjectionVector::<4>::concatenate_coefficients(&polynomials) == vector);
     }
 
     // Test that the probability of the inequality being true is close to 1/2
