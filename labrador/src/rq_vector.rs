@@ -1,5 +1,6 @@
 use crate::rq::Rq;
-use std::ops::{Index, IndexMut, Mul};
+use core::ops::{Index, IndexMut, Mul};
+use core::slice::Iter;
 
 /// Vector of polynomials in Rq
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -8,40 +9,27 @@ pub struct RqVector<const N: usize, const D: usize> {
 }
 
 impl<const N: usize, const D: usize> RqVector<N, D> {
-    /// Create a new vector from an array of elements
-    pub fn new(elements: [Rq<D>; N]) -> Self {
-        Self {
-            elements: elements.to_vec(),
-        }
-    }
-
-    /// Create a new vector from a Vec of elements
-    pub fn from_vec(elements: Vec<Rq<D>>) -> Self {
-        assert_eq!(elements.len(), N, "Vector length must match N");
-        Self { elements }
-    }
-
     /// Create a zero vector
     pub fn zero() -> Self {
-        let mut elements = Vec::with_capacity(N);
-        for _ in 0..N {
-            elements.push(Rq::zero());
+        Self {
+            elements: vec![Rq::zero(); N],
         }
-        Self { elements }
     }
 
     /// Create a random small vector
     pub fn random_small() -> Self {
-        let mut elements = Vec::with_capacity(N);
-        for _ in 0..N {
-            elements.push(Rq::random_small());
+        Self {
+            elements: (0..N).map(|_| Rq::random_small()).collect(),
         }
-        Self { elements }
     }
 
     /// Get the underlying vector as slice
     pub fn as_slice(&self) -> &[Rq<D>] {
         &self.elements
+    }
+
+    pub fn iter(&self) -> Iter<'_, Rq<D>> {
+        self.elements.iter()
     }
 
     /// Convert into array
@@ -67,17 +55,11 @@ impl<const N: usize, const D: usize> IndexMut<usize> for RqVector<N, D> {
     }
 }
 
-// From array conversion
-impl<const N: usize, const D: usize> From<[Rq<D>; N]> for RqVector<N, D> {
-    fn from(elements: [Rq<D>; N]) -> Self {
-        Self::new(elements)
-    }
-}
-
-// Into array conversion
-impl<const N: usize, const D: usize> From<RqVector<N, D>> for [Rq<D>; N] {
-    fn from(vector: RqVector<N, D>) -> Self {
-        vector.into_array()
+/// Create a new vector from a `Vec` of elements
+impl<const N: usize, const D: usize> From<Vec<Rq<D>>> for RqVector<N, D> {
+    fn from(elements: Vec<Rq<D>>) -> Self {
+        assert_eq!(elements.len(), N, "Vector length must match N");
+        Self { elements }
     }
 }
 
