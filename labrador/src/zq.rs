@@ -1,4 +1,6 @@
 use core::ops::{Add, AddAssign, Mul, MulAssign, Sub, SubAssign};
+use rand::distr::uniform::{Error, SampleBorrow, SampleUniform, UniformInt, UniformSampler};
+use rand::prelude::*;
 use std::fmt;
 /// Represents an element in the ring Z/qZ where q = 2^32.
 /// Uses native u32 operations with automatic modulo reduction through wrapping arithmetic.
@@ -68,6 +70,35 @@ impl fmt::Display for Zq {
         // Shows value with modulus for clarity
         write!(f, "{} (mod 2^32)", self.value())
     }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct UniformZq(UniformInt<u32>);
+
+impl UniformSampler for UniformZq {
+    type X = Zq;
+
+    fn new<B1, B2>(low: B1, high: B2) -> Result<Self, Error>
+    where
+        B1: SampleBorrow<Self::X> + Sized,
+        B2: SampleBorrow<Self::X> + Sized,
+    {
+        UniformInt::<u32>::new(low.borrow().value(), high.borrow().value()).map(UniformZq)
+    }
+    fn new_inclusive<B1, B2>(low: B1, high: B2) -> Result<Self, Error>
+    where
+        B1: SampleBorrow<Self::X> + Sized,
+        B2: SampleBorrow<Self::X> + Sized,
+    {
+        UniformInt::<u32>::new_inclusive(low.borrow().value(), high.borrow().value()).map(UniformZq)
+    }
+    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> Self::X {
+        self.0.sample(rng).into()
+    }
+}
+
+impl SampleUniform for Zq {
+    type Sampler = UniformZq;
 }
 
 #[cfg(test)]

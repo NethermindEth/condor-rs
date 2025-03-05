@@ -82,11 +82,14 @@ pub struct AjtaiCommitment<const M: usize, const N: usize, const D: usize> {
 // Core implementation with security checks
 impl<const M: usize, const N: usize, const D: usize> AjtaiCommitment<M, N, D> {
     /// Creates new commitment scheme with validated parameters
-    pub fn new(params: AjtaiParameters) -> Result<Self, ParameterError> {
+    pub fn new(
+        params: AjtaiParameters,
+        matrix_a: RqMatrix<M, N, D>,
+    ) -> Result<Self, ParameterError> {
         Self::validate_parameters(&params)?;
 
         Ok(Self {
-            matrix_a: RqMatrix::random(),
+            matrix_a,
             witness_bound: params.witness_bound,
         })
     }
@@ -211,11 +214,14 @@ mod tests {
         }
 
         pub fn random_valid_witness() -> RqVector<TEST_N, TEST_D> {
-            RqVector::random_small()
+            let mut rng = rand::rng();
+            RqVector::random_small(&mut rng)
         }
 
         pub fn setup_scheme() -> TestAjtai {
-            TestAjtai::new(AjtaiParameters::new(Zq::ONE, Zq::ONE).unwrap()).unwrap()
+            let mut rng = rand::rng();
+            let matrix_a = RqMatrix::random_small(&mut rng);
+            TestAjtai::new(AjtaiParameters::new(Zq::ONE, Zq::ONE).unwrap(), matrix_a).unwrap()
         }
     }
 
@@ -240,7 +246,8 @@ mod tests {
         assert!(scheme.verify(&commitment, &opening).is_ok());
 
         let mut bad_opening = opening.clone();
-        bad_opening.witness[0] = Rq::random_small();
+        let mut rng = rand::rng();
+        bad_opening.witness[0] = Rq::random(&mut rng);
         assert!(scheme.verify(&commitment, &bad_opening).is_err());
     }
 

@@ -17,7 +17,9 @@
 // We use the Zq ring
 use crate::zq::Zq;
 use core::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
+use rand::distr::{Distribution, Uniform};
 use rand::{CryptoRng, Rng};
+
 /// This module provides implementations for various operations
 /// in the polynomial ring R = Z_q\[X\] / (X^d + 1).
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -120,48 +122,27 @@ impl<const D: usize> Rq<D> {
         self.coeffs == other.coeffs
     }
 
-    /// Generate random small polynomial for commitments
-    pub fn random_small() -> Self {
-        let mut rng = rand::rng();
-        Self::random_small_with_secure_rng(&mut rng)
+    /// Generate random polynomial with a provided cryptographically secure RNG
+    pub fn random<R: Rng + CryptoRng>(rng: &mut R) -> Self {
+        let uniform = Uniform::new_inclusive(Zq::ZERO, Zq::MAX).unwrap();
+        let mut coeffs = [Zq::ZERO; D];
+        coeffs.iter_mut().for_each(|c| *c = uniform.sample(rng));
+        Self { coeffs }
     }
 
-    /// Generate random small polynomial with a provided seed
-    pub fn random_small_with_seed(seed: u64) -> Self {
-        use rand::rngs::StdRng;
-        use rand::SeedableRng;
-        let mut rng = StdRng::seed_from_u64(seed);
-        Self::random_small_with_any_rng(&mut rng)
-    }
-
-    /// Generate random small polynomial with a custom seeded RNG
-    ///
-    /// This function provides maximum flexibility for different contexts:
-    /// - For no-std environments, use a no-std compatible RNG
-    /// - For extra security, use a stronger cryptographic RNG
-    /// - For testing, use a simple deterministic RNG
-    pub fn random_small_with_seeded_rng<R: Rng + rand::SeedableRng>(mut rng: R) -> Self {
-        Self::random_small_with_any_rng(&mut rng)
-    }
-
-    /// Generate random small polynomial with a provided cryptographically secure RNG
-    pub fn random_small_with_secure_rng<R: Rng + CryptoRng>(rng: &mut R) -> Self {
-        Self::random_small_with_any_rng(rng)
-    }
-
-    /// Generate random small polynomial with any RNG implementation
-    pub fn random_small_with_any_rng<R: Rng>(rng: &mut R) -> Self {
+    /// Generate random small polynomial with secure RNG implementation
+    pub fn random_ternary<R: Rng + CryptoRng>(rng: &mut R) -> Self {
         let mut coeffs = [Zq::ZERO; D];
 
         for coeff in coeffs.iter_mut() {
             // Explicitly sample from {-1, 0, 1} with equal probability
             let val = match rng.random_range(0..3) {
-                0 => Zq::Q.wrapping_sub(1), // -1 mod q
-                1 => 0,                     // 0
-                2 => 1,                     // 1
+                0 => Zq::MAX,  // -1 mod q
+                1 => Zq::ZERO, // 0
+                2 => Zq::ONE,  // 1
                 _ => unreachable!(),
             };
-            *coeff = Zq::new(val);
+            *coeff = val;
         }
 
         Rq::new(coeffs)

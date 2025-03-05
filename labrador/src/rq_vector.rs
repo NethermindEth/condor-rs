@@ -1,6 +1,7 @@
 use crate::rq::Rq;
 use core::ops::{Index, IndexMut, Mul};
 use core::slice::Iter;
+use rand::{CryptoRng, Rng};
 
 /// Vector of polynomials in Rq
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -16,10 +17,17 @@ impl<const N: usize, const D: usize> RqVector<N, D> {
         }
     }
 
-    /// Create a random small vector
-    pub fn random_small() -> Self {
+    /// Create a random vector
+    pub fn random<R: Rng + CryptoRng>(rng: &mut R) -> Self {
         Self {
-            elements: (0..N).map(|_| Rq::random_small()).collect(),
+            elements: (0..N).map(|_| Rq::random(rng)).collect(),
+        }
+    }
+
+    /// Create a random vector
+    pub fn random_small<R: Rng + CryptoRng>(rng: &mut R) -> Self {
+        Self {
+            elements: (0..N).map(|_| Rq::random_ternary(rng)).collect(),
         }
     }
 

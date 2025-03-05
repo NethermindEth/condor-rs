@@ -1,4 +1,5 @@
 use crate::rq_vector::RqVector;
+use rand::{CryptoRng, Rng};
 use std::ops::Mul;
 
 /// Matrix of polynomials in Rq
@@ -8,10 +9,17 @@ pub struct RqMatrix<const M: usize, const N: usize, const D: usize> {
 }
 
 impl<const M: usize, const N: usize, const D: usize> RqMatrix<M, N, D> {
-    /// Create a random matrix of polynomials with small coefficients
-    pub fn random() -> Self {
+    /// Create a random matrix of polynomials
+    pub fn random<R: Rng + CryptoRng>(rng: &mut R) -> Self {
         Self {
-            elements: (0..M).map(|_| RqVector::random_small()).collect(),
+            elements: (0..M).map(|_| RqVector::random(rng)).collect(),
+        }
+    }
+
+    /// Create a random matrix of polynomials with small coefficients
+    pub fn random_small<R: Rng + CryptoRng>(rng: &mut R) -> Self {
+        Self {
+            elements: (0..M).map(|_| RqVector::random_small(rng)).collect(),
         }
     }
 }
@@ -46,6 +54,7 @@ mod tests {
 
     #[test]
     fn rqmatrix_fits_stack() {
-        let _: RqMatrix<256, { 1 << 10 }, 64> = RqMatrix::random();
+        let mut rng = rand::rng();
+        let _: RqMatrix<256, { 1 << 10 }, 64> = RqMatrix::random(&mut rng);
     }
 }
