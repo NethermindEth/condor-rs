@@ -10,12 +10,9 @@ pub struct RqMatrix<const M: usize, const N: usize, const D: usize> {
 impl<const M: usize, const N: usize, const D: usize> RqMatrix<M, N, D> {
     /// Create a random matrix of polynomials with small coefficients
     pub fn random() -> Self {
-        let mut elements = Vec::with_capacity(M);
-        for _ in 0..M {
-            let row = RqVector::random_small();
-            elements.push(row);
+        Self {
+            elements: (0..M).map(|_| RqVector::random_small()).collect(),
         }
-        Self { elements }
     }
 }
 

@@ -59,15 +59,6 @@ impl AjtaiParameters {
     }
 }
 
-impl Default for AjtaiParameters {
-    fn default() -> Self {
-        Self {
-            beta: Zq::ONE,
-            witness_bound: Zq::ONE,
-        }
-    }
-}
-
 /// Cryptographic opening containing witness
 #[derive(Clone, Debug)]
 pub struct Opening<const N: usize, const D: usize> {
@@ -86,12 +77,6 @@ impl<const N: usize, const D: usize> Opening<N, D> {
 pub struct AjtaiCommitment<const M: usize, const N: usize, const D: usize> {
     matrix_a: RqMatrix<M, N, D>,
     witness_bound: Zq,
-}
-
-impl<const M: usize, const N: usize, const D: usize> Default for AjtaiCommitment<M, N, D> {
-    fn default() -> Self {
-        Self::new(AjtaiParameters::default()).expect("Default parameters should always be valid")
-    }
 }
 
 // Core implementation with security checks
@@ -230,7 +215,7 @@ mod tests {
         }
 
         pub fn setup_scheme() -> TestAjtai {
-            TestAjtai::new(AjtaiParameters::default()).unwrap()
+            TestAjtai::new(AjtaiParameters::new(Zq::ONE, Zq::ONE).unwrap()).unwrap()
         }
     }
 
@@ -242,7 +227,7 @@ mod tests {
 
     #[test]
     fn initializes_with_correct_bounds() {
-        let scheme = TestAjtai::default();
+        let scheme = test_utils::setup_scheme();
         assert_eq!(scheme.witness_bound().value(), 1);
     }
 
@@ -289,7 +274,7 @@ mod tests {
 
     #[test]
     fn stress_test() {
-        let scheme = TestAjtai::default();
+        let scheme = test_utils::setup_scheme();
 
         (0..100).for_each(|_| {
             let witness = test_utils::valid_witness(&scheme);
