@@ -63,8 +63,8 @@ impl<const D: usize> ProjectionVector<D> {
 
     /// Function to concatenate coefficients from multiple Rq into a Vec<Zq>
     fn concatenate_coefficients(rqvect: &[Rq<D>]) -> Vec<Zq> {
-        let mut concatenated_coeffs: Vec<Zq> = Vec::new();
-
+        let total_coeffs = rqvect.iter().fold(0, |sum, _rq| sum + D);
+        let mut concatenated_coeffs: Vec<Zq> = Vec::with_capacity(total_coeffs);
         // Iterate over each Rq, extracting the coefficients and concatenating them
         for rq in rqvect {
             let coeffs = rq.get_coefficients();
@@ -79,20 +79,22 @@ impl<const D: usize> ProjectionVector<D> {
         self.projection.iter().map(|coeff| *coeff * *coeff).sum()
     }
 }
-
+// Bound verification
+const UPPER_BOUND_FACTOR: Zq = Zq::new(128);
+const LOWER_BOUND_FACTOR: Zq = Zq::new(30);
 // Function to verify upper bound of projection
 pub fn verify_upper_bound<const D: usize>(
     projection: ProjectionVector<D>,
     beta_squared: Zq,
 ) -> bool {
-    projection.norm_squared().value() < (Zq::new(128) * beta_squared).value()
+    projection.norm_squared().value() < (UPPER_BOUND_FACTOR * beta_squared).value()
 }
 // Function to verify lower bound of projection
 pub fn verify_lower_bound<const D: usize>(
     projection: ProjectionVector<D>,
     beta_squared: Zq,
 ) -> bool {
-    projection.norm_squared().value() > (Zq::new(30) * beta_squared).value()
+    projection.norm_squared().value() > (LOWER_BOUND_FACTOR * beta_squared).value()
 }
 
 #[cfg(test)]
@@ -126,6 +128,7 @@ mod tests {
     // Test the distribution of values in the random matrix
     #[test]
     fn test_random_distribution_matrix() {
+        // 1000 was chosen to provide a reasonably large sample size
         let n = 1000;
         let matrix = ProjectionMatrix::<4>::new(n);
         let mut counts = [0.0, 0.0, 0.0]; // -1, 0, 1
@@ -140,15 +143,18 @@ mod tests {
                 }
             }
         }
+        // Number of elements in the matrix as f64 (256x4x1000)
         let total: f64 = 1024000.0;
+        println!("this is the total amount of elements{}", total);
         let expected = [0.25, 0.5, 0.25];
         for i in 0..3 {
             let actual = counts[i] / total;
             println!("This is the actual value {}", actual);
             assert!(
-                (actual - expected[i]).abs() < 0.05,
+                //Since its a statistical test some small error tolerance is allowed
+                (actual - expected[i]).abs() < 0.005,
                 "Values are not within expected proportions"
-            ); // we allow some tolerance
+            );
         }
     }
 
@@ -175,12 +181,13 @@ mod tests {
     // Test that the probability of the inequality being true is close to 1/2
     #[test]
     fn test_probability_is_close_to_half() {
-        let trials: f64 = 1000.0;
+        // 10.000 was chosen to provide a reasonably large sample size
+        let trials: f64 = 10000.0;
         let mut success_count: f64 = 0.0;
         let n = 5;
-        for _ in 0..1000 {
+        for _ in 0..10000 {
             // Generate the random polynomials
-            let polynomials = Rq::<64>::random_small_vector(n);
+            let polynomials = Rq::<5>::random_small_vector(n);
             // Generate projection matrix
             let matrix = ProjectionMatrix::new(n);
             // Generate Projection
@@ -195,7 +202,7 @@ mod tests {
 
         let observed_probability = success_count / trials;
 
-        // we allow some tolerance
+        // We allow some tolerance becasuse of the statistical nature of the results.
         let tolerance = 0.05;
         assert!(
             (observed_probability - 0.5).abs() < tolerance,
@@ -207,9 +214,10 @@ mod tests {
     // On average the projected norm squared is the same as 128 * vector norm squared
     #[test]
     fn average_value() {
-        let trials: u32 = 5000;
-        let n = 5;
-        let polynomials = Rq::<64>::random_small_vector(n);
+        // 100.000 was chosen to provide a reasonably large sample size
+        let trials: u32 = 100000;
+        let n = 4;
+        let polynomials = Rq::<3>::random_small_vector(n);
         let mut matrix = ProjectionMatrix::new(n);
         let mut projection = ProjectionVector::new(&matrix, &polynomials);
         let mut norm_sum = projection.norm_squared();
@@ -223,21 +231,11 @@ mod tests {
 
         // Calculate the observed probability
         let average = norm_sum.value() / trials;
-
-        // we allow some tolerance
-        let tolerance: u32 = 100;
-        let abs_difference = if average < norm_value {
-            norm_value - average
-        } else {
-            average - norm_value
-        };
-
         assert!(
-            abs_difference < tolerance,
-            "Average norm value {} is not close to {}. Difference: {}",
+            norm_value == average,
+            "Average norm value {} is not equal to {}.",
             average,
             (Zq::new(128) * Rq::compute_norm_squared(&polynomials)).value(),
-            abs_difference
         );
     }
 
