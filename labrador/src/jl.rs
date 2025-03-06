@@ -136,9 +136,9 @@ mod tests {
             for &elem in row.iter() {
                 if elem == Zq::MAX {
                     counts[0] += 1.0;
-                } else if elem == Zq::zero() {
+                } else if elem == Zq::ZERO {
                     counts[1] += 1.0;
-                } else if elem == Zq::one() {
+                } else if elem == Zq::ONE {
                     counts[2] += 1.0;
                 }
             }
@@ -162,16 +162,16 @@ mod tests {
     #[test]
     fn test_vector_concatenation() {
         let polynomials = vec![
-            vec![Zq::new(1), Zq::zero(), Zq::zero(), Zq::MAX].into(),
-            vec![Zq::new(6), Zq::zero(), Zq::new(5), Zq::new(3)].into(),
+            vec![Zq::ONE, Zq::ZERO, Zq::ZERO, Zq::MAX].into(),
+            vec![Zq::new(6), Zq::ZERO, Zq::new(5), Zq::new(3)].into(),
         ];
         let vector = vec![
-            Zq::new(1),
-            Zq::zero(),
-            Zq::zero(),
+            Zq::ONE,
+            Zq::ZERO,
+            Zq::ZERO,
             Zq::MAX,
             Zq::new(6),
-            Zq::zero(),
+            Zq::ZERO,
             Zq::new(5),
             Zq::new(3),
         ];
@@ -216,7 +216,7 @@ mod tests {
     fn average_value() {
         // 100.000 was chosen to provide a reasonably large sample size
         let trials: u32 = 100000;
-        let n = 4;
+        let n = 3;
         let polynomials = Rq::<3>::random_small_vector(n);
         let mut matrix = ProjectionMatrix::new(n);
         let mut projection = ProjectionVector::new(&matrix, &polynomials);

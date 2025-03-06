@@ -173,7 +173,7 @@ impl<const D: usize> Rq<D> {
         }
 
         Rq::new(coeffs)
-    }    
+    }
 
     /// Generate a vector of random small polynomial for commitments of size n
     pub fn random_small_vector(n: usize) -> Vec<Self> {
@@ -273,7 +273,6 @@ impl<const D: usize> From<Vec<Zq>> for Rq<D> {
         Rq::new(temp)
     }
 }
-
 
 impl Sum for Zq {
     // Accumulate using the addition operator
@@ -537,27 +536,27 @@ mod tests {
     // Test coefficient extraction
     #[test]
     fn test_get_coefficient() {
-        let poly: Rq<4> = vec![Zq::new(1), Zq::zero(), Zq::new(5), Zq::MAX].into();
-        let vec = vec![Zq::new(1), Zq::zero(), Zq::new(5), Zq::MAX];
+        let poly: Rq<4> = vec![Zq::ONE, Zq::ZERO, Zq::new(5), Zq::MAX].into();
+        let vec = vec![Zq::ONE, Zq::ZERO, Zq::new(5), Zq::MAX];
         assert!(poly.get_coefficients() == vec);
 
-        let poly_zero: Rq<4> = vec![Zq::zero(), Zq::zero(), Zq::zero(), Zq::zero()].into();
-        let vec_zero = vec![Zq::zero(), Zq::zero(), Zq::zero(), Zq::zero()];
+        let poly_zero: Rq<4> = vec![Zq::ZERO, Zq::ZERO, Zq::ZERO, Zq::ZERO].into();
+        let vec_zero = vec![Zq::ZERO, Zq::ZERO, Zq::ZERO, Zq::ZERO];
         assert!(poly_zero.get_coefficients() == vec_zero);
     }
 
     // Test the square of the norm
     #[test]
     fn test_norm() {
-        let poly: Rq<4> = vec![Zq::new(1), Zq::zero(), Zq::new(5), Zq::MAX].into();
+        let poly: Rq<4> = vec![Zq::ONE, Zq::ZERO, Zq::new(5), Zq::MAX].into();
         let result = Zq::new(27);
         assert!(Rq::compute_norm_squared(&[poly]).value() == result.value());
 
-        let poly2: Rq<4> = vec![Zq::new(5), Zq::new(1), Zq::MAX, Zq::zero()].into();
+        let poly2: Rq<4> = vec![Zq::new(5), Zq::ONE, Zq::MAX, Zq::ZERO].into();
         assert!(Rq::compute_norm_squared(&[poly2]).value() == result.value());
 
-        let poly_zero: Rq<4> = vec![Zq::zero(), Zq::zero(), Zq::zero(), Zq::zero()].into();
-        let result_zero = Zq::zero();
+        let poly_zero: Rq<4> = vec![Zq::ZERO, Zq::ZERO, Zq::ZERO, Zq::ZERO].into();
+        let result_zero = Zq::ZERO;
         assert!(Rq::compute_norm_squared(&[poly_zero]).value() == result_zero.value());
-    }    
+    }
 }

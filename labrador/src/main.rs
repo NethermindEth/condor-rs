@@ -6,9 +6,6 @@ use labrador::zq::Zq;
 
 const D: usize = 4; // Degree of polynomials in S_i
 
-mod poly_ring;
-use poly_ring::Poly;
-
 fn main() {
     // Example poly_ring
     let p1: Rq<D> = vec![Zq::new(1)].into();
@@ -67,6 +64,4 @@ fn main() {
     // Within bounds with probability 1/2
     let beta = Rq::compute_norm_squared(&polynomials);
     println!("{}", verify_upper_bound(projection, beta));
-
 }
-

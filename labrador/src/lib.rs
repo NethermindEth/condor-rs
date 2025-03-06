@@ -1,9 +1,6 @@
 // Documentation
 
 // Main Introduction
-
-// Main Introduction
-
 #![forbid(unsafe_code)]
 #![deny(clippy::as_conversions)]
 #![doc = include_str!("../doc/labrador_docs/mainpage-doc.md")]
@@ -17,7 +14,6 @@
 #![doc = include_str!("../doc/labrador_docs/aggregation.md")]
 // Amortization
 #![doc = include_str!("../doc/labrador_docs/amortization.md")]
-
 
 pub mod rq;
 
