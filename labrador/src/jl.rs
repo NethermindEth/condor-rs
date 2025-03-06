@@ -202,7 +202,7 @@ mod tests {
 
         let observed_probability = success_count / trials;
 
-        // We allow some tolerance becasuse of the statistical nature of the results.
+        // We allow some tolerance because of the statistical nature of the results.
         let tolerance = 0.05;
         assert!(
             (observed_probability - 0.5).abs() < tolerance,
