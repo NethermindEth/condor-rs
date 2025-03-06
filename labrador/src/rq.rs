@@ -156,30 +156,12 @@ impl<const D: usize> Rq<D> {
         Rq::new(coeffs)
     }
 
-    /// TEMPORARY FUNCTION (TO BE REPLACED FOR RANDOM TERNARY)
-    pub fn random_small() -> Self {
-        let mut rng = rand::rng();
-        let mut coeffs = [Zq::ZERO; D];
-
-        for coeff in coeffs.iter_mut() {
-            // Explicitly sample from {-1, 0, 1} with equal probability
-            let val = match rng.random_range(0..3) {
-                0 => Zq::Q.wrapping_sub(1), // -1 mod q
-                1 => 0,                     // 0
-                2 => 1,                     // 1
-                _ => unreachable!(),
-            };
-            *coeff = Zq::new(val);
-        }
-
-        Rq::new(coeffs)
-    }
-
     /// Generate a vector of random small polynomial for commitments of size n
     pub fn random_small_vector(n: usize) -> Vec<Self> {
         let mut v: Vec<Self> = Vec::new();
         for _ in 0..n {
-            v.push(Self::random_small());
+            let mut rng = rand::rng();
+            v.push(Self::random_ternary(&mut rng));
         }
         v
     }
