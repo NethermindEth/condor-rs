@@ -231,8 +231,16 @@ mod tests {
 
         // Calculate the observed probability
         let average = norm_sum.value() / trials;
+        let diference = if norm_value <= average {
+            average - norm_value
+        } else {
+            norm_value - average
+        };
+
+        // we choose a small tolerance value for posible statistical error
+        let tolerance: u32 = 2;
         assert!(
-            norm_value == average,
+            diference < tolerance,
             "Average norm value {} is not equal to {}.",
             average,
             (Zq::new(128) * Rq::compute_norm_squared(&polynomials)).value(),
