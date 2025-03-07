@@ -1,10 +1,11 @@
-use core::ops::{Add, AddAssign, Mul, MulAssign, Sub, SubAssign};
+use core::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 use rand::distr::uniform::{Error, SampleBorrow, SampleUniform, UniformInt, UniformSampler};
 use rand::prelude::*;
+use std::cmp::Ordering;
 use std::fmt;
 /// Represents an element in the ring Z/qZ where q = 2^32.
 /// Uses native u32 operations with automatic modulo reduction through wrapping arithmetic.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct Zq {
     /// Stored value is always in [0, q-1] due to u32's wrapping behavior
     value: u32,
@@ -99,6 +100,44 @@ impl UniformSampler for UniformZq {
 
 impl SampleUniform for Zq {
     type Sampler = UniformZq;
+}
+
+// Implementing the Ord trait
+
+impl PartialEq for Zq {
+    fn eq(&self, other: &Self) -> bool {
+        self.value == other.value
+    }
+}
+impl Eq for Zq {}
+
+impl PartialOrd for Zq {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.value.cmp(&other.value))
+    }
+}
+
+impl Ord for Zq {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.value.cmp(&other.value)
+    }
+}
+
+// Implement the Neg trait for Zq.
+impl Neg for Zq {
+    type Output = Zq;
+
+    /// Returns the additive inverse of the field element.
+    ///
+    /// Wrap around (q - a) mod q.
+    fn neg(self) -> Zq {
+        // If the value is zero, its inverse is itself.
+        if self.value == 0 {
+            self
+        } else {
+            Zq::MAX + Zq::ONE - self
+        }
+    }
 }
 
 #[cfg(test)]
@@ -212,5 +251,34 @@ mod tests {
     #[test]
     fn test_maximum_element() {
         assert_eq!(Zq::MAX, Zq::ZERO - Zq::ONE);
+    }
+
+    #[test]
+    fn test_ord() {
+        let a = Zq::new(100);
+        let b = Zq::new(200);
+        let c = Zq::new(100);
+        let d = Zq::new(400);
+
+        let res_1 = a.cmp(&b);
+        let res_2 = a.cmp(&c);
+        let res_3 = d.cmp(&b);
+        assert!(res_1.is_lt());
+        assert!(res_2.is_eq());
+        assert!(res_3.is_gt());
+        assert_eq!(a, c);
+        assert!(a < b);
+        assert!(d > b);
+    }
+
+    #[test]
+    fn test_neg() {
+        let a = Zq::new(100);
+        let b = Zq::ZERO;
+        let neg_a: Zq = -a;
+        let neg_b: Zq = -b;
+
+        assert_eq!(neg_a + a, Zq::ZERO);
+        assert_eq!(neg_b, Zq::ZERO);
     }
 }
