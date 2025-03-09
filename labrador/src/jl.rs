@@ -14,8 +14,16 @@ impl<const D: usize> ProjectionMatrix<D> {
     pub fn new(n: usize) -> Self {
         let mut matrix = vec![vec![Zq::ZERO; n * D]; 256];
         let mut rng = rng();
-        // Fill the matrix with random values from {-1, 0, 1}
         for row in matrix.iter_mut() {
+            //let coefficients = Rq::<D>::random_ternary(&mut rng).get_coefficients().to_vec();
+            //let vector = Rq::<D>::random_small_vector(n);
+            //let mut r: Vec<Zq> = Vec::new();
+            //for polynomial in vector{
+            //    for element in polynomial.get_coefficients(){
+            //        r.push(*element);
+            //    }
+            //}
+            //*row = r;
             for elem in row.iter_mut() {
                 let rand_val: f64 = rng.random();
                 *elem = if rand_val < 0.25 {
@@ -27,8 +35,10 @@ impl<const D: usize> ProjectionMatrix<D> {
                 };
             }
         }
+
         ProjectionMatrix { matrix }
     }
+
     /// Returns the matrix
     pub fn get_matrix(&self) -> &Vec<Vec<Zq>> {
         &self.matrix
@@ -63,12 +73,12 @@ impl<const D: usize> ProjectionVector<D> {
 
     /// Function to concatenate coefficients from multiple Rq into a Vec<Zq>
     fn concatenate_coefficients(rqvect: &[Rq<D>]) -> Vec<Zq> {
-        let total_coeffs = rqvect.iter().fold(0, |sum, _rq| sum + D);
+        let total_coeffs = rqvect.len() * D;
         let mut concatenated_coeffs: Vec<Zq> = Vec::with_capacity(total_coeffs);
         // Iterate over each Rq, extracting the coefficients and concatenating them
         for rq in rqvect {
             let coeffs = rq.get_coefficients();
-            concatenated_coeffs.extend_from_slice(&coeffs);
+            concatenated_coeffs.extend_from_slice(coeffs);
         }
 
         concatenated_coeffs
@@ -158,26 +168,6 @@ mod tests {
         }
     }
 
-    // Test vector concatenation
-    #[test]
-    fn test_vector_concatenation() {
-        let polynomials = vec![
-            vec![Zq::ONE, Zq::ZERO, Zq::ZERO, Zq::MAX].into(),
-            vec![Zq::new(6), Zq::ZERO, Zq::new(5), Zq::new(3)].into(),
-        ];
-        let vector = vec![
-            Zq::ONE,
-            Zq::ZERO,
-            Zq::ZERO,
-            Zq::MAX,
-            Zq::new(6),
-            Zq::ZERO,
-            Zq::new(5),
-            Zq::new(3),
-        ];
-        assert!(ProjectionVector::<4>::concatenate_coefficients(&polynomials) == vector);
-    }
-
     // Test that the probability of the inequality being true is close to 1/2
     #[test]
     fn test_probability_is_close_to_half() {
@@ -260,5 +250,25 @@ mod tests {
         let beta = Rq::compute_norm_squared(&polynomials);
         // Check if the norm of the projection is bigger than 30 * (squared norm of the projection of the random polynomial)
         assert!(verify_lower_bound(projection, beta));
+    }
+
+    // Test vector concatenation
+    #[test]
+    fn test_vector_concatenation() {
+        let polynomials = vec![
+            vec![Zq::ONE, Zq::ZERO, Zq::ZERO, Zq::MAX].into(),
+            vec![Zq::new(6), Zq::ZERO, Zq::new(5), Zq::new(3)].into(),
+        ];
+        let vector = vec![
+            Zq::ONE,
+            Zq::ZERO,
+            Zq::ZERO,
+            Zq::MAX,
+            Zq::new(6),
+            Zq::ZERO,
+            Zq::new(5),
+            Zq::new(3),
+        ];
+        assert!(ProjectionVector::<4>::concatenate_coefficients(&polynomials) == vector);
     }
 }

@@ -37,8 +37,8 @@ impl<const D: usize> Rq<D> {
         Rq { coeffs }
     }
     /// Get the coefficients as a vector
-    pub fn get_coefficients(&self) -> Vec<Zq> {
-        self.coeffs.to_vec()
+    pub fn get_coefficients(&self) -> &[Zq; D] {
+        &self.coeffs
     }
 
     /// Polynomial addition
@@ -209,7 +209,7 @@ impl<const D: usize> Rq<D> {
     pub fn compute_norm_squared(polynomials: &[Rq<D>]) -> Zq {
         polynomials
             .iter()
-            .flat_map(|poly| poly.get_coefficients()) // Collect coefficients from all polynomials
+            .flat_map(|poly| poly.get_coefficients().to_vec()) // Collect coefficients from all polynomials
             .map(|coeff| coeff * coeff)
             .sum()
     }
@@ -520,11 +520,11 @@ mod tests {
     fn test_get_coefficient() {
         let poly: Rq<4> = vec![Zq::ONE, Zq::ZERO, Zq::new(5), Zq::MAX].into();
         let vec = vec![Zq::ONE, Zq::ZERO, Zq::new(5), Zq::MAX];
-        assert!(poly.get_coefficients() == vec);
+        assert!(poly.get_coefficients().to_vec() == vec);
 
         let poly_zero: Rq<4> = vec![Zq::ZERO, Zq::ZERO, Zq::ZERO, Zq::ZERO].into();
         let vec_zero = vec![Zq::ZERO, Zq::ZERO, Zq::ZERO, Zq::ZERO];
-        assert!(poly_zero.get_coefficients() == vec_zero);
+        assert!(poly_zero.get_coefficients().to_vec() == vec_zero);
     }
 
     // Test the square of the norm
