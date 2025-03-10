@@ -31,9 +31,8 @@ impl Zq {
     // pub const fn value(&self) -> u32 {
     //     self.value
     // }
-
-    pub const fn to_u128(&self) -> u128 {
-        self.value as u128
+    pub fn to_u128(&self) -> u128 {
+        u128::from(self.value)
     }
 
     pub const fn is_zero(&self) -> bool {

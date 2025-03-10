@@ -129,7 +129,7 @@ impl<const M: usize, const N: usize, const D: usize> AjtaiCommitment<M, N, D> {
 
     /// Validates scheme parameters against cryptographic security requirements
     fn validate_parameters(params: &AjtaiParameters) -> Result<(), ParameterError> {
-        if [M, N, D].iter().any(|&v| v == 0) {
+        if [M, N, D].contains(&0) {
             return Err(ParameterError::ZeroParameter);
         }
 
