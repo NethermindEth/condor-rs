@@ -133,7 +133,7 @@ impl<const M: usize, const N: usize, const D: usize> AjtaiCommitment<M, N, D> {
             return Err(ParameterError::ZeroParameter);
         }
 
-        Self::verify_security_relation(params.beta.value(), M)
+        Self::verify_security_relation(params.beta, M)
     }
 
     /// Verifies the security relation β²m³ < q² required for Ajtai's commitment scheme.
@@ -148,13 +148,13 @@ impl<const M: usize, const N: usize, const D: usize> AjtaiCommitment<M, N, D> {
     /// - β bounds the size of witness coefficients
     /// - m is the commitment output length
     /// - q is the modulus of the underlying ring
-    fn verify_security_relation(beta: u32, m: usize) -> Result<(), ParameterError> {
+    fn verify_security_relation(beta:Zq, m: usize) -> Result<(), ParameterError> {
         // Calculate q from Zq properties
-        let q_val = Zq::MAX.value();
-        let q = u128::from(q_val) + 1;
+        let q_val = Zq::MAX;
+        let q: u128 = q_val.to_u128() + 1;
 
         // Calculate beta²
-        let beta_squared = u128::from(beta)
+        let beta_squared = beta.to_u128()
             .checked_pow(2)
             .ok_or(ParameterError::SecurityBoundViolation)?;
 
@@ -234,7 +234,7 @@ mod tests {
     #[test]
     fn initializes_with_correct_bounds() {
         let scheme = test_utils::setup_scheme();
-        assert_eq!(scheme.witness_bound().value(), 1);
+        assert_eq!(scheme.witness_bound(), Zq::ONE);
     }
 
     #[test]
