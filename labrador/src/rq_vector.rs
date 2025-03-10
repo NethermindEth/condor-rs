@@ -1,4 +1,5 @@
 use crate::rq::Rq;
+use crate::zq::Zq;
 use core::ops::{Index, IndexMut, Mul};
 use core::slice::Iter;
 use rand::{CryptoRng, Rng};
@@ -31,6 +32,19 @@ impl<const N: usize, const D: usize> RqVector<N, D> {
         }
     }
 
+    /// Function to concatenate coefficients from multiple Rq into a Vec<Zq>
+    pub fn concatenate_coefficients(rqvect: Self) -> Vec<Zq> {
+        let total_coeffs = rqvect.elements.len() * D;
+        let mut concatenated_coeffs: Vec<Zq> = Vec::with_capacity(total_coeffs);
+        // Iterate over each Rq, extracting the coefficients and concatenating them
+        for rq in rqvect.elements {
+            let coeffs = rq.get_coefficients();
+            concatenated_coeffs.extend_from_slice(coeffs);
+        }
+
+        concatenated_coeffs
+    }
+
     /// Get the underlying vector as slice
     pub fn as_slice(&self) -> &[Rq<D>] {
         &self.elements
@@ -45,6 +59,16 @@ impl<const N: usize, const D: usize> RqVector<N, D> {
         self.elements
             .try_into()
             .unwrap_or_else(|_| panic!("Vector length mismatch"))
+    }
+
+    // Compute the squared norm of a vector of polynomials
+    pub fn compute_norm_squared(polynomials: Self) -> Zq {
+        polynomials
+            .elements
+            .iter()
+            .flat_map(|poly| poly.get_coefficients().to_vec()) // Collect coefficients from all polynomials
+            .map(|coeff| coeff * coeff)
+            .sum()
     }
 }
 

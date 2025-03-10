@@ -1,4 +1,4 @@
-use crate::rq::Rq;
+use crate::rq_vector::RqVector;
 use crate::zq::Zq;
 use rand::prelude::*;
 use rand::rng;
@@ -15,15 +15,6 @@ impl<const D: usize> ProjectionMatrix<D> {
         let mut matrix = vec![vec![Zq::ZERO; n * D]; 256];
         let mut rng = rng();
         for row in matrix.iter_mut() {
-            //let coefficients = Rq::<D>::random_ternary(&mut rng).get_coefficients().to_vec();
-            //let vector = Rq::<D>::random_small_vector(n);
-            //let mut r: Vec<Zq> = Vec::new();
-            //for polynomial in vector{
-            //    for element in polynomial.get_coefficients(){
-            //        r.push(*element);
-            //    }
-            //}
-            //*row = r;
             for elem in row.iter_mut() {
                 let rand_val: f64 = rng.random();
                 *elem = if rand_val < 0.25 {
@@ -47,15 +38,15 @@ impl<const D: usize> ProjectionMatrix<D> {
 
 /// Calculate projection vector
 #[derive(Debug)]
-pub struct ProjectionVector<const D: usize> {
+pub struct ProjectionVector<const N: usize, const D: usize> {
     projection: [Zq; 256], // 256-dimensional projection vector
 }
 
-impl<const D: usize> ProjectionVector<D> {
+impl<const N: usize, const D: usize> ProjectionVector<N, D> {
     /// Calculates Projection  
-    pub fn new(matrix: &ProjectionMatrix<D>, s_i: &[Rq<D>]) -> Self {
+    pub fn new(matrix: &ProjectionMatrix<D>, s_i: RqVector<N, D>) -> Self {
         let mut projection = [Zq::ZERO; 256];
-        let coefficients = Self::concatenate_coefficients(s_i);
+        let coefficients = RqVector::concatenate_coefficients(s_i);
         for (i, item) in projection.iter_mut().enumerate() {
             *item = matrix.get_matrix()[i]
                 .iter()
@@ -71,37 +62,27 @@ impl<const D: usize> ProjectionVector<D> {
         &self.projection
     }
 
-    /// Function to concatenate coefficients from multiple Rq into a Vec<Zq>
-    fn concatenate_coefficients(rqvect: &[Rq<D>]) -> Vec<Zq> {
-        let total_coeffs = rqvect.len() * D;
-        let mut concatenated_coeffs: Vec<Zq> = Vec::with_capacity(total_coeffs);
-        // Iterate over each Rq, extracting the coefficients and concatenating them
-        for rq in rqvect {
-            let coeffs = rq.get_coefficients();
-            concatenated_coeffs.extend_from_slice(coeffs);
-        }
-
-        concatenated_coeffs
-    }
-
     /// Euclidean norm
     pub fn norm_squared(&self) -> Zq {
         self.projection.iter().map(|coeff| *coeff * *coeff).sum()
     }
 }
 // Bound verification
+
+// LaBRADOR: Compact Proofs for R1CS from Module-SIS | Page 5 | Proving smallness section
 const UPPER_BOUND_FACTOR: Zq = Zq::new(128);
 const LOWER_BOUND_FACTOR: Zq = Zq::new(30);
+
 // Function to verify upper bound of projection
-pub fn verify_upper_bound<const D: usize>(
-    projection: ProjectionVector<D>,
+pub fn verify_upper_bound<const N: usize, const D: usize>(
+    projection: ProjectionVector<N, D>,
     beta_squared: Zq,
 ) -> bool {
     projection.norm_squared().value() < (UPPER_BOUND_FACTOR * beta_squared).value()
 }
 // Function to verify lower bound of projection
-pub fn verify_lower_bound<const D: usize>(
-    projection: ProjectionVector<D>,
+pub fn verify_lower_bound<const N: usize, const D: usize>(
+    projection: ProjectionVector<N, D>,
     beta_squared: Zq,
 ) -> bool {
     projection.norm_squared().value() > (LOWER_BOUND_FACTOR * beta_squared).value()
@@ -176,13 +157,14 @@ mod tests {
         let mut success_count: f64 = 0.0;
         let n = 5;
         for _ in 0..10000 {
+            let mut rng = rng();
             // Generate the random polynomials
-            let polynomials = Rq::<5>::random_small_vector(n);
+            let polynomials = RqVector::<5, 5>::random_small(&mut rng);
             // Generate projection matrix
             let matrix = ProjectionMatrix::new(n);
             // Generate Projection
-            let projection = ProjectionVector::new(&matrix, &polynomials);
-            let beta = Rq::compute_norm_squared(&polynomials);
+            let projection = ProjectionVector::new(&matrix, polynomials.clone());
+            let beta = RqVector::compute_norm_squared(polynomials);
             // Check if the norm of the projection is smaller than 128 * (squared norm of the projection of the random polynomial)
             let test: bool = verify_upper_bound(projection, beta);
             if test {
@@ -207,15 +189,17 @@ mod tests {
         // 100.000 was chosen to provide a reasonably large sample size
         let trials: u32 = 100000;
         let n = 3;
-        let polynomials = Rq::<3>::random_small_vector(n);
+        let mut rng = rng();
+        let polynomials = RqVector::<3, 3>::random_small(&mut rng);
         let mut matrix = ProjectionMatrix::new(n);
-        let mut projection = ProjectionVector::new(&matrix, &polynomials);
+        let mut projection = ProjectionVector::new(&matrix, polynomials.clone());
         let mut norm_sum = projection.norm_squared();
-        let norm_value = (Zq::new(128) * Rq::compute_norm_squared(&polynomials)).value();
+        let norm_value =
+            (Zq::new(128) * RqVector::compute_norm_squared(polynomials.clone())).value();
         // Run the test multiple times to simulate the probability
         for _ in 0..trials {
             matrix = ProjectionMatrix::new(n);
-            projection = ProjectionVector::new(&matrix, &polynomials);
+            projection = ProjectionVector::new(&matrix, polynomials.clone());
             norm_sum += projection.norm_squared();
         }
 
@@ -233,7 +217,7 @@ mod tests {
             difference < tolerance,
             "Average norm value {} is not equal to {}.",
             average,
-            (Zq::new(128) * Rq::compute_norm_squared(&polynomials)).value(),
+            (Zq::new(128) * RqVector::compute_norm_squared(polynomials)).value(),
         );
     }
 
@@ -241,13 +225,14 @@ mod tests {
     #[test]
     fn test_lower_bound() {
         let n = 5;
+        let mut rng = rng();
         // Generate random vector of polynomials of small norm
-        let polynomials = Rq::<64>::random_small_vector(n);
+        let polynomials = RqVector::<5, 64>::random_small(&mut rng);
         // Generate projection matrix
         let matrix = ProjectionMatrix::new(n);
         // Generate Projection
-        let projection = ProjectionVector::new(&matrix, &polynomials);
-        let beta = Rq::compute_norm_squared(&polynomials);
+        let projection = ProjectionVector::new(&matrix, polynomials.clone());
+        let beta = RqVector::compute_norm_squared(polynomials);
         // Check if the norm of the projection is bigger than 30 * (squared norm of the projection of the random polynomial)
         assert!(verify_lower_bound(projection, beta));
     }
@@ -255,10 +240,10 @@ mod tests {
     // Test vector concatenation
     #[test]
     fn test_vector_concatenation() {
-        let polynomials = vec![
+        let polynomials: RqVector<2, 4> = RqVector::from(vec![
             vec![Zq::ONE, Zq::ZERO, Zq::ZERO, Zq::MAX].into(),
             vec![Zq::new(6), Zq::ZERO, Zq::new(5), Zq::new(3)].into(),
-        ];
+        ]);
         let vector = vec![
             Zq::ONE,
             Zq::ZERO,
@@ -269,6 +254,6 @@ mod tests {
             Zq::new(5),
             Zq::new(3),
         ];
-        assert!(ProjectionVector::<4>::concatenate_coefficients(&polynomials) == vector);
+        assert!(RqVector::concatenate_coefficients(polynomials) == vector);
     }
 }

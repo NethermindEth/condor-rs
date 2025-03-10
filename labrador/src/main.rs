@@ -2,9 +2,12 @@ use labrador::jl::verify_upper_bound;
 use labrador::jl::ProjectionMatrix;
 use labrador::jl::ProjectionVector;
 use labrador::rq::Rq;
+use labrador::rq_vector::RqVector;
 use labrador::zq::Zq;
+use rand::rng;
 
 const D: usize = 4; // Degree of polynomials in S_i
+const N: usize = 5; // Size of S_i
 
 fn main() {
     // Example poly_ring
@@ -56,12 +59,13 @@ fn main() {
     // Example
     // Generate the random polynomials
     let n = 3;
-    let polynomials = Rq::<D>::random_small_vector(n);
+    let mut rng = rng();
+    let polynomials = RqVector::<N, D>::random_small(&mut rng);
     // Random projection matrix
     let matrix = ProjectionMatrix::new(n);
     // Calculate projection
-    let projection = ProjectionVector::new(&matrix, &polynomials);
+    let projection = ProjectionVector::new(&matrix, polynomials.clone());
     // Within bounds with probability 1/2
-    let beta = Rq::compute_norm_squared(&polynomials);
+    let beta = RqVector::compute_norm_squared(polynomials);
     println!("{}", verify_upper_bound(projection, beta));
 }

@@ -3,17 +3,17 @@
 // Main Introduction
 #![forbid(unsafe_code)]
 #![deny(clippy::as_conversions)]
-#![doc = include_str!("../doc/labrador_docs/mainpage-doc.md")]
+#![doc = include_str!("../doc/mainpage-doc.md")]
 // Arithmetic Circuit Translation
-#![doc = include_str!("../doc/labrador_docs/arithmetic_circuit_translation.md")]
+#![doc = include_str!("../doc/arithmetic_circuit_translation.md")]
 // Ajtai Commitment
-#![doc = include_str!("../doc/labrador_docs/ajtai_commitment.md")]
+#![doc = include_str!("../doc/ajtai_commitment.md")]
 // Projections
-#![doc = include_str!("../doc/labrador_docs/projections.md")]
+#![doc = include_str!("../doc/projections.md")]
 // Aggregation
-#![doc = include_str!("../doc/labrador_docs/aggregation.md")]
+#![doc = include_str!("../doc/aggregation.md")]
 // Amortization
-#![doc = include_str!("../doc/labrador_docs/amortization.md")]
+#![doc = include_str!("../doc/amortization.md")]
 
 pub mod rq;
 

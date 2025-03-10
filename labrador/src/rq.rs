@@ -156,16 +156,6 @@ impl<const D: usize> Rq<D> {
         Rq::new(coeffs)
     }
 
-    /// Generate a vector of random small polynomial for commitments of size n
-    pub fn random_small_vector(n: usize) -> Vec<Self> {
-        let mut v: Vec<Self> = Vec::new();
-        for _ in 0..n {
-            let mut rng = rand::rng();
-            v.push(Self::random_ternary(&mut rng));
-        }
-        v
-    }
-
     /// Encode message into polynomial with small coefficients.
     ///
     /// # Arguments
@@ -203,15 +193,6 @@ impl<const D: usize> Rq<D> {
 
     pub const fn zero() -> Self {
         Self::new([Zq::ZERO; D])
-    }
-
-    // Compute the squared norm of a vector of polynomials
-    pub fn compute_norm_squared(polynomials: &[Rq<D>]) -> Zq {
-        polynomials
-            .iter()
-            .flat_map(|poly| poly.get_coefficients().to_vec()) // Collect coefficients from all polynomials
-            .map(|coeff| coeff * coeff)
-            .sum()
     }
 }
 
@@ -525,20 +506,5 @@ mod tests {
         let poly_zero: Rq<4> = vec![Zq::ZERO, Zq::ZERO, Zq::ZERO, Zq::ZERO].into();
         let vec_zero = vec![Zq::ZERO, Zq::ZERO, Zq::ZERO, Zq::ZERO];
         assert!(poly_zero.get_coefficients().to_vec() == vec_zero);
-    }
-
-    // Test the square of the norm
-    #[test]
-    fn test_norm() {
-        let poly: Rq<4> = vec![Zq::ONE, Zq::ZERO, Zq::new(5), Zq::MAX].into();
-        let result = Zq::new(27);
-        assert!(Rq::compute_norm_squared(&[poly]).value() == result.value());
-
-        let poly2: Rq<4> = vec![Zq::new(5), Zq::ONE, Zq::MAX, Zq::ZERO].into();
-        assert!(Rq::compute_norm_squared(&[poly2]).value() == result.value());
-
-        let poly_zero: Rq<4> = vec![Zq::ZERO, Zq::ZERO, Zq::ZERO, Zq::ZERO].into();
-        let result_zero = Zq::ZERO;
-        assert!(Rq::compute_norm_squared(&[poly_zero]).value() == result_zero.value());
     }
 }
