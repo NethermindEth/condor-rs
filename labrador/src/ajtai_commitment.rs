@@ -148,13 +148,14 @@ impl<const M: usize, const N: usize, const D: usize> AjtaiCommitment<M, N, D> {
     /// - β bounds the size of witness coefficients
     /// - m is the commitment output length
     /// - q is the modulus of the underlying ring
-    fn verify_security_relation(beta:Zq, m: usize) -> Result<(), ParameterError> {
+    fn verify_security_relation(beta: Zq, m: usize) -> Result<(), ParameterError> {
         // Calculate q from Zq properties
         let q_val = Zq::MAX;
         let q: u128 = q_val.to_u128() + 1;
 
         // Calculate beta²
-        let beta_squared = beta.to_u128()
+        let beta_squared = beta
+            .to_u128()
             .checked_pow(2)
             .ok_or(ParameterError::SecurityBoundViolation)?;
 

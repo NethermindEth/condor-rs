@@ -167,11 +167,7 @@ mod tests {
         let b = Zq::ONE;
 
         assert_eq!((a + b).value, 0, "u32::MAX + 1 should wrap to 0");
-        assert_eq!(
-            (b - a).value,
-            2,
-            "1 - u32::MAX should wrap to 2 (mod 2^32)"
-        );
+        assert_eq!((b - a).value, 2, "1 - u32::MAX should wrap to 2 (mod 2^32)");
     }
 
     #[test]
@@ -222,11 +218,7 @@ mod tests {
 
         // Test underflow handling (3 - 5 in u32 terms)
         let result = small - large;
-        assert_eq!(
-            result.value,
-            u32::MAX - 1,
-            "3 - 5 should wrap to 2^32 - 2"
-        );
+        assert_eq!(result.value, u32::MAX - 1, "3 - 5 should wrap to 2^32 - 2");
 
         // Test compound negative operations
         let mut x = Zq::new(10);
