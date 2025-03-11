@@ -180,12 +180,7 @@ impl<const D: usize> Rq<D> {
 
     /// Check if polynomial coefficients are within bounds
     pub fn check_bounds(&self, bound: Zq) -> bool {
-        self.iter().all(|coeff| {
-            // let val = coeff.value();
-            // // Check if value is within [-bound, bound]
-            // val <= bound.value() || val >= Zq::Q.wrapping_sub(bound.value())
-            coeff <= &bound || coeff >= &-bound
-        })
+        self.iter().all(|coeff| coeff <= &bound || coeff >= &-bound)
     }
 
     pub const fn zero() -> Self {

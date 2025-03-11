@@ -1,11 +1,10 @@
 use core::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 use rand::distr::uniform::{Error, SampleBorrow, SampleUniform, UniformInt, UniformSampler};
 use rand::prelude::*;
-use std::cmp::Ordering;
 use std::fmt;
 /// Represents an element in the ring Z/qZ where q = 2^32.
 /// Uses native u32 operations with automatic modulo reduction through wrapping arithmetic.
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Default)]
 pub struct Zq {
     /// Stored value is always in [0, q-1] due to u32's wrapping behavior
     value: u32,
@@ -27,10 +26,6 @@ impl Zq {
         Self { value }
     }
 
-    /// Returns the raw u32 value. Use with caution as it's modulo q.
-    // pub const fn value(&self) -> u32 {
-    //     self.value
-    // }
     pub fn to_u128(&self) -> u128 {
         u128::from(self.value)
     }
@@ -103,27 +98,6 @@ impl UniformSampler for UniformZq {
 
 impl SampleUniform for Zq {
     type Sampler = UniformZq;
-}
-
-// Implementing the Ord trait
-
-impl PartialEq for Zq {
-    fn eq(&self, other: &Self) -> bool {
-        self.value == other.value
-    }
-}
-impl Eq for Zq {}
-
-impl PartialOrd for Zq {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.value.cmp(&other.value))
-    }
-}
-
-impl Ord for Zq {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.value.cmp(&other.value)
-    }
 }
 
 // Implement the Neg trait for Zq.
