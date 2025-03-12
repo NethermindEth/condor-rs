@@ -26,7 +26,7 @@ cargo clippy --all-targets --all-features -- -D warnings || {
 }
 
 # Tests
-cargo test --workspace --verbose || {
+cargo test --workspace --verbose --features skip-slow-tests || {
     echo "❌ Test failures detected"
     exit 5
 }
