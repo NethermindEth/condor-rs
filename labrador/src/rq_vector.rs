@@ -1,4 +1,5 @@
 use crate::rq::Rq;
+use crate::zq::Zq;
 use core::ops::{Index, IndexMut, Mul};
 use core::slice::Iter;
 use rand::{CryptoRng, Rng};
@@ -31,6 +32,19 @@ impl<const N: usize, const D: usize> RqVector<N, D> {
         }
     }
 
+    /// Function to concatenate coefficients from multiple Rq into a Vec<Zq>
+    pub fn concatenate_coefficients(&self) -> Vec<Zq> {
+        let total_coeffs = self.elements.len() * D;
+        let mut concatenated_coeffs: Vec<Zq> = Vec::with_capacity(total_coeffs);
+        // Iterate over each Rq, extracting the coefficients and concatenating them
+        for rq in &self.elements {
+            let coeffs = rq.get_coefficients();
+            concatenated_coeffs.extend_from_slice(coeffs);
+        }
+
+        concatenated_coeffs
+    }
+
     /// Get the underlying vector as slice
     pub fn as_slice(&self) -> &[Rq<D>] {
         &self.elements
@@ -45,6 +59,15 @@ impl<const N: usize, const D: usize> RqVector<N, D> {
         self.elements
             .try_into()
             .unwrap_or_else(|_| panic!("Vector length mismatch"))
+    }
+
+    // Compute the squared norm of a vector of polynomials
+    pub fn compute_norm_squared(&self) -> Zq {
+        self.elements
+            .iter()
+            .flat_map(|poly| poly.get_coefficients()) // Collect coefficients from all polynomials
+            .map(|coeff| *coeff * *coeff)
+            .sum()
     }
 }
 
@@ -119,5 +142,26 @@ mod tests {
         let poly_exp_2: Rq<4> =
             vec![Zq::new(u32::MAX - 3), Zq::ZERO, Zq::new(4), Zq::new(8)].into();
         assert_eq!(result_2, poly_exp_2);
+    }
+
+    // Test the square of the norm
+    #[test]
+    fn test_norm() {
+        let poly: RqVector<2, 4> = vec![
+            vec![Zq::ONE, Zq::ZERO, Zq::new(5), Zq::MAX].into(),
+            vec![Zq::ZERO, Zq::ZERO, Zq::new(5), Zq::ONE].into(),
+        ]
+        .into();
+        let result = Zq::new(53);
+        assert!(RqVector::compute_norm_squared(&poly).to_u128() == result.to_u128());
+
+        let poly2: RqVector<1, 4> =
+            vec![vec![Zq::new(5), Zq::ONE, Zq::MAX, Zq::ZERO].into()].into();
+        let result2 = Zq::new(27);
+        assert!(RqVector::compute_norm_squared(&poly2).to_u128() == result2.to_u128());
+
+        let poly_zero: RqVector<4, 4> = RqVector::zero();
+        let result_zero = Zq::ZERO;
+        assert!(RqVector::compute_norm_squared(&poly_zero).to_u128() == result_zero.to_u128());
     }
 }

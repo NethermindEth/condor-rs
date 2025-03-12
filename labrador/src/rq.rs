@@ -2,15 +2,18 @@
 //
 //
 // Currently implemented functions include:
-// - Polynomial addition:         +
-// - Polynomial multiplication:   *
-// - inner_product/ Dot product:  inner_product()
-// - Polynomial subtraction:      -
-// - Polynomial negation:         neg()
-// - Scalar multiplication:       scalar_mul()
-// - Polynomial evaluation:       eval()
-// - Zero check:                  is_zero()
-// - Polynomial equality check:   is_equal()
+// - Polynomial addition:          +
+// - Polynomial multiplication:    *
+// - inner_product/ Dot product:   inner_product()
+// - Polynomial subtraction:       -
+// - Polynomial negation:          neg()
+// - Scalar multiplication:        scalar_mul()
+// - Polynomial evaluation:        eval()
+// - Zero check:                   is_zero()
+// - Polynomial equality check:    is_equal()
+// - Get the Coefficients:         get_coefficients()
+// - Random small norm vector:     random_small_vector()
+// - Squared norm of coefficients: compute_norm_squared()
 //
 // Further operations and optimizations will be added in future versions.
 
@@ -19,6 +22,7 @@ use crate::zq::Zq;
 use core::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 use rand::distr::{Distribution, Uniform};
 use rand::{CryptoRng, Rng};
+use std::iter::Sum;
 
 /// This module provides implementations for various operations
 /// in the polynomial ring R = Z_q\[X\] / (X^d + 1).
@@ -31,6 +35,10 @@ impl<const D: usize> Rq<D> {
     /// Constructor for the polynomial ring
     pub const fn new(coeffs: [Zq; D]) -> Self {
         Rq { coeffs }
+    }
+    /// Get the coefficients as a vector
+    pub fn get_coefficients(&self) -> &[Zq; D] {
+        &self.coeffs
     }
 
     /// Polynomial addition
@@ -226,6 +234,16 @@ impl<const D: usize> From<Vec<Zq>> for Rq<D> {
             }
         }
         Rq::new(temp)
+    }
+}
+
+impl Sum for Zq {
+    // Accumulate using the addition operator
+    fn sum<I>(iter: I) -> Self
+    where
+        I: Iterator<Item = Zq>,
+    {
+        iter.fold(Zq::ZERO, |acc, x| acc + x)
     }
 }
 
@@ -476,5 +494,17 @@ mod tests {
         let empty_message: Vec<bool> = vec![];
         let encoded_empty = Rq::<4>::encode_message(&empty_message).unwrap();
         assert!(encoded_empty.is_zero());
+    }
+
+    // Test coefficient extraction
+    #[test]
+    fn test_get_coefficient() {
+        let poly: Rq<4> = vec![Zq::ONE, Zq::ZERO, Zq::new(5), Zq::MAX].into();
+        let vec = vec![Zq::ONE, Zq::ZERO, Zq::new(5), Zq::MAX];
+        assert!(poly.get_coefficients().to_vec() == vec);
+
+        let poly_zero: Rq<4> = vec![Zq::ZERO, Zq::ZERO, Zq::ZERO, Zq::ZERO].into();
+        let vec_zero = vec![Zq::ZERO, Zq::ZERO, Zq::ZERO, Zq::ZERO];
+        assert!(poly_zero.get_coefficients().to_vec() == vec_zero);
     }
 }

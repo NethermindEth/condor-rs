@@ -1,9 +1,18 @@
+use labrador::jl::verify_upper_bound;
+use labrador::jl::ProjectionMatrix;
+use labrador::jl::ProjectionVector;
 use labrador::rq::Rq;
+use labrador::rq_vector::RqVector;
 use labrador::zq::Zq;
+use rand::rng;
+
+const D: usize = 4; // Degree of polynomials in S_i
+const N: usize = 5; // Size of S_i
+
 fn main() {
     // Example poly_ring
-    let p1: Rq<2> = vec![Zq::new(1)].into();
-    let p2: Rq<2> = vec![Zq::new(2), Zq::new(1), Zq::new(1)].into();
+    let p1: Rq<D> = vec![Zq::new(1)].into();
+    let p2: Rq<D> = vec![Zq::new(2), Zq::new(1), Zq::new(1)].into();
     // Perform polynomial multiplication
     let product = p1.clone() * p2.clone();
 
@@ -45,4 +54,18 @@ fn main() {
     let a = Zq::new(5);
     let b = Zq::new(3);
     println!("a + b = {}", a + b);
+
+    // Johnson Linderstrauss Projections
+    // Example
+    // Generate the random polynomials
+    let n = 3;
+    let mut rng = rng();
+    let polynomials = RqVector::<N, D>::random_small(&mut rng);
+    // Random projection matrix
+    let matrix = ProjectionMatrix::new(n);
+    // Calculate projection
+    let projection = ProjectionVector::new(&matrix, &polynomials);
+    // Within bounds with probability 1/2
+    let beta = RqVector::compute_norm_squared(&polynomials);
+    println!("{}", verify_upper_bound(projection, beta));
 }

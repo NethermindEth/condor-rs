@@ -8,3 +8,7 @@ license.workspace = true
 [dependencies]
 rand = {version = "0.9", default-features = false, features = ["thread_rng", "unbiased"] }
 thiserror = {version = "1.0", default-features = false }
+
+[features]
+skip-slow-tests = []
+

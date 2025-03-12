@@ -1,7 +1,6 @@
 // Documentation
 
 // Main Introduction
-
 #![forbid(unsafe_code)]
 #![deny(clippy::as_conversions)]
 #![doc = include_str!("../doc/mainpage-doc.md")]
@@ -25,3 +24,5 @@ pub mod ajtai_commitment;
 pub mod rq_matrix;
 
 pub mod rq_vector;
+
+pub mod jl;
