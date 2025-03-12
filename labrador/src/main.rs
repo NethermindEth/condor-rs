@@ -64,8 +64,8 @@ fn main() {
     // Random projection matrix
     let matrix = ProjectionMatrix::new(n);
     // Calculate projection
-    let projection = ProjectionVector::new(&matrix, polynomials.clone());
+    let projection = ProjectionVector::new(&matrix, &polynomials);
     // Within bounds with probability 1/2
-    let beta = RqVector::compute_norm_squared(polynomials);
+    let beta = RqVector::compute_norm_squared(&polynomials);
     println!("{}", verify_upper_bound(projection, beta));
 }

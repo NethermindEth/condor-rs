@@ -44,9 +44,9 @@ pub struct ProjectionVector<const N: usize, const D: usize> {
 
 impl<const N: usize, const D: usize> ProjectionVector<N, D> {
     /// Calculates Projection  
-    pub fn new(matrix: &ProjectionMatrix<D>, s_i: RqVector<N, D>) -> Self {
+    pub fn new(matrix: &ProjectionMatrix<D>, s_i: &RqVector<N, D>) -> Self {
         let mut projection = [Zq::ZERO; 256];
-        let coefficients = RqVector::concatenate_coefficients(s_i);
+        let coefficients = s_i.concatenate_coefficients();
         for (i, item) in projection.iter_mut().enumerate() {
             *item = matrix.get_matrix()[i]
                 .iter()
@@ -163,8 +163,8 @@ mod tests {
             // Generate projection matrix
             let matrix = ProjectionMatrix::new(n);
             // Generate Projection
-            let projection = ProjectionVector::new(&matrix, polynomials.clone());
-            let beta = RqVector::compute_norm_squared(polynomials);
+            let projection = ProjectionVector::new(&matrix, &polynomials);
+            let beta = RqVector::compute_norm_squared(&polynomials);
             // Check if the norm of the projection is smaller than 128 * (squared norm of the projection of the random polynomial)
             let test: bool = verify_upper_bound(projection, beta);
             if test {
@@ -192,14 +192,13 @@ mod tests {
         let mut rng = rng();
         let polynomials = RqVector::<3, 3>::random_small(&mut rng);
         let mut matrix = ProjectionMatrix::new(n);
-        let mut projection = ProjectionVector::new(&matrix, polynomials.clone());
+        let mut projection = ProjectionVector::new(&matrix, &polynomials);
         let mut norm_sum = projection.norm_squared();
-        let norm_value =
-            (Zq::new(128) * RqVector::compute_norm_squared(polynomials.clone())).value();
+        let norm_value = (Zq::new(128) * RqVector::compute_norm_squared(&polynomials)).value();
         // Run the test multiple times to simulate the probability
         for _ in 0..trials {
             matrix = ProjectionMatrix::new(n);
-            projection = ProjectionVector::new(&matrix, polynomials.clone());
+            projection = ProjectionVector::new(&matrix, &polynomials);
             norm_sum += projection.norm_squared();
         }
 
@@ -217,7 +216,7 @@ mod tests {
             difference < tolerance,
             "Average norm value {} is not equal to {}.",
             average,
-            (Zq::new(128) * RqVector::compute_norm_squared(polynomials)).value(),
+            (Zq::new(128) * RqVector::compute_norm_squared(&polynomials)).value(),
         );
     }
 
@@ -231,8 +230,8 @@ mod tests {
         // Generate projection matrix
         let matrix = ProjectionMatrix::new(n);
         // Generate Projection
-        let projection = ProjectionVector::new(&matrix, polynomials.clone());
-        let beta = RqVector::compute_norm_squared(polynomials);
+        let projection = ProjectionVector::new(&matrix, &polynomials);
+        let beta = RqVector::compute_norm_squared(&polynomials);
         // Check if the norm of the projection is bigger than 30 * (squared norm of the projection of the random polynomial)
         assert!(verify_lower_bound(projection, beta));
     }
@@ -254,6 +253,6 @@ mod tests {
             Zq::new(5),
             Zq::new(3),
         ];
-        assert!(RqVector::concatenate_coefficients(polynomials) == vector);
+        assert!(polynomials.concatenate_coefficients() == vector);
     }
 }

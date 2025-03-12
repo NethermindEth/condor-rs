@@ -33,11 +33,11 @@ impl<const N: usize, const D: usize> RqVector<N, D> {
     }
 
     /// Function to concatenate coefficients from multiple Rq into a Vec<Zq>
-    pub fn concatenate_coefficients(rqvect: Self) -> Vec<Zq> {
-        let total_coeffs = rqvect.elements.len() * D;
+    pub fn concatenate_coefficients(&self) -> Vec<Zq> {
+        let total_coeffs = self.elements.len() * D;
         let mut concatenated_coeffs: Vec<Zq> = Vec::with_capacity(total_coeffs);
         // Iterate over each Rq, extracting the coefficients and concatenating them
-        for rq in rqvect.elements {
+        for rq in &self.elements {
             let coeffs = rq.get_coefficients();
             concatenated_coeffs.extend_from_slice(coeffs);
         }
@@ -62,12 +62,11 @@ impl<const N: usize, const D: usize> RqVector<N, D> {
     }
 
     // Compute the squared norm of a vector of polynomials
-    pub fn compute_norm_squared(polynomials: Self) -> Zq {
-        polynomials
-            .elements
+    pub fn compute_norm_squared(&self) -> Zq {
+        self.elements
             .iter()
-            .flat_map(|poly| poly.get_coefficients().to_vec()) // Collect coefficients from all polynomials
-            .map(|coeff| coeff * coeff)
+            .flat_map(|poly| poly.get_coefficients()) // Collect coefficients from all polynomials
+            .map(|coeff| *coeff * *coeff)
             .sum()
     }
 }
