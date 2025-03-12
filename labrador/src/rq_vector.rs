@@ -153,15 +153,15 @@ mod tests {
         ]
         .into();
         let result = Zq::new(53);
-        assert!(RqVector::compute_norm_squared(&poly).to_u128() == result.to_u128());
+        assert!(poly.compute_norm_squared() == result);
 
         let poly2: RqVector<1, 4> =
             vec![vec![Zq::new(5), Zq::ONE, Zq::MAX, Zq::ZERO].into()].into();
         let result2 = Zq::new(27);
-        assert!(RqVector::compute_norm_squared(&poly2).to_u128() == result2.to_u128());
+        assert!(poly2.compute_norm_squared() == result2);
 
         let poly_zero: RqVector<4, 4> = RqVector::zero();
         let result_zero = Zq::ZERO;
-        assert!(RqVector::compute_norm_squared(&poly_zero).to_u128() == result_zero.to_u128());
+        assert!(poly_zero.compute_norm_squared() == result_zero);
     }
 }
