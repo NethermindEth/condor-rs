@@ -78,14 +78,14 @@ pub fn verify_upper_bound<const N: usize, const D: usize>(
     projection: ProjectionVector<N, D>,
     beta_squared: Zq,
 ) -> bool {
-    projection.norm_squared().value() < (UPPER_BOUND_FACTOR * beta_squared).value()
+    projection.norm_squared().to_u128() < (UPPER_BOUND_FACTOR * beta_squared).to_u128()
 }
 // Function to verify lower bound of projection
 pub fn verify_lower_bound<const N: usize, const D: usize>(
     projection: ProjectionVector<N, D>,
     beta_squared: Zq,
 ) -> bool {
-    projection.norm_squared().value() > (LOWER_BOUND_FACTOR * beta_squared).value()
+    projection.norm_squared().to_u128() > (LOWER_BOUND_FACTOR * beta_squared).to_u128()
 }
 
 #[cfg(test)]
@@ -195,7 +195,7 @@ mod tests {
         let mut matrix = ProjectionMatrix::new(n);
         let mut projection = ProjectionVector::new(&matrix, &polynomials);
         let mut norm_sum = projection.norm_squared();
-        let norm_value = (Zq::new(128) * RqVector::compute_norm_squared(&polynomials)).value();
+        let norm_value = (Zq::new(128) * RqVector::compute_norm_squared(&polynomials)).to_u128();
         // Run the test multiple times to simulate the probability
         for _ in 0..trials {
             matrix = ProjectionMatrix::new(n);
@@ -204,7 +204,7 @@ mod tests {
         }
 
         // Calculate the observed probability
-        let average = norm_sum.value() / trials;
+        let average = norm_sum.to_u128() / trials;
         let difference = if norm_value <= average {
             average - norm_value
         } else {
@@ -217,7 +217,7 @@ mod tests {
             difference < tolerance,
             "Average norm value {} is not equal to {}.",
             average,
-            (Zq::new(128) * RqVector::compute_norm_squared(&polynomials)).value(),
+            (Zq::new(128) * RqVector::compute_norm_squared(&polynomials)).to_u128(),
         );
     }
 

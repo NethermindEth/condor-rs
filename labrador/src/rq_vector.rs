@@ -144,34 +144,24 @@ mod tests {
         assert_eq!(result_2, poly_exp_2);
     }
 
+    // Test the square of the norm
     #[test]
-    fn test_rqvector_mul() {
-        let poly1: Rq<2> = vec![Zq::ONE, Zq::new(2)].into();
-        let poly2: Rq<2> = vec![Zq::ONE, Zq::new(4)].into();
-        let vec_1: RqVector<1, 2> = RqVector::from(vec![poly1]);
-        let vec_2: RqVector<1, 2> = RqVector::from(vec![poly2]);
-        let result = vec_1.mul(&vec_2);
-        let poly_exp: Rq<2> = vec![Zq::new(u32::MAX - 6), Zq::new(6)].into();
-        assert_eq!(result, poly_exp);
+    fn test_norm() {
+        let poly: RqVector<2, 4> = vec![
+            vec![Zq::ONE, Zq::ZERO, Zq::new(5), Zq::MAX].into(),
+            vec![Zq::ZERO, Zq::ZERO, Zq::new(5), Zq::ONE].into(),
+        ]
+        .into();
+        let result = Zq::new(53);
+        assert!(RqVector::compute_norm_squared(&poly).to_u128() == result.to_u128());
 
-        let poly3: Rq<4> = vec![Zq::ONE, Zq::ONE, Zq::ONE, Zq::ONE].into();
-        let poly4: Rq<4> = vec![Zq::ONE, Zq::ONE, Zq::ONE, Zq::ONE].into();
-        let vec_3: RqVector<1, 4> = RqVector::from(vec![poly3]);
-        let vec_4: RqVector<1, 4> = RqVector::from(vec![poly4]);
-        let result_1 = vec_3.mul(&vec_4);
-        let poly_exp_1: Rq<4> =
-            vec![Zq::new(u32::MAX - 1), Zq::ZERO, Zq::new(2), Zq::new(4)].into();
-        assert_eq!(result_1, poly_exp_1);
+        let poly2: RqVector<1, 4> =
+            vec![vec![Zq::new(5), Zq::ONE, Zq::MAX, Zq::ZERO].into()].into();
+        let result2 = Zq::new(27);
+        assert!(RqVector::compute_norm_squared(&poly2).to_u128() == result2.to_u128());
 
-        let poly5: Rq<4> = vec![Zq::ONE, Zq::ONE, Zq::ONE, Zq::ONE].into();
-        let poly6: Rq<4> = vec![Zq::ONE, Zq::ONE, Zq::ONE, Zq::ONE].into();
-        let poly7: Rq<4> = vec![Zq::ONE, Zq::ONE, Zq::ONE, Zq::ONE].into();
-        let poly8: Rq<4> = vec![Zq::ONE, Zq::ONE, Zq::ONE, Zq::ONE].into();
-        let vec_5: RqVector<2, 4> = RqVector::from(vec![poly5, poly6]);
-        let vec_6: RqVector<2, 4> = RqVector::from(vec![poly7, poly8]);
-        let result_2 = vec_5.mul(&vec_6);
-        let poly_exp_2: Rq<4> =
-            vec![Zq::new(u32::MAX - 3), Zq::ZERO, Zq::new(4), Zq::new(8)].into();
-        assert_eq!(result_2, poly_exp_2);
+        let poly_zero: RqVector<4, 4> = RqVector::zero();
+        let result_zero = Zq::ZERO;
+        assert!(RqVector::compute_norm_squared(&poly_zero).to_u128() == result_zero.to_u128());
     }
 }
