@@ -196,7 +196,7 @@ mod tests {
         let mut matrix = ProjectionMatrix::new(n);
         let mut projection = ProjectionVector::new(&matrix, &polynomials);
         let mut norm_sum = projection.norm_squared();
-        let norm_value = Zq::new(128) * RqVector::compute_norm_squared(&polynomials);
+        let norm_value = (Zq::new(128) * RqVector::compute_norm_squared(&polynomials)).to_u128();
         // Run the test multiple times to simulate the probability
         for _ in 0..trials {
             matrix = ProjectionMatrix::new(n);
@@ -206,10 +206,10 @@ mod tests {
 
         // Calculate the observed probability
         let average = norm_sum.to_u128() / trials;
-        let difference = if norm_value.to_u128() <= average {
-            average - norm_value.to_u128()
+        let difference = if norm_value <= average {
+            average - norm_value
         } else {
-            norm_value.to_u128() - average
+            norm_value - average
         };
 
         // we choose a small tolerance value for possible statistical error
