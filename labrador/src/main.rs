@@ -66,6 +66,6 @@ fn main() {
     // Calculate projection
     let projection = ProjectionVector::new(&matrix, &polynomials);
     // Within bounds with probability 1/2
-    let beta = RqVector::compute_norm_squared(&polynomials);
+    let beta = polynomials.compute_norm_squared();
     println!("{}", verify_upper_bound(projection, beta));
 }

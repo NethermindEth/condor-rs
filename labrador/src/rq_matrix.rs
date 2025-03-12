@@ -59,6 +59,7 @@ mod tests {
     use crate::{rq::Rq, zq::Zq};
 
     #[test]
+    #[cfg(not(feature = "skip-slow-tests"))]
     fn rqmatrix_fits_stack() {
         let mut rng = rand::rng();
         let _: RqMatrix<256, { 1 << 10 }, 64> = RqMatrix::random(&mut rng);

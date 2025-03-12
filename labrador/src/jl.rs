@@ -78,18 +78,17 @@ pub fn verify_upper_bound<const N: usize, const D: usize>(
     projection: ProjectionVector<N, D>,
     beta_squared: Zq,
 ) -> bool {
-    projection.norm_squared().to_u128() < (UPPER_BOUND_FACTOR * beta_squared).to_u128()
+    projection.norm_squared() < (UPPER_BOUND_FACTOR * beta_squared)
 }
 // Function to verify lower bound of projection
 pub fn verify_lower_bound<const N: usize, const D: usize>(
     projection: ProjectionVector<N, D>,
     beta_squared: Zq,
 ) -> bool {
-    projection.norm_squared().to_u128() > (LOWER_BOUND_FACTOR * beta_squared).to_u128()
+    projection.norm_squared() > (LOWER_BOUND_FACTOR * beta_squared)
 }
 
 #[cfg(test)]
-#[cfg(feature = "skip-slow-tests")]
 mod tests {
     use super::*;
 
@@ -152,6 +151,7 @@ mod tests {
 
     // Test that the probability of the inequality being true is close to 1/2
     #[test]
+    #[cfg(not(feature = "skip-slow-tests"))]
     fn test_probability_is_close_to_half() {
         // 10.000 was chosen to provide a reasonably large sample size
         let trials: f64 = 10000.0;
@@ -165,7 +165,7 @@ mod tests {
             let matrix = ProjectionMatrix::new(n);
             // Generate Projection
             let projection = ProjectionVector::new(&matrix, &polynomials);
-            let beta = RqVector::compute_norm_squared(&polynomials);
+            let beta = polynomials.compute_norm_squared();
             // Check if the norm of the projection is smaller than 128 * (squared norm of the projection of the random polynomial)
             let test: bool = verify_upper_bound(projection, beta);
             if test {
@@ -186,6 +186,7 @@ mod tests {
 
     // On average the projected norm squared is the same as 128 * vector norm squared
     #[test]
+    #[cfg(not(feature = "skip-slow-tests"))]
     fn average_value() {
         // 100.000 was chosen to provide a reasonably large sample size
         let trials: u128 = 100000;
@@ -195,7 +196,7 @@ mod tests {
         let mut matrix = ProjectionMatrix::new(n);
         let mut projection = ProjectionVector::new(&matrix, &polynomials);
         let mut norm_sum = projection.norm_squared();
-        let norm_value = (Zq::new(128) * RqVector::compute_norm_squared(&polynomials)).to_u128();
+        let norm_value = Zq::new(128) * RqVector::compute_norm_squared(&polynomials);
         // Run the test multiple times to simulate the probability
         for _ in 0..trials {
             matrix = ProjectionMatrix::new(n);
@@ -205,10 +206,10 @@ mod tests {
 
         // Calculate the observed probability
         let average = norm_sum.to_u128() / trials;
-        let difference = if norm_value <= average {
-            average - norm_value
+        let difference = if norm_value.to_u128() <= average {
+            average - norm_value.to_u128()
         } else {
-            norm_value - average
+            norm_value.to_u128() - average
         };
 
         // we choose a small tolerance value for possible statistical error
@@ -217,7 +218,7 @@ mod tests {
             difference < tolerance,
             "Average norm value {} is not equal to {}.",
             average,
-            (Zq::new(128) * RqVector::compute_norm_squared(&polynomials)).to_u128(),
+            Zq::new(128) * polynomials.compute_norm_squared(),
         );
     }
 
@@ -232,7 +233,7 @@ mod tests {
         let matrix = ProjectionMatrix::new(n);
         // Generate Projection
         let projection = ProjectionVector::new(&matrix, &polynomials);
-        let beta = RqVector::compute_norm_squared(&polynomials);
+        let beta = polynomials.compute_norm_squared();
         // Check if the norm of the projection is bigger than 30 * (squared norm of the projection of the random polynomial)
         assert!(verify_lower_bound(projection, beta));
     }
