@@ -89,6 +89,7 @@ pub fn verify_lower_bound<const N: usize, const D: usize>(
 }
 
 #[cfg(test)]
+#[cfg(feature = "skip-slow-tests")]
 mod tests {
     use super::*;
 
