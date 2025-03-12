@@ -188,7 +188,7 @@ mod tests {
     #[test]
     fn average_value() {
         // 100.000 was chosen to provide a reasonably large sample size
-        let trials: u32 = 100000;
+        let trials: u128 = 100000;
         let n = 3;
         let mut rng = rng();
         let polynomials = RqVector::<3, 3>::random_small(&mut rng);
@@ -212,7 +212,7 @@ mod tests {
         };
 
         // we choose a small tolerance value for possible statistical error
-        let tolerance: u32 = 2;
+        let tolerance: u128 = 2;
         assert!(
             difference < tolerance,
             "Average norm value {} is not equal to {}.",
