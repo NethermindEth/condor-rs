@@ -143,4 +143,35 @@ mod tests {
             vec![Zq::new(u32::MAX - 3), Zq::ZERO, Zq::new(4), Zq::new(8)].into();
         assert_eq!(result_2, poly_exp_2);
     }
+
+    #[test]
+    fn test_rqvector_mul() {
+        let poly1: Rq<2> = vec![Zq::ONE, Zq::new(2)].into();
+        let poly2: Rq<2> = vec![Zq::ONE, Zq::new(4)].into();
+        let vec_1: RqVector<1, 2> = RqVector::from(vec![poly1]);
+        let vec_2: RqVector<1, 2> = RqVector::from(vec![poly2]);
+        let result = vec_1.mul(&vec_2);
+        let poly_exp: Rq<2> = vec![Zq::new(u32::MAX - 6), Zq::new(6)].into();
+        assert_eq!(result, poly_exp);
+
+        let poly3: Rq<4> = vec![Zq::ONE, Zq::ONE, Zq::ONE, Zq::ONE].into();
+        let poly4: Rq<4> = vec![Zq::ONE, Zq::ONE, Zq::ONE, Zq::ONE].into();
+        let vec_3: RqVector<1, 4> = RqVector::from(vec![poly3]);
+        let vec_4: RqVector<1, 4> = RqVector::from(vec![poly4]);
+        let result_1 = vec_3.mul(&vec_4);
+        let poly_exp_1: Rq<4> =
+            vec![Zq::new(u32::MAX - 1), Zq::ZERO, Zq::new(2), Zq::new(4)].into();
+        assert_eq!(result_1, poly_exp_1);
+
+        let poly5: Rq<4> = vec![Zq::ONE, Zq::ONE, Zq::ONE, Zq::ONE].into();
+        let poly6: Rq<4> = vec![Zq::ONE, Zq::ONE, Zq::ONE, Zq::ONE].into();
+        let poly7: Rq<4> = vec![Zq::ONE, Zq::ONE, Zq::ONE, Zq::ONE].into();
+        let poly8: Rq<4> = vec![Zq::ONE, Zq::ONE, Zq::ONE, Zq::ONE].into();
+        let vec_5: RqVector<2, 4> = RqVector::from(vec![poly5, poly6]);
+        let vec_6: RqVector<2, 4> = RqVector::from(vec![poly7, poly8]);
+        let result_2 = vec_5.mul(&vec_6);
+        let poly_exp_2: Rq<4> =
+            vec![Zq::new(u32::MAX - 3), Zq::ZERO, Zq::new(4), Zq::new(8)].into();
+        assert_eq!(result_2, poly_exp_2);
+    }
 }
