@@ -221,7 +221,7 @@ mod tests {
 
         pub fn setup_scheme() -> TestAjtai {
             let mut rng = rand::rng();
-            let matrix_a = RqMatrix::random_small(&mut rng);
+            let matrix_a = RqMatrix::random(&mut rng);
             TestAjtai::new(AjtaiParameters::new(Zq::ONE, Zq::ONE).unwrap(), matrix_a).unwrap()
         }
     }
