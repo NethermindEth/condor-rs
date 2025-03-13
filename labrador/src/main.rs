@@ -60,7 +60,7 @@ fn main() {
     // Generate the random polynomials
     let n = 3;
     let mut rng = rng();
-    let polynomials = RqVector::<N, D>::random_small(&mut rng);
+    let polynomials = RqVector::<N, D>::random_ternary(&mut rng);
     // Random projection matrix
     let matrix = ProjectionMatrix::new(n);
     // Calculate projection
