@@ -1,4 +1,4 @@
-use core::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
+use core::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 use rand::distr::uniform::{Error, SampleBorrow, SampleUniform, UniformInt, UniformSampler};
 use rand::prelude::*;
 use std::fmt;
@@ -30,6 +30,43 @@ impl Zq {
         u128::from(self.value)
     }
 
+    pub fn to_i128(&self) -> i128 {
+        i128::from(self.value)
+    }
+
+    /// Converts an element from Zq (in the range [0, q-1])
+    /// to its balanced (signed) representation in i128.
+    pub fn to_signed_zq(&self) -> i128 {
+        // Compute the threshold for conversion.
+        let q: u128 = Self::MAX.to_u128() + 1;
+        let half_q = q / 2;
+        if self.to_u128() > half_q {
+            // If x is above the threshold, subtract q to get a negative value.
+            self.to_i128() - i128::try_from(q).unwrap()
+        } else {
+            self.to_i128()
+        }
+    }
+
+    /// Converts a balanced (signed) representative `x` in Zq to its standard (unsigned)
+    /// representative in the range [0, q-1].
+    ///
+    /// # Arguments
+    /// * `x` - A signed integer representing the element in balanced form.
+    /// * `q` - The modulus.
+    ///
+    /// # Returns
+    /// A nonnegative integer in the range [0, q-1].
+    pub fn to_unsigned_zq(value: i128) -> Zq {
+        // If x is negative, add q to bring it into the range [0, q-1]
+        let q: i128 = i128::try_from(Self::MAX.to_u128() + 1).unwrap();
+        if value < 0 {
+            Zq::new(u32::try_from(value + q).unwrap())
+        } else {
+            Zq::new(u32::try_from(value).unwrap())
+        }
+    }
+
     pub const fn is_zero(&self) -> bool {
         self.value == 0
     }
@@ -57,6 +94,7 @@ macro_rules! impl_arithmetic {
 impl_arithmetic!(Add, AddAssign, add, add_assign, wrapping_add);
 impl_arithmetic!(Sub, SubAssign, sub, sub_assign, wrapping_sub);
 impl_arithmetic!(Mul, MulAssign, mul, mul_assign, wrapping_mul);
+impl_arithmetic!(Div, DivAssign, div, div_assign, wrapping_div);
 
 impl From<u32> for Zq {
     fn from(value: u32) -> Self {
@@ -249,5 +287,17 @@ mod tests {
 
         assert_eq!(neg_a + a, Zq::ZERO);
         assert_eq!(neg_b, Zq::ZERO);
+    }
+
+    #[test]
+    fn test_to_signed_zq() {
+        let a = Zq::MAX - Zq::new(99);
+        let b = Zq::ONE;
+
+        let c: i128 = a.to_signed_zq();
+        let d: i128 = b.to_signed_zq();
+
+        assert_eq!(c, -100);
+        assert_eq!(d, 1);
     }
 }
