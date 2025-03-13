@@ -21,10 +21,10 @@ impl<const M: usize, const N: usize, const D: usize> RqMatrix<M, N, D> {
         }
     }
 
-    /// Create a random matrix of polynomials with small coefficients
-    pub fn random_small<R: Rng + CryptoRng>(rng: &mut R) -> Self {
+    /// Create a random matrix of polynomials with ternary coefficients
+    pub fn random_ternary<R: Rng + CryptoRng>(rng: &mut R) -> Self {
         Self {
-            elements: (0..M).map(|_| RqVector::random_small(rng)).collect(),
+            elements: (0..M).map(|_| RqVector::random_ternary(rng)).collect(),
         }
     }
 }

@@ -216,7 +216,7 @@ mod tests {
 
         pub fn random_valid_witness() -> RqVector<TEST_N, TEST_D> {
             let mut rng = rand::rng();
-            RqVector::random_small(&mut rng)
+            RqVector::random_ternary(&mut rng)
         }
 
         pub fn setup_scheme() -> TestAjtai {
