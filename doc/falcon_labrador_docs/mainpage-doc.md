@@ -8,7 +8,12 @@ The main idea is to define a signature aggregation scheme (AS) for Falcon based 
 
 ## Overview 
 
-The implemented changes consist of the following sequential steps: 
+The implemented changes consist of the following steps: 
+- Changing the Modulus & Norm Checks
+- Reformulating Constraints
+- Working over Subring
+
+
 
 
 ## Notation
