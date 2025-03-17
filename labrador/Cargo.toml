@@ -7,6 +7,7 @@ license.workspace = true
 
 [dependencies]
 rand = {version = "0.9", default-features = false, features = ["thread_rng", "unbiased"] }
+rustfft = "6.2.0"
 thiserror = {version = "1.0", default-features = false }
 
 [features]

@@ -34,6 +34,15 @@ impl Zq {
         i128::from(self.value)
     }
 
+    pub fn to_f64(&self) -> f64 {
+        let half = Self::MAX.value / 2;
+        if self.value > half {
+            f64::from(self.value) - f64::from(Self::MAX.value) - 1.0
+        } else {
+            f64::from(self.value)
+        }
+    }
+
     /// Converts an element from Zq (in the range [0, q-1])
     /// to its balanced (signed) representation in i128.
     pub fn to_signed_zq(&self) -> i128 {
@@ -50,13 +59,6 @@ impl Zq {
 
     /// Converts a balanced (signed) representative `x` in Zq to its standard (unsigned)
     /// representative in the range [0, q-1].
-    ///
-    /// # Arguments
-    /// * `x` - A signed integer representing the element in balanced form.
-    /// * `q` - The modulus.
-    ///
-    /// # Returns
-    /// A nonnegative integer in the range [0, q-1].
     pub fn to_unsigned_zq(value: i128) -> Zq {
         // If x is negative, add q to bring it into the range [0, q-1]
         let q: i128 = i128::try_from(Self::MAX.to_u128() + 1).unwrap();
