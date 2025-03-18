@@ -1,4 +1,6 @@
-use core::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
+use core::ops::{
+    Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Rem, RemAssign, Sub, SubAssign,
+};
 use rand::distr::uniform::{Error, SampleBorrow, SampleUniform, UniformInt, UniformSampler};
 use rand::prelude::*;
 use std::fmt;
@@ -17,6 +19,8 @@ impl Zq {
     pub const ZERO: Self = Self::new(0);
     /// Multiplicative identity
     pub const ONE: Self = Self::new(1);
+    /// Two
+    pub const TWO: Self = Self::new(2);
     /// Maximum element
     pub const MAX: Self = Self::new(u32::MAX);
 
@@ -51,12 +55,22 @@ macro_rules! impl_arithmetic {
                 self.value = self.value.$op(rhs.value);
             }
         }
+
+        impl $trait<Zq> for &Zq {
+            type Output = Zq;
+
+            fn $method(self, rhs: Zq) -> Self::Output {
+                Zq::new(self.value.$op(rhs.value))
+            }
+        }
     };
 }
 
 impl_arithmetic!(Add, AddAssign, add, add_assign, wrapping_add);
 impl_arithmetic!(Sub, SubAssign, sub, sub_assign, wrapping_sub);
 impl_arithmetic!(Mul, MulAssign, mul, mul_assign, wrapping_mul);
+impl_arithmetic!(Div, DivAssign, div, div_assign, wrapping_div);
+impl_arithmetic!(Rem, RemAssign, rem, rem_assign, wrapping_rem);
 
 impl From<u32> for Zq {
     fn from(value: u32) -> Self {
@@ -147,7 +161,7 @@ mod tests {
     fn test_subtraction_edge_cases() {
         let max = Zq::MAX;
         let one = Zq::ONE;
-        let two = Zq::new(2);
+        let two = Zq::TWO;
 
         assert_eq!((one - max).value, 2);
         assert_eq!((two - max).value, 3);
@@ -157,7 +171,7 @@ mod tests {
     #[test]
     fn test_multiplication_wrapping() {
         let a = Zq::new(1 << 31);
-        let two = Zq::new(2);
+        let two = Zq::TWO;
 
         // Multiplication wraps when exceeding u32 range
         assert_eq!((a * two).value, 0, "2^31 * 2 should wrap to 0");
@@ -200,7 +214,7 @@ mod tests {
 
         // Test negative equivalent value in multiplication
         let a = Zq::MAX; // Represents -1 in mod 2^32 arithmetic
-        let b = Zq::new(2);
+        let b = Zq::TWO;
         assert_eq!(
             (a * b).value,
             u32::MAX - 1,

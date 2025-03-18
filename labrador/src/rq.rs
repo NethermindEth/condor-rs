@@ -156,6 +156,45 @@ impl<const D: usize> Rq<D> {
         Rq::new(coeffs)
     }
 
+    /// Decomposes a polynomial into base-B representation:
+    /// p = p⁽⁰⁾ + p⁽¹⁾·B + p⁽²⁾·B² + ... + p⁽ᵗ⁻¹⁾·B^(t-1)
+    /// Where each p⁽ⁱ⁾ has small coefficients, using centered representatives
+    pub fn decompose(&self, base: Zq, num_parts: usize) -> Vec<Self> {
+        let mut parts = Vec::with_capacity(num_parts);
+        let mut current = self.clone();
+        let half_base = base / Zq::TWO;
+
+        for i in 0..num_parts {
+            if i == num_parts - 1 {
+                parts.push(current.clone());
+            } else {
+                // Extract low part (mod base, centered around 0)
+                let mut low_coeffs = [Zq::ZERO; D];
+
+                for (j, coeff) in current.get_coefficients().iter().enumerate() {
+                    let val = coeff % base;
+                    let centered = if val > half_base { val - base } else { val };
+                    low_coeffs[j] = centered;
+                }
+
+                let low_part = Self::new(low_coeffs);
+                parts.push(low_part.clone());
+
+                // Update current
+                current -= low_part;
+
+                // Divide by base
+                let mut divided_coeffs = [Zq::ZERO; D];
+                for (j, coeff) in current.get_coefficients().iter().enumerate() {
+                    divided_coeffs[j] = coeff / base;
+                }
+                current = Self::new(divided_coeffs);
+            }
+        }
+
+        parts
+    }
+
     /// Encode message into polynomial with small coefficients.
     ///
     /// # Arguments
