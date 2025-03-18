@@ -69,6 +69,24 @@ impl<const N: usize, const D: usize> RqVector<N, D> {
             .map(|coeff| *coeff * *coeff)
             .sum()
     }
+
+    // Compute the conjugate automorphism \sigma_{-1} of vector based on B) Constraints..., Page 21.
+    pub fn conjugate_automorphism(&self) -> RqVector<N, D> {
+        let mut new_vector_poly = Vec::new();
+        for poly in self.elements.iter() {
+            let mut new_coeffs = [Zq::ZERO; D];
+            new_coeffs[0] = poly.get_coefficients()[0];
+
+            for i in 1..D {
+                let j = D - i;
+                new_coeffs[j] = -poly.get_coefficients()[i];
+            }
+
+            new_vector_poly.push(Rq::new(new_coeffs));
+        }
+
+        RqVector::from(new_vector_poly)
+    }
 }
 
 // Enable array-like indexing
@@ -163,5 +181,36 @@ mod tests {
         let poly_zero: RqVector<4, 4> = RqVector::zero();
         let result_zero = Zq::ZERO;
         assert!(poly_zero.compute_norm_squared() == result_zero);
+    }
+
+    // Test conjugation automorphis
+    // test 1: ||a_2^2|| =? ct(<\sigma_{-1}(\vec{a}), \vec{a}>)
+    // test 2: ct(\sigma{-1}(X^j)\vec{a}) =? a_j
+    #[test]
+    fn test_conjugation_automorphis() {
+        let poly1: RqVector<3, 4> = vec![
+            vec![Zq::ONE, Zq::new(2), Zq::new(3), Zq::new(4)].into(),
+            vec![Zq::ONE, Zq::new(3), Zq::new(4), Zq::new(5)].into(),
+            vec![Zq::ONE, Zq::new(4), Zq::new(5), Zq::new(6)].into(),
+        ]
+        .into();
+
+        // test 1:
+        let l2norm_poly1 = poly1.compute_norm_squared();
+        let poly1_conj = poly1.conjugate_automorphism();
+        let dot_product_vec = poly1.mul(&poly1_conj);
+        assert_eq!(dot_product_vec.const_term(), l2norm_poly1);
+
+        // test 2:
+        let poly_degree = poly1[0].get_coefficients().len();
+        for j in 1..poly_degree {
+            for ele in poly1.iter().zip(poly1_conj.iter()) {
+                let (ele_poly1, ele_poly1_conj) = ele;
+                let a_j = ele_poly1.get_coefficients()[j];
+                let x_j_conj = -ele_poly1_conj.get_coefficients()[poly_degree - j];
+                let x_j_conj_mul_poly1 = ele_poly1.const_term() * x_j_conj;
+                assert_eq!(x_j_conj_mul_poly1, a_j);
+            }
+        }
     }
 }

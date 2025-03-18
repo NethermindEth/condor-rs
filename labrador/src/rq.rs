@@ -194,6 +194,11 @@ impl<const D: usize> Rq<D> {
     pub const fn zero() -> Self {
         Self::new([Zq::ZERO; D])
     }
+
+    // Return the const term of the vector
+    pub fn const_term(&self) -> Zq {
+        self.coeffs[0]
+    }
 }
 
 macro_rules! impl_arithmetic {
