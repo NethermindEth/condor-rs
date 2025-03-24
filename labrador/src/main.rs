@@ -5,6 +5,9 @@ use labrador::rq::Rq;
 use labrador::rq_vector::RqVector;
 use labrador::zq::Zq;
 use rand::rng;
+use labrador::transcript::Transcript;
+use labrador::transcript::SimpleTranscript;
+
 
 const D: usize = 4; // Degree of polynomials in S_i
 const N: usize = 5; // Size of S_i
@@ -68,4 +71,18 @@ fn main() {
     // Within bounds with probability 1/2
     let beta = polynomials.compute_norm_squared();
     println!("{}", verify_upper_bound(projection, beta));
+
+    // very basic transcript
+    let mut transcript = SimpleTranscript::new();  // state starts at 0
+    
+    // Absorb values
+    transcript.absorb(42);  // state becomes 0 ^ 42 = 42
+    transcript.absorb(7);   // state becomes 42 ^ 7 = 45
+    
+    // Get a challenge based on the current state
+    let challenge = transcript.get_challenge();  // challenge will be 45 + 1 = 46
+    
+    // Print the challenge
+    println!("Challenge: {}", challenge);  // Output: Challenge: 46
+    
 }
