@@ -145,17 +145,17 @@ pub mod test_coeffs {
 
     use super::*;
 
-    const BASIS_TEST_RANGE: [Zq; 1] = [Zq::new(4)];
+    const BASIS_TEST_RANGE: [u32; 1] = [4];
 
     #[test]
     fn test_decompose_balanced() {
         let poly1: Rq<2> = vec![Zq::new(100), Zq::new(200)].into();
         const D: usize = 8;
-        let b = Zq::new(2);
-        let b_half = b / Zq::new(2);
+        let b: u32 = 4;
+        let b_half = Zq::from(b / 2);
         let elements = poly1.get_coefficients();
-        let decomp1: Vec<Zq> = decompose_balanced(elements[0], b, D);
-        let decomp2: Vec<Zq> = decompose_balanced(elements[1], b, D);
+        let decomp1: Vec<Zq> = decompose_balanced(elements[0], Zq::new(b), D);
+        let decomp2: Vec<Zq> = decompose_balanced(elements[1], Zq::new(b), D);
 
         for v1_i in &decomp1 {
             assert!(*v1_i <= b_half || *v1_i >= -b_half);
@@ -164,16 +164,16 @@ pub mod test_coeffs {
         for v2_i in &decomp2 {
             assert!(*v2_i <= b_half || *v2_i >= -b_half);
         }
-        assert_eq!(elements[0], recompose(decomp1, b));
-        assert_eq!(elements[1], recompose(decomp2, b));
+        assert_eq!(elements[0], recompose(decomp1, Zq::new(b)));
+        assert_eq!(elements[1], recompose(decomp2, Zq::new(b)));
     }
 
     #[test]
     fn test_decompose_balanced_vec() {
         let poly1: Rq<2> = vec![Zq::new(100), Zq::new(200)].into();
         for b in BASIS_TEST_RANGE {
-            let b_half = b / Zq::new(2);
-            let decomp = decompose_balanced_vec(poly1.clone(), b, 8);
+            let b_half = Zq::new(b / 2);
+            let decomp = decompose_balanced_vec(poly1.clone(), Zq::new(b), 8);
             println!("{:?}", decomp);
 
             // Check that all entries are smaller than b/2 in absolute value
@@ -187,7 +187,7 @@ pub mod test_coeffs {
                 // Check that the decomposition is correct
                 let decomp_i = item.clone();
                 println!("{:?}", decomp_i);
-                assert_eq!(poly1.get_coefficients()[i], recompose(decomp_i, b));
+                assert_eq!(poly1.get_coefficients()[i], recompose(decomp_i, Zq::new(b)));
             }
         }
     }
@@ -196,13 +196,10 @@ pub mod test_coeffs {
     fn test_decompose_balanced_commits() {
         let poly5: Rq<2> = vec![Zq::new(100), Zq::new(200)].into();
         let poly6: Rq<2> = vec![Zq::new(1000), Zq::new(2000)].into();
-        // let poly7: Rq<2> = vec![Zq::new(10000), Zq::new(20000)].into();
-        // let poly8: Rq<2> = vec![Zq::new(100000), Zq::new(200000)].into();
         let vec_5: RqVector<2, 2> = RqVector::from(vec![poly5, poly6]);
-        // let vec_6: RqVector<2, 2> = RqVector::from(vec![poly7, poly8]);
         for b in BASIS_TEST_RANGE {
-            let b_half = b / Zq::new(2);
-            let decomp = decompose_balanced_commits(vec_5.clone(), b, 8);
+            let b_half = Zq::new(b / 2);
+            let decomp = decompose_balanced_commits(vec_5.clone(), Zq::new(b), 8);
             println!("{:?}", decomp);
 
             // Check that all entries are smaller than b/2 in absolute value
@@ -218,7 +215,10 @@ pub mod test_coeffs {
                 let decomp_i = decomp[i].clone();
                 for (j, item) in decomp_i.iter().enumerate() {
                     let decomp_ij = item.clone();
-                    assert_eq!(vec_5[i].get_coefficients()[j], recompose(decomp_ij, b));
+                    assert_eq!(
+                        vec_5[i].get_coefficients()[j],
+                        recompose(decomp_ij, Zq::new(b))
+                    );
                 }
             }
         }

@@ -1,4 +1,4 @@
-use core::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
+use core::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 use rand::distr::uniform::{Error, SampleBorrow, SampleUniform, UniformInt, UniformSampler};
 use rand::prelude::*;
 use std::fmt;
@@ -96,7 +96,6 @@ macro_rules! impl_arithmetic {
 impl_arithmetic!(Add, AddAssign, add, add_assign, wrapping_add);
 impl_arithmetic!(Sub, SubAssign, sub, sub_assign, wrapping_sub);
 impl_arithmetic!(Mul, MulAssign, mul, mul_assign, wrapping_mul);
-impl_arithmetic!(Div, DivAssign, div, div_assign, wrapping_div);
 
 impl From<u32> for Zq {
     fn from(value: u32) -> Self {
