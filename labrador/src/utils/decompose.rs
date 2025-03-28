@@ -4,7 +4,12 @@
 //! Section 5.2 Main Protocol, decompose \vec{t_i} into t_1 >= 2 parts
 //! with a small base b_1, where each coefficient's infity norm should
 //! be bounded to b_1/2.
-use crate::{rq::Rq, rq_vector::RqVector, zq::Zq};
+use crate::{
+    poly::{PolyRing, PolyVector},
+    rq::Rq,
+    rq_vector::RqVector,
+    zq::Zq,
+};
 pub trait Decompose: Sized + Copy {
     fn decompose_balanced_in_place(&self, b: Zq, out: &mut [Zq]);
     fn decompose(&self, b: Zq, padding_size: usize) -> Vec<Zq> {
@@ -93,46 +98,48 @@ fn rounded_div(n: i128, d: i128) -> i128 {
 }
 
 /// Returns the balanced decomposition of a slice as a Vec of Vecs.
-pub fn decompose_balanced_vec<const D: usize>(
-    v: Rq<D>,
-    b: Zq,
-    padding_size: usize,
-) -> Vec<Vec<Zq>> {
-    v.iter()
-        .map(|v_i| decompose_balanced(*v_i, b, padding_size))
-        .collect()
+pub fn decompose_balanced_vec<const D: usize>(v: Rq<D>, b: Zq, padding_size: usize) -> PolyVector {
+    let mut result = Vec::with_capacity(D);
+    for v_i in v.iter() {
+        result.push(decompose_balanced(*v_i, b, padding_size));
+    }
+    PolyVector::new(result)
 }
 
 pub fn decompose_balanced_commits<const N: usize, const D: usize>(
     v: RqVector<N, D>,
     b: Zq,
     padding_size: usize,
-) -> Vec<Vec<Vec<Zq>>> {
+) -> Vec<PolyVector> {
     v.as_slice()
         .iter()
         .map(|v_i| {
-            v_i.iter()
-                .map(|v_j| decompose_balanced(*v_j, b, padding_size))
-                .collect()
+            let mut row = Vec::new();
+            for v_j in v_i.iter() {
+                row.push(decompose_balanced(*v_j, b, padding_size));
+            }
+            PolyVector::new(row)
         })
         .collect()
 }
 
-pub fn decompose_balanced(v: Zq, b: Zq, padding_size: usize) -> Vec<Zq> {
+pub fn decompose_balanced(v: Zq, b: Zq, padding_size: usize) -> PolyRing {
     let mut result = vec![Zq::ZERO; padding_size];
 
     decompose_balanced_in_place(v, b, &mut result);
 
-    result
+    PolyRing::new(result)
 }
 
 /// revert the decomposition, mainly for testing
-pub fn recompose(decomp: Vec<Zq>, b: Zq) -> Zq {
+pub fn recompose(decomp: PolyRing, b: Zq) -> Zq {
     let mut result = Zq::ZERO;
 
-    for v_i in decomp.iter().rev() {
+    // Use collect to convert to Vec first, which implements DoubleEndedIterator
+    let decomp_vec: Vec<&Zq> = decomp.iter().collect();
+    for v_i in decomp_vec.iter().rev() {
         result *= b;
-        result += *v_i;
+        result += **v_i;
     }
 
     result
@@ -154,14 +161,14 @@ pub mod test_coeffs {
         let b: u32 = 4;
         let b_half = Zq::from(b / 2);
         let elements = poly1.get_coefficients();
-        let decomp1: Vec<Zq> = decompose_balanced(elements[0], Zq::new(b), D);
-        let decomp2: Vec<Zq> = decompose_balanced(elements[1], Zq::new(b), D);
+        let decomp1: PolyRing = decompose_balanced(elements[0], Zq::new(b), D);
+        let decomp2: PolyRing = decompose_balanced(elements[1], Zq::new(b), D);
 
-        for v1_i in &decomp1 {
+        for v1_i in decomp1.iter() {
             assert!(*v1_i <= b_half || *v1_i >= -b_half);
         }
 
-        for v2_i in &decomp2 {
+        for v2_i in decomp2.iter() {
             assert!(*v2_i <= b_half || *v2_i >= -b_half);
         }
         assert_eq!(elements[0], recompose(decomp1, Zq::new(b)));
@@ -174,19 +181,15 @@ pub mod test_coeffs {
         for b in BASIS_TEST_RANGE {
             let b_half = Zq::new(b / 2);
             let decomp = decompose_balanced_vec(poly1.clone(), Zq::new(b), 8);
-            println!("{:?}", decomp);
-
             // Check that all entries are smaller than b/2 in absolute value
-            for d_i in &decomp {
-                for d_ij in d_i {
+            for d_i in decomp.iter() {
+                for d_ij in d_i.iter() {
                     assert!(*d_ij <= b_half || *d_ij >= -b_half);
                 }
             }
-            println!("{:?}", decomp.len());
             for (i, item) in decomp.iter().enumerate() {
                 // Check that the decomposition is correct
                 let decomp_i = item.clone();
-                println!("{:?}", decomp_i);
                 assert_eq!(poly1.get_coefficients()[i], recompose(decomp_i, Zq::new(b)));
             }
         }
@@ -200,12 +203,11 @@ pub mod test_coeffs {
         for b in BASIS_TEST_RANGE {
             let b_half = Zq::new(b / 2);
             let decomp = decompose_balanced_commits(vec_5.clone(), Zq::new(b), 8);
-            println!("{:?}", decomp);
 
             // Check that all entries are smaller than b/2 in absolute value
             for d_i in &decomp {
-                for d_ij in d_i {
-                    for d_ijk in d_ij {
+                for d_ij in d_i.iter() {
+                    for d_ijk in d_ij.iter() {
                         assert!(*d_ijk <= b_half || *d_ijk >= -b_half);
                     }
                 }

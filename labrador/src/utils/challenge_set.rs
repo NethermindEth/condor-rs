@@ -1,49 +1,29 @@
-use crate::{rq::Rq, zq::Zq};
+use crate::{poly::PolyRing, zq::Zq};
 use rand::prelude::*;
 use rand::seq::SliceRandom;
 use rustfft::{num_complex::Complex, FftPlanner};
 
-pub struct ChallengeSet<const D: usize> {
-    cs: Rq<D>,
+pub struct ChallengeSet {
+    challenges: PolyRing,
     norm: f64,
 }
 
-/// The concrete instantiations d is 64, paper page 6
-pub const D: usize = 64;
-
 /// Challenge Space over R = Z_q\[X\] / (X^d + 1), paper page 6:
-impl<const D: usize> Default for ChallengeSet<D> {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl<const D: usize> ChallengeSet<D> {
-    pub fn new() -> Self {
+impl ChallengeSet {
+    pub fn new(deg_bound_d: usize) -> Self {
         // threshold \in R, threshold is "T" in the paper(Challenge Space, page 6) which is at most 15.
         let op_norm = 15.0;
-
         // Sample challenges with a given norm.
-        let challenges = sample_challenge_with_norm(op_norm);
-
-        // Convert the challenges into an array.
-        // This will panic if the length is not exactly D.
-        let coeffs: [Zq; D] = challenges
-            .clone()
-            .try_into()
-            .expect("Challenge vector does not have the required length");
-
-        let cs = Rq::new(coeffs);
-
+        let challenges: PolyRing = sample_challenge_with_norm(deg_bound_d, op_norm);
         // Convert challenges into f64 values and compute the operator norm.
         let candidate_f64 = zq_to_f64(challenges.clone());
         let norm = operator_norm(&candidate_f64);
-        ChallengeSet { cs, norm }
+        ChallengeSet { challenges, norm }
     }
 
     /// Returns a reference to the challenge polynomial.
-    pub fn get_challenges(&self) -> &Rq<D> {
-        &self.cs
+    pub fn get_challenges(&self) -> &PolyRing {
+        &self.challenges
     }
 
     /// Returns the norm of the challenges.
@@ -80,9 +60,9 @@ fn operator_norm(coeffs: &[f64]) -> f64 {
 /// - 10 coefficients are chosen uniformly from {+2, -2}
 ///
 /// The coefficients are then shuffled randomly.
-fn sample_challenge() -> Vec<Zq> {
+fn sample_challenge(deg_bound_d: usize) -> PolyRing {
     let mut rng = rand::rng();
-    let mut challenge: Vec<Zq> = Vec::with_capacity(D);
+    let mut challenge: Vec<Zq> = Vec::with_capacity(deg_bound_d);
 
     // Add 23 zeros.
     for _ in 0..23 {
@@ -109,23 +89,23 @@ fn sample_challenge() -> Vec<Zq> {
 
     // Shuffle the vector to randomize the positions.
     challenge.shuffle(&mut rng);
-    challenge
+    PolyRing::new(challenge)
 }
 
 /// Rejection sampling: repeatedly sample candidate challenges until one has an operator norm
 /// less than the specified threshold. Returns the accepted challenge and the number of samples tried.
-fn sample_challenge_with_norm(threshold: f64) -> Vec<Zq> {
+fn sample_challenge_with_norm(deg_bound_d: usize, threshold: f64) -> PolyRing {
     loop {
-        let candidate = sample_challenge();
+        let candidate = sample_challenge(deg_bound_d);
         let candidate_f64 = zq_to_f64(candidate.clone());
         let norm = operator_norm(&candidate_f64);
         if norm < threshold {
-            return candidate.clone();
+            return candidate;
         }
     }
 }
 
-fn zq_to_f64(zq: Vec<Zq>) -> Vec<f64> {
+fn zq_to_f64(zq: PolyRing) -> Vec<f64> {
     let _zq = zq.iter().map(|z| z.to_f64()).collect();
     _zq
 }
@@ -134,18 +114,25 @@ fn zq_to_f64(zq: Vec<Zq>) -> Vec<f64> {
 mod tests {
     use super::*;
 
-    /// Test Challenge Set. 71 and 15 are from Challenge Space, paper page 6.
+    /// Test Challenge Set:
+    /// const 71 and const 15 are from Challenge Space, paper page 6.
     /// l2 norm <= 71
     /// operator norm <= 15
     #[test]
     fn test_challenge_set() {
         let op_norm = 15.0;
-        let cs: ChallengeSet<D> = ChallengeSet::default();
-        let norm = cs.get_norm();
-        let challenges = cs.get_challenges();
+        let deg_bound_d: usize = 8;
+        let cs_1: ChallengeSet = ChallengeSet::new(deg_bound_d);
+        let norm = cs_1.get_norm();
+        let challenges_1 = cs_1.get_challenges();
+
+        let cs_2: ChallengeSet = ChallengeSet::new(deg_bound_d);
+        let challenges_2 = cs_2.get_challenges();
 
         // l2 norm 71 is from paper page 6, Challenge Space.
-        assert_eq!(challenges.inner_product(challenges), Zq::new(71));
+        assert_eq!(challenges_1.inner_product(challenges_1), Zq::new(71));
         assert!(norm <= op_norm);
+
+        assert_ne!(challenges_1, challenges_2);
     }
 }

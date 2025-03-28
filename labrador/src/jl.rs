@@ -1,5 +1,5 @@
 use crate::rq::Rq;
-use crate::{rq_vector::RqVector, zq::Zq, zq_vector::ZqMatrix, zq_vector::ZqVector};
+use crate::{poly::PolyRing, poly::PolyVector, rq_vector::RqVector, zq::Zq};
 use rand::prelude::*;
 use rand::rng;
 
@@ -9,7 +9,7 @@ pub const SECURITY_LEVEL: usize = 128;
 pub const PROJECTION_MATRIX_SIZE: usize = 2 * SECURITY_LEVEL;
 /// Projection matrix with values in {1,0,-1} mod q
 pub struct ProjectionMatrix<const D: usize> {
-    matrix: ZqMatrix,
+    matrix: PolyVector,
 }
 
 impl<const D: usize> ProjectionMatrix<D> {
@@ -17,8 +17,8 @@ impl<const D: usize> ProjectionMatrix<D> {
     /// n is the size of the vector of polynomials
     pub fn new(n: usize) -> Self {
         // let mut matrix = vec![vec![Zq::ZERO; n * D]; 256];
-        let mut matrix = ZqMatrix::new(vec![
-            ZqVector::new(vec![Zq::ZERO; n * D]);
+        let mut matrix = PolyVector::new(vec![
+            PolyRing::new(vec![Zq::ZERO; n * D]);
             PROJECTION_MATRIX_SIZE
         ]);
         let mut rng = rng();
@@ -39,7 +39,7 @@ impl<const D: usize> ProjectionMatrix<D> {
     }
 
     /// Returns the matrix
-    pub fn get_matrix(&self) -> &ZqMatrix {
+    pub fn get_matrix(&self) -> &PolyVector {
         &self.matrix
     }
 }

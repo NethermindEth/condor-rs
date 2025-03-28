@@ -25,8 +25,10 @@ pub mod rq_matrix;
 
 pub mod rq_vector;
 
-pub mod zq_vector;
+pub mod poly;
 
 pub mod jl;
 
 pub mod utils;
+
+pub mod statement;
