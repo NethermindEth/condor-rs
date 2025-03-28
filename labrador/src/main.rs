@@ -76,7 +76,7 @@ fn main() {
 
     // Absorb values
     transcript.absorb(Zq::new(42));
-    transcript.absorb(Zq::new(8));
+    transcript.absorb(Zq::new(9));
 
     // Get a challenge based on the current state
     let challenge = transcript.get_challenge();

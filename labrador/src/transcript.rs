@@ -11,17 +11,15 @@ pub trait Transcript {
 fn simple_mds_like_matrix(size: usize) -> Vec<Vec<Zq>> {
     let mut matrix = vec![vec![Zq::ZERO; size]; size];
 
-    for i in 0..size {
-        for j in 0..size {
-            if i == j {
-                matrix[i][j] = Zq::ONE;
+    for (i, row) in matrix.iter_mut().enumerate().take(size) {
+        for (j, elem) in row.iter_mut().enumerate().take(size) {
+            *elem = if i == j {
+                Zq::ONE
             } else if i + j == size - 1 {
-                matrix[i][j] = Zq::new(2);
-            } else if i < j {
-                matrix[i][j] = Zq::new(1);
+                Zq::new(2)
             } else {
-                matrix[i][j] = Zq::new(1);
-            }
+                Zq::new(3)
+            };
         }
     }
     matrix
@@ -35,16 +33,16 @@ fn generate_incremental_round_constants(
 ) -> Vec<Vec<Zq>> {
     let mut ark = vec![vec![Zq::ZERO; state_size]; rounds];
     let mut counter = Zq::new(start);
-
-    for i in 0..rounds {
-        for j in 0..state_size {
-            ark[i][j] = counter;
+    for row in ark.iter_mut().take(rounds) {
+        for elem in row.iter_mut().take(state_size) {
+            *elem = counter.clone();
             counter += Zq::ONE;
         }
     }
 
     ark
 }
+
 pub struct PoseidonTranscript {
     sponge: PoseidonSponge, // Transcrip will use the Poseidon sponge
 }
