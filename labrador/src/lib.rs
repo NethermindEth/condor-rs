@@ -27,4 +27,6 @@ pub mod rq_vector;
 
 pub mod jl;
 
+pub mod poseidon;
+
 pub mod transcript;

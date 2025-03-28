@@ -33,6 +33,24 @@ impl Zq {
     pub const fn is_zero(&self) -> bool {
         self.value == 0
     }
+
+    // Computes x^exp % q using exponentiation by squaring
+    pub fn pow(&self, exp: u64) -> Self {
+        let mut result = Zq::ONE;
+        let mut base = *self;
+        let mut exponent = exp;
+
+        // Exponentiation by squaring
+        while exponent > 0 {
+            if exponent % 2 == 1 {
+                result *= base;
+            }
+            base = base * base;
+            exponent /= 2;
+        }
+
+        result
+    }
 }
 
 // Macro to generate arithmetic trait implementations
@@ -249,5 +267,41 @@ mod tests {
 
         assert_eq!(neg_a + a, Zq::ZERO);
         assert_eq!(neg_b, Zq::ZERO);
+    }
+    // Exponenciation tests
+    #[test]
+    fn test_pow_zero_exponent() {
+        let base = Zq::new(5);
+        let result = base.pow(0);
+        assert_eq!(result, Zq::ONE);
+    }
+
+    #[test]
+    fn test_pow_one_exponent() {
+        let base = Zq::new(7);
+        let result = base.pow(1);
+        assert_eq!(result, Zq::new(7));
+    }
+
+    #[test]
+    fn test_pow_small_exponent() {
+        let base = Zq::new(3);
+        let result = base.pow(4);
+        assert_eq!(result, Zq::new(81));
+    }
+
+    #[test]
+    fn test_pow_large_exponent() {
+        let base = Zq::new(2);
+        let result = base.pow(10);
+        assert_eq!(result, Zq::new(1024));
+    }
+
+    #[test]
+    fn test_pow_wrapping() {
+        let base = Zq::new(3);
+        let result = base.pow(30);
+        let expected = Zq::new(3284826297);
+        assert_eq!(result, expected);
     }
 }

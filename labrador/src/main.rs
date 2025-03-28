@@ -3,7 +3,7 @@ use labrador::jl::ProjectionMatrix;
 use labrador::jl::ProjectionVector;
 use labrador::rq::Rq;
 use labrador::rq_vector::RqVector;
-use labrador::transcript::SimpleTranscript;
+use labrador::transcript::PoseidonTranscript;
 use labrador::transcript::Transcript;
 use labrador::zq::Zq;
 use rand::rng;
@@ -71,16 +71,16 @@ fn main() {
     let beta = polynomials.compute_norm_squared();
     println!("{}", verify_upper_bound(projection, beta));
 
-    // very basic transcript
-    let mut transcript = SimpleTranscript::new(); // state starts at 0
+    // very basic transcript example
+    let mut transcript: PoseidonTranscript = Transcript::new(); // state starts at 0
 
     // Absorb values
-    transcript.absorb(42); // state becomes 0 ^ 42 = 42
-    transcript.absorb(7); // state becomes 42 ^ 7 = 45
+    transcript.absorb(Zq::new(42));
+    transcript.absorb(Zq::new(8));
 
     // Get a challenge based on the current state
-    let challenge = transcript.get_challenge(); // challenge will be 45 + 1 = 46
+    let challenge = transcript.get_challenge();
 
     // Print the challenge
-    println!("Challenge: {}", challenge); // Output: Challenge: 46
+    println!("Challenge: {}", challenge);
 }
