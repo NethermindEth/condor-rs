@@ -8,6 +8,8 @@
 #![doc = include_str!("../doc/arithmetic_circuit_translation.md")]
 // Ajtai Commitment
 #![doc = include_str!("../doc/ajtai_commitment.md")]
+// Hierarchical Commitment
+#![doc = include_str!("../doc/hierarchical_commitment.md")]
 // Projections
 #![doc = include_str!("../doc/projections.md")]
 // Aggregation
@@ -28,6 +30,8 @@ pub mod rq_vector;
 pub mod poly;
 
 pub mod jl;
+
+pub mod hierarchical_commitment;
 
 pub mod utils;
 

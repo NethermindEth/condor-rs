@@ -17,6 +17,8 @@ impl Zq {
     pub const ZERO: Self = Self::new(0);
     /// Multiplicative identity
     pub const ONE: Self = Self::new(1);
+    /// Two
+    pub const TWO: Self = Self::new(2);
     /// Maximum element
     pub const MAX: Self = Self::new(u32::MAX);
 
@@ -72,6 +74,41 @@ impl Zq {
     pub const fn is_zero(&self) -> bool {
         self.value == 0
     }
+
+    /// Returns the centered representative modulo the given bound
+    /// Result is guaranteed to be in (-bound/2, bound/2]
+    ///
+    /// # Panics
+    ///
+    /// Panics if `bound` is zero.
+    pub(crate) fn centered_mod(&self, bound: Self) -> Self {
+        assert!(
+            bound != Zq::ZERO,
+            "cannot get centered representative modulo for zero bound"
+        );
+        let bounded_coeff = Self::new(self.value % bound.value);
+        let half_bound = bound.scale_by(Self::TWO);
+
+        if bounded_coeff > half_bound {
+            bounded_coeff - bound
+        } else {
+            bounded_coeff
+        }
+    }
+
+    /// Scales by other Zq.
+    ///
+    /// Effectively it is a floor division of internal values.
+    /// But for the ring of integers there is no defined division
+    /// operation.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `bound` is zero.
+    pub(crate) fn scale_by(&self, rhs: Self) -> Self {
+        assert!(rhs != Zq::ZERO, "cannot scale by zero");
+        Self::new(self.value / rhs.value)
+    }
 }
 
 // Macro to generate arithmetic trait implementations
@@ -88,6 +125,14 @@ macro_rules! impl_arithmetic {
         impl $assign_trait for Zq {
             fn $assign_method(&mut self, rhs: Self) {
                 self.value = self.value.$op(rhs.value);
+            }
+        }
+
+        impl $trait<Zq> for &Zq {
+            type Output = Zq;
+
+            fn $method(self, rhs: Zq) -> Self::Output {
+                Zq::new(self.value.$op(rhs.value))
             }
         }
     };
@@ -186,7 +231,7 @@ mod tests {
     fn test_subtraction_edge_cases() {
         let max = Zq::MAX;
         let one = Zq::ONE;
-        let two = Zq::new(2);
+        let two = Zq::TWO;
 
         assert_eq!((one - max).value, 2);
         assert_eq!((two - max).value, 3);
@@ -196,7 +241,7 @@ mod tests {
     #[test]
     fn test_multiplication_wrapping() {
         let a = Zq::new(1 << 31);
-        let two = Zq::new(2);
+        let two = Zq::TWO;
 
         // Multiplication wraps when exceeding u32 range
         assert_eq!((a * two).value, 0, "2^31 * 2 should wrap to 0");
@@ -239,7 +284,7 @@ mod tests {
 
         // Test negative equivalent value in multiplication
         let a = Zq::MAX; // Represents -1 in mod 2^32 arithmetic
-        let b = Zq::new(2);
+        let b = Zq::TWO;
         assert_eq!(
             (a * b).value,
             u32::MAX - 1,

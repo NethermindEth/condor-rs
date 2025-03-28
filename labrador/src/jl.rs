@@ -52,7 +52,7 @@ pub struct ProjectionVector<const N: usize, const D: usize> {
 }
 
 impl<const N: usize, const D: usize> ProjectionVector<N, D> {
-    /// Calculates Projection  
+    /// Calculates Projection
     pub fn new(matrix: &ProjectionMatrix<D>, s_i: &RqVector<N, D>) -> Self {
         let mut projection = Rq::new([Zq::ZERO; PROJECTION_MATRIX_SIZE]);
         let coefficients = s_i.concatenate_coefficients();
@@ -177,7 +177,7 @@ mod tests {
         for _ in 0..10000 {
             let mut rng = rng();
             // Generate the random polynomials
-            let polynomials = RqVector::<5, 5>::random_small(&mut rng);
+            let polynomials = RqVector::<5, 5>::random_ternary(&mut rng);
             // Generate projection matrix
             let matrix = ProjectionMatrix::new(n);
             // Generate Projection
@@ -209,7 +209,7 @@ mod tests {
         let trials: u128 = 100000;
         let n = 3;
         let mut rng = rng();
-        let polynomials = RqVector::<3, 3>::random_small(&mut rng);
+        let polynomials = RqVector::<3, 3>::random_ternary(&mut rng);
         let mut matrix = ProjectionMatrix::new(n);
         let mut projection = ProjectionVector::new(&matrix, &polynomials);
         let mut norm_sum = projection.norm_squared();
@@ -247,7 +247,7 @@ mod tests {
         let n = 5;
         let mut rng = rng();
         // Generate random vector of polynomials of small norm
-        let polynomials = RqVector::<5, 64>::random_small(&mut rng);
+        let polynomials = RqVector::<5, 64>::random_ternary(&mut rng);
         // Generate projection matrix
         let matrix = ProjectionMatrix::new(n);
         // Generate Projection

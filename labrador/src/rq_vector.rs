@@ -26,7 +26,7 @@ impl<const N: usize, const D: usize> RqVector<N, D> {
     }
 
     /// Create a random vector
-    pub fn random_small<R: Rng + CryptoRng>(rng: &mut R) -> Self {
+    pub fn random_ternary<R: Rng + CryptoRng>(rng: &mut R) -> Self {
         Self {
             elements: (0..N).map(|_| Rq::random_ternary(rng)).collect(),
         }
