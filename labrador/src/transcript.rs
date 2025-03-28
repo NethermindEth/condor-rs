@@ -35,7 +35,7 @@ fn generate_incremental_round_constants(
     let mut counter = Zq::new(start);
     for row in ark.iter_mut().take(rounds) {
         for elem in row.iter_mut().take(state_size) {
-            *elem = counter.clone();
+            *elem = counter;
             counter += Zq::ONE;
         }
     }
