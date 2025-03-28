@@ -2,11 +2,6 @@ use crate::{
     poly::{PolyRing, PolyVector},
     zq::Zq,
 };
-// modulus of the ring, 2^32
-pub const Q: u128 = 42949672962;
-pub const SECURITY_LEVEL: usize = 128;
-pub const PROJECTION_MATRIX_SIZE: usize = 2 * SECURITY_LEVEL;
-
 /// Calculate aprimes from aprime_l, a_{i,j}^{''k} = \sum_{l=1}^{L}\psi_l^{k}a_{ij}^{'(l)}
 ///
 /// @param: random_psi: \psi_l^k
@@ -60,9 +55,10 @@ pub fn calculate_aggr_ct_a(
 ///
 /// @param: phi_ct: \phi_{i}^{'(l)}
 /// @param: pi: pi_i^{j}
-/// @param: size_params: Vec<usize> contains size_r, size_n, deg_bound_d, size_k, constraint_l and constraint_k
 /// @param: random_psi: \psi_l^{k}
 /// @param: random_omega: \omega_j^{k}
+/// @param: size_params: Vec<usize> contains size_r, size_n, deg_bound_d, size_k, constraint_l and constraint_k
+/// @param: security_level2: 256 in the paper
 ///
 /// return: \phi_{i}^{''(k)}
 pub fn calculate_aggr_ct_phi(
@@ -71,6 +67,7 @@ pub fn calculate_aggr_ct_phi(
     random_psi: &PolyVector,
     random_omega: &PolyVector,
     size_params: &[usize],
+    security_level2: usize,
 ) -> Vec<Vec<PolyVector>> {
     let (r, n, deg_bound_d, k, constraint_l) = (
         size_params[0],
@@ -100,7 +97,7 @@ pub fn calculate_aggr_ct_phi(
 
                     // Calculate the right side: \sum(\omega_j^{k} * \sigma_{-1} * pi_i^{j})
                     // Because the length of pi is n*d, so we need to split it into n parts, each part has d elements to do the conjugate automorphism.
-                    let right_side: PolyVector = (0..PROJECTION_MATRIX_SIZE)
+                    let right_side: PolyVector = (0..security_level2)
                         .map(|j| {
                             let omega_j = random_omega.get_elements()[k].get_coeffs()[j];
 
@@ -229,7 +226,6 @@ pub fn calculate_aggr_a(
 ///
 /// param: phi_constraint: \phi_{i}^{k}
 /// param: phi_ct_aggr: \phi_{i}^{''(k)}
-/// param: constraint_k: size k
 /// param: random_alpha: alpha_k
 /// param: random_beta: beta_k
 /// param: size_params: Vec<usize> contains size_r, size_n, deg_bound_d, size_k, constraint_l and constraint_k
@@ -451,9 +447,9 @@ mod tests {
         // number of witnesses
         let r: usize = 3;
         let n: usize = 5;
-        let deg_bound_d: usize = 2;
+        let deg_bound_d: usize = 4;
         // set constant D for JL projection matrix, D = deg_bound_d
-        const D: usize = 2;
+        const D: usize = 4;
 
         // security level is \lambda in the paper
         let security_level: usize = 128;
@@ -513,13 +509,21 @@ mod tests {
 
         // calculate \phi_{i}^{''(k)}
         // \pi is from JL projection, pi contains r matrices and each matrix: security_level2 * (n*d), (security_level2 is 256 in the paper).
-        // explicitly set the deg_bound_d to 8
+        // explicitly set the deg_bound_d to D == deg_bound_d
         let pi: Vec<PolyVector> = (0..r)
             .map(|_| ProjectionMatrix::<D>::new(n).get_matrix().clone())
             .collect();
 
-        let phi_ct_aggr: Vec<Vec<PolyVector>> =
-            calculate_aggr_ct_phi(&phi_ct, &pi, &random_psi, &random_omega, &size_params);
+        // calculate \phi_{i}^{''(k)}
+        // only this function needs "security_level2", so I didn't add it to size_params.
+        let phi_ct_aggr: Vec<Vec<PolyVector>> = calculate_aggr_ct_phi(
+            &phi_ct,
+            &pi,
+            &random_psi,
+            &random_omega,
+            &size_params,
+            security_level2,
+        );
 
         // calculate b^{''(k)}
         let b_ct_aggr: PolyVector =

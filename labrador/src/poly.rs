@@ -1,8 +1,8 @@
 use crate::{rq::Rq, rq_vector::RqVector, zq::Zq};
 use rand::distr::{Distribution, Uniform};
-use rand::{CryptoRng, Rng}; // Keep the imports as they are
+use rand::{CryptoRng, Rng};
 
-#[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Default)] // Removed Copy trait
+#[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Default)]
 pub struct PolyRing {
     coeffs: Vec<Zq>,
 }
@@ -35,10 +35,6 @@ impl PolyRing {
 
     pub fn get_coeffs(&self) -> &Vec<Zq> {
         &self.coeffs
-    }
-
-    pub fn get_coeffs_mut(&mut self) -> &mut Vec<Zq> {
-        &mut self.coeffs
     }
 
     pub fn iter(&self) -> impl Iterator<Item = &Zq> {
@@ -114,7 +110,8 @@ impl PolyRing {
     pub fn to_rq<const D: usize>(&self) -> Rq<D> {
         Rq::from_vec(self.get_coeffs().clone())
     }
-    // Compute the conjugate automorphism \sigma_{-1} of vector based on B) Constraints..., Page 21.
+
+    /// Compute the conjugate automorphism \sigma_{-1} of vector based on B) Constraints..., Page 21.
     pub fn conjugate_automorphism(&self) -> PolyRing {
         let q_minus_1 = Zq::MAX;
         let mut new_coeffs = vec![Zq::ZERO; PolyRing::DEGREE_BOUND];
@@ -169,14 +166,6 @@ impl PolyVector {
 
     pub fn get_elements(&self) -> &Vec<PolyRing> {
         &self.elements
-    }
-
-    pub fn get_elements_mut(&mut self) -> &mut Vec<PolyRing> {
-        &mut self.elements
-    }
-
-    pub fn get_row(&self, i: usize) -> &PolyRing {
-        &self.elements[i]
     }
 
     pub fn len(&self) -> usize {
