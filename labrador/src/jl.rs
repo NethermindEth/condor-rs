@@ -16,7 +16,6 @@ impl<const D: usize> ProjectionMatrix<D> {
     /// Defines a matrix of size 256xnxD
     /// n is the size of the vector of polynomials
     pub fn new(n: usize) -> Self {
-        // let mut matrix = vec![vec![Zq::ZERO; n * D]; 256];
         let mut matrix = PolyVector::new(vec![
             PolyRing::new(vec![Zq::ZERO; n * D]);
             PROJECTION_MATRIX_SIZE
@@ -47,7 +46,6 @@ impl<const D: usize> ProjectionMatrix<D> {
 /// Calculate projection vector
 #[derive(Debug, Clone)]
 pub struct ProjectionVector<const N: usize, const D: usize> {
-    // projection: [Zq; PROJECTION_MATRIX_SIZE], // 256-dimensional projection vector
     projection: Rq<PROJECTION_MATRIX_SIZE>,
 }
 
@@ -110,12 +108,14 @@ mod tests {
         assert_eq!(
             matrix.matrix.len(),
             PROJECTION_MATRIX_SIZE,
-            "Matrix should have 256 rows"
+            "Matrix should have {} rows",
+            PROJECTION_MATRIX_SIZE
         );
         assert_eq!(
             matrix.matrix.get_elements()[0].len(),
             n * 4,
-            "Matrix should have n * D columns"
+            "Matrix should have {} columns",
+            n * 4
         );
 
         let n2 = 1;
@@ -124,12 +124,14 @@ mod tests {
         assert_eq!(
             matrix.matrix.len(),
             PROJECTION_MATRIX_SIZE,
-            "Matrix should have 256 rows"
+            "Matrix should have {} rows",
+            PROJECTION_MATRIX_SIZE
         );
         assert_eq!(
             matrix.matrix.get_elements()[0].len(),
             n2 * 4,
-            "Matrix should have n * D columns"
+            "Matrix should have {} columns",
+            n2 * 4
         );
     }
 

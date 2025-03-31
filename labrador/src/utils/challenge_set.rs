@@ -1,7 +1,6 @@
 use crate::{poly::PolyRing, zq::Zq};
 use rand::prelude::*;
 use rand::seq::SliceRandom;
-use rustfft::{num_complex::Complex, FftPlanner};
 
 pub struct ChallengeSet {
     challenges: PolyRing,
@@ -16,8 +15,8 @@ impl ChallengeSet {
         // Sample challenges with a given norm.
         let challenges: PolyRing = sample_challenge_with_norm(deg_bound_d, op_norm);
         // Convert challenges into f64 values and compute the operator norm.
-        let candidate_f64 = zq_to_f64(challenges.clone());
-        let norm = operator_norm(&candidate_f64);
+        let candidate_f64 = PolyRing::zq_to_f64(&challenges);
+        let norm = PolyRing::operator_norm(&candidate_f64);
         ChallengeSet { challenges, norm }
     }
 
@@ -30,28 +29,6 @@ impl ChallengeSet {
     pub fn get_norm(&self) -> f64 {
         self.norm
     }
-}
-
-/// Compute the operator norm of a polynomial given its coefficients.
-/// The operator norm is defined as the maximum magnitude of the DFT (eigenvalues)
-/// of the coefficient vector.
-fn operator_norm(coeffs: &[f64]) -> f64 {
-    let n = coeffs.len();
-    let mut planner = FftPlanner::new();
-    let fft = planner.plan_fft_forward(n);
-
-    // Convert coefficients into complex numbers (with zero imaginary parts)
-    let mut buffer: Vec<Complex<f64>> =
-        coeffs.iter().map(|&x| Complex { re: x, im: 0.0 }).collect();
-
-    // Compute the FFT (this gives the eigenvalues of the circulant matrix)
-    fft.process(&mut buffer);
-
-    // Return the maximum absolute value (norm) among the eigenvalues
-    buffer
-        .iter()
-        .map(|c| c.norm())
-        .fold(0.0, |max, x| max.max(x))
 }
 
 /// Generates a candidate challenge polynomial with 64 coefficients:
@@ -97,17 +74,12 @@ fn sample_challenge(deg_bound_d: usize) -> PolyRing {
 fn sample_challenge_with_norm(deg_bound_d: usize, threshold: f64) -> PolyRing {
     loop {
         let candidate = sample_challenge(deg_bound_d);
-        let candidate_f64 = zq_to_f64(candidate.clone());
-        let norm = operator_norm(&candidate_f64);
+        let candidate_f64 = PolyRing::zq_to_f64(&candidate);
+        let norm = PolyRing::operator_norm(&candidate_f64);
         if norm < threshold {
             return candidate;
         }
     }
-}
-
-fn zq_to_f64(zq: PolyRing) -> Vec<f64> {
-    let _zq = zq.iter().map(|z| z.to_f64()).collect();
-    _zq
 }
 
 #[cfg(test)]

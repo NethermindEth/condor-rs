@@ -1,6 +1,7 @@
 use crate::{rq::Rq, rq_vector::RqVector, zq::Zq};
 use rand::distr::{Distribution, Uniform};
 use rand::{CryptoRng, Rng};
+use rustfft::{num_complex::Complex, FftPlanner};
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Default)]
 pub struct PolyRing {
@@ -13,9 +14,9 @@ impl PolyRing {
     pub fn new(coeffs: Vec<Zq>) -> Self {
         Self { coeffs }
     }
-    pub fn zero(length: usize) -> Self {
+    pub fn zero(degree: usize) -> Self {
         Self {
-            coeffs: vec![Zq::ZERO; length],
+            coeffs: vec![Zq::ZERO; degree],
         }
     }
 
@@ -138,6 +139,32 @@ impl PolyRing {
             .collect::<Vec<Zq>>();
 
         PolyRing::new(reversed_coefficients)
+    }
+
+    /// Compute the operator norm of a polynomial given its coefficients.
+    /// The operator norm is defined as the maximum magnitude of the DFT (eigenvalues)
+    /// of the coefficient vector.
+    pub fn operator_norm(coeffs: &[f64]) -> f64 {
+        let n = coeffs.len();
+        let mut planner = FftPlanner::new();
+        let fft = planner.plan_fft_forward(n);
+
+        // Convert coefficients into complex numbers (with zero imaginary parts)
+        let mut buffer: Vec<Complex<f64>> =
+            coeffs.iter().map(|&x| Complex { re: x, im: 0.0 }).collect();
+
+        // Compute the FFT (this gives the eigenvalues of the circulant matrix)
+        fft.process(&mut buffer);
+
+        // Return the maximum absolute value (norm) among the eigenvalues
+        buffer
+            .iter()
+            .map(|c| c.norm())
+            .fold(0.0, |max, x| max.max(x))
+    }
+
+    pub fn zq_to_f64(zq: &PolyRing) -> Vec<f64> {
+        zq.iter().map(|z| z.to_f64()).collect()
     }
 }
 
