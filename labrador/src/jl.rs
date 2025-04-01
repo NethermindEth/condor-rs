@@ -1,5 +1,5 @@
 use crate::rq::Rq;
-use crate::{poly::PolyRing, poly::PolyVector, rq_vector::RqVector, zq::Zq};
+use crate::{poly::ZqVector, rq_vector::RqVector, zq::Zq};
 use rand::prelude::*;
 use rand::rng;
 
@@ -9,17 +9,14 @@ pub const SECURITY_LEVEL: usize = 128;
 pub const PROJECTION_MATRIX_SIZE: usize = 2 * SECURITY_LEVEL;
 /// Projection matrix with values in {1,0,-1} mod q
 pub struct ProjectionMatrix<const D: usize> {
-    matrix: PolyVector,
+    matrix: Vec<ZqVector>,
 }
 
 impl<const D: usize> ProjectionMatrix<D> {
     /// Defines a matrix of size 256xnxD
     /// n is the size of the vector of polynomials
     pub fn new(n: usize) -> Self {
-        let mut matrix = PolyVector::new(vec![
-            PolyRing::new(vec![Zq::ZERO; n * D]);
-            PROJECTION_MATRIX_SIZE
-        ]);
+        let mut matrix = vec![ZqVector::new(vec![Zq::ZERO; n * D]); PROJECTION_MATRIX_SIZE];
         let mut rng = rng();
         for row in matrix.iter_mut() {
             for elem in row.iter_mut() {
@@ -38,7 +35,7 @@ impl<const D: usize> ProjectionMatrix<D> {
     }
 
     /// Returns the matrix
-    pub fn get_matrix(&self) -> &PolyVector {
+    pub fn get_matrix(&self) -> &Vec<ZqVector> {
         &self.matrix
     }
 }
@@ -55,7 +52,7 @@ impl<const N: usize, const D: usize> ProjectionVector<N, D> {
         let mut projection = Rq::new([Zq::ZERO; PROJECTION_MATRIX_SIZE]);
         let coefficients = s_i.concatenate_coefficients();
         for (i, item) in projection.iter_mut().enumerate() {
-            *item = matrix.get_matrix().get_elements()[i]
+            *item = matrix.get_matrix()[i]
                 .iter()
                 .zip(coefficients.iter())
                 .map(|(m, s)| *m * *s)
@@ -112,7 +109,7 @@ mod tests {
             PROJECTION_MATRIX_SIZE
         );
         assert_eq!(
-            matrix.matrix.get_elements()[0].len(),
+            matrix.matrix[0].len(),
             n * 4,
             "Matrix should have {} columns",
             n * 4
@@ -128,7 +125,7 @@ mod tests {
             PROJECTION_MATRIX_SIZE
         );
         assert_eq!(
-            matrix.matrix.get_elements()[0].len(),
+            matrix.matrix[0].len(),
             n2 * 4,
             "Matrix should have {} columns",
             n2 * 4

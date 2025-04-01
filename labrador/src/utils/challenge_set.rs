@@ -15,7 +15,7 @@ impl ChallengeSet {
         // Sample challenges with a given norm.
         let challenges: PolyRing = sample_challenge_with_norm(deg_bound_d, op_norm);
         // Convert challenges into f64 values and compute the operator norm.
-        let candidate_f64 = PolyRing::zq_to_f64(&challenges);
+        let candidate_f64 = zq_to_f64(&challenges);
         let norm = PolyRing::operator_norm(&candidate_f64);
         ChallengeSet { challenges, norm }
     }
@@ -74,12 +74,26 @@ fn sample_challenge(deg_bound_d: usize) -> PolyRing {
 fn sample_challenge_with_norm(deg_bound_d: usize, threshold: f64) -> PolyRing {
     loop {
         let candidate = sample_challenge(deg_bound_d);
-        let candidate_f64 = PolyRing::zq_to_f64(&candidate);
+        let candidate_f64 = zq_to_f64(&candidate);
         let norm = PolyRing::operator_norm(&candidate_f64);
         if norm < threshold {
             return candidate;
         }
     }
+}
+
+#[allow(clippy::as_conversions)]
+fn zq_to_f64(poly: &PolyRing) -> Vec<f64> {
+    poly.iter()
+        .map(|z| {
+            let half = Zq::MAX.scale_by(Zq::TWO);
+            if *z > half {
+                z.to_u128() as f64 - Zq::MAX.to_u128() as f64 - 1.0
+            } else {
+                z.to_u128() as f64
+            }
+        })
+        .collect()
 }
 
 #[cfg(test)]

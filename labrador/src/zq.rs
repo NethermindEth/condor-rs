@@ -32,45 +32,6 @@ impl Zq {
         u128::from(self.value)
     }
 
-    pub fn to_i128(&self) -> i128 {
-        i128::from(self.value)
-    }
-
-    pub fn to_f64(&self) -> f64 {
-        let half = Self::MAX.value / 2;
-        if self.value > half {
-            f64::from(self.value) - f64::from(Self::MAX.value) - 1.0
-        } else {
-            f64::from(self.value)
-        }
-    }
-
-    /// Converts an element from Zq (in the range [0, q-1])
-    /// to its balanced (signed) representation in i128.
-    pub fn to_signed_zq(&self) -> i128 {
-        // Compute the threshold for conversion.
-        let q: u128 = Self::MAX.to_u128() + 1;
-        let half_q = q / 2;
-        if self.to_u128() > half_q {
-            // If x is above the threshold, subtract q to get a negative value.
-            self.to_i128() - i128::try_from(q).unwrap()
-        } else {
-            self.to_i128()
-        }
-    }
-
-    /// Converts a balanced (signed) representative `x` in Zq to its standard (unsigned)
-    /// representative in the range [0, q-1].
-    pub fn to_unsigned_zq(value: i128) -> Zq {
-        // If x is negative, add q to bring it into the range [0, q-1]
-        let q: i128 = i128::try_from(Self::MAX.to_u128() + 1).unwrap();
-        if value < 0 {
-            Zq::new(u32::try_from(value + q).unwrap())
-        } else {
-            Zq::new(u32::try_from(value).unwrap())
-        }
-    }
-
     pub const fn is_zero(&self) -> bool {
         self.value == 0
     }
@@ -333,17 +294,5 @@ mod tests {
 
         assert_eq!(neg_a + a, Zq::ZERO);
         assert_eq!(neg_b, Zq::ZERO);
-    }
-
-    #[test]
-    fn test_to_signed_zq() {
-        let a = Zq::MAX - Zq::new(99);
-        let b = Zq::ONE;
-
-        let c: i128 = a.to_signed_zq();
-        let d: i128 = b.to_signed_zq();
-
-        assert_eq!(c, -100);
-        assert_eq!(d, 1);
     }
 }

@@ -1,8 +1,11 @@
+use std::ops::{Add, Mul};
+
 use crate::{rq::Rq, rq_vector::RqVector, zq::Zq};
 use rand::distr::{Distribution, Uniform};
 use rand::{CryptoRng, Rng};
 use rustfft::{num_complex::Complex, FftPlanner};
 
+/// A PolyRing is a vector of Zq elements with a flexible degree that is less than or equal to DEGREE_BOUND.
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Default)]
 pub struct PolyRing {
     coeffs: Vec<Zq>,
@@ -12,18 +15,19 @@ impl PolyRing {
     pub const DEGREE_BOUND: usize = 64;
 
     pub fn new(coeffs: Vec<Zq>) -> Self {
+        assert!(
+            coeffs.len() <= Self::DEGREE_BOUND,
+            "Polynomial degree should be less than {}",
+            Self::DEGREE_BOUND
+        );
         Self { coeffs }
     }
     pub fn zero(degree: usize) -> Self {
-        Self {
-            coeffs: vec![Zq::ZERO; degree],
-        }
+        Self::new(vec![Zq::ZERO; degree])
     }
 
     pub fn zero_poly() -> Self {
-        Self {
-            coeffs: vec![Zq::ZERO; 1],
-        }
+        Self::new(vec![Zq::ZERO; 1])
     }
 
     pub fn len(&self) -> usize {
@@ -55,61 +59,12 @@ impl PolyRing {
             .sum()
     }
 
-    /// Add two polynomials with flexible degree
-    pub fn add(&self, other: &Self) -> Self {
-        let max_degree = self.get_coeffs().len().max(other.get_coeffs().len());
-        let mut coeffs = vec![Zq::ZERO; max_degree];
-        for (i, coeff) in coeffs.iter_mut().enumerate().take(max_degree) {
-            if i < self.get_coeffs().len() {
-                *coeff += self.get_coeffs()[i];
-            }
-            if i < other.get_coeffs().len() {
-                *coeff += other.get_coeffs()[i];
-            }
-        }
-        Self { coeffs }
-    }
-
-    /// Scalar multiplication of a polynomial
-    pub fn scalar_mul(&self, other: &Zq) -> Self {
-        Self {
-            coeffs: self.coeffs.iter().map(|c| *c * *other).collect(),
-        }
-    }
-
-    /// Polynomial multiplication of two polynomials
-    pub fn mul_poly(&self, other: &Self) -> PolyRing {
-        // Initialize a vector to hold the intermediate multiplication result
-        let mut result_coefficients =
-            vec![Zq::new(0); self.get_coeffs().len() + other.get_coeffs().len() - 1];
-        for (i, &coeff1) in self.get_coeffs().iter().enumerate() {
-            for (j, &coeff2) in other.get_coeffs().iter().enumerate() {
-                result_coefficients[i + j] += coeff1 * coeff2;
-            }
-        }
-
-        // Reduce modulo X^d + 1
-        if result_coefficients.len() > Self::DEGREE_BOUND {
-            let q_minus_1 = Zq::MAX;
-            let (left, right) = result_coefficients.split_at_mut(Self::DEGREE_BOUND);
-            for (i, &overflow) in right.iter().enumerate() {
-                left[i] += overflow * q_minus_1;
-            }
-            result_coefficients.truncate(Self::DEGREE_BOUND);
-        }
-        PolyRing::new(result_coefficients)
-    }
-
     /// Generate random Zq vector with a provided cryptographically secure RNG
     pub fn random<R: Rng + CryptoRng>(rng: &mut R, n: usize) -> Self {
         let uniform = Uniform::new_inclusive(Zq::ZERO, Zq::MAX).unwrap();
         let mut coeffs = Vec::with_capacity(n);
         coeffs.extend((0..n).map(|_| uniform.sample(rng)));
         Self { coeffs }
-    }
-
-    pub fn to_rq<const D: usize>(&self) -> Rq<D> {
-        Rq::from_vec(self.get_coeffs().clone())
     }
 
     /// Compute the conjugate automorphism \sigma_{-1} of vector based on B) Constraints..., Page 21.
@@ -162,9 +117,11 @@ impl PolyRing {
             .map(|c| c.norm())
             .fold(0.0, |max, x| max.max(x))
     }
+}
 
-    pub fn zq_to_f64(zq: &PolyRing) -> Vec<f64> {
-        zq.iter().map(|z| z.to_f64()).collect()
+impl<const D: usize> From<PolyRing> for Rq<D> {
+    fn from(zqs: PolyRing) -> Self {
+        zqs.get_coeffs().clone().into()
     }
 }
 
@@ -172,6 +129,58 @@ impl FromIterator<Zq> for PolyRing {
     fn from_iter<T: IntoIterator<Item = Zq>>(iter: T) -> Self {
         let coeffs: Vec<Zq> = iter.into_iter().collect();
         PolyRing::new(coeffs)
+    }
+}
+
+impl Add<&PolyRing> for &PolyRing {
+    type Output = PolyRing;
+    /// Add two polynomials with flexible degree
+    fn add(self, other: &PolyRing) -> PolyRing {
+        let max_degree = self.get_coeffs().len().max(other.get_coeffs().len());
+        let mut coeffs = vec![Zq::ZERO; max_degree];
+        for (i, coeff) in coeffs.iter_mut().enumerate().take(max_degree) {
+            if i < self.get_coeffs().len() {
+                *coeff += self.get_coeffs()[i];
+            }
+            if i < other.get_coeffs().len() {
+                *coeff += other.get_coeffs()[i];
+            }
+        }
+        PolyRing::new(coeffs)
+    }
+}
+
+impl Mul<&PolyRing> for &PolyRing {
+    type Output = PolyRing;
+    /// Polynomial multiplication of two polynomials
+    fn mul(self, other: &PolyRing) -> PolyRing {
+        // Initialize a vector to hold the intermediate multiplication result
+        let mut result_coefficients =
+            vec![Zq::new(0); self.get_coeffs().len() + other.get_coeffs().len() - 1];
+        for (i, &coeff1) in self.get_coeffs().iter().enumerate() {
+            for (j, &coeff2) in other.get_coeffs().iter().enumerate() {
+                result_coefficients[i + j] += coeff1 * coeff2;
+            }
+        }
+
+        // Reduce modulo X^d + 1
+        if result_coefficients.len() > PolyRing::DEGREE_BOUND {
+            let q_minus_1 = Zq::MAX;
+            let (left, right) = result_coefficients.split_at_mut(PolyRing::DEGREE_BOUND);
+            for (i, &overflow) in right.iter().enumerate() {
+                left[i] += overflow * q_minus_1;
+            }
+            result_coefficients.truncate(PolyRing::DEGREE_BOUND);
+        }
+        PolyRing::new(result_coefficients)
+    }
+}
+
+impl Mul<&Zq> for &PolyRing {
+    type Output = PolyRing;
+    /// Scalar multiplication of a polynomial
+    fn mul(self, other: &Zq) -> PolyRing {
+        PolyRing::new(self.coeffs.iter().map(|c| c * *other).collect())
     }
 }
 
@@ -220,31 +229,19 @@ impl PolyVector {
         vector
     }
 
-    pub fn add(&self, other: &PolyVector) -> PolyVector {
-        self.iter()
-            .zip(other.iter())
-            .map(|(a, b)| a.add(b))
-            .collect()
-    }
-
-    pub fn scalar_mul_vector(&self, other: &Zq) -> PolyVector {
-        self.iter().map(|a| a.scalar_mul(other)).collect()
-    }
-
     pub fn inner_product_poly_vector(&self, other: &PolyVector) -> PolyRing {
-        self.iter()
-            .zip(other.iter())
-            .map(|(a, b)| a.mul_poly(b))
-            .fold(
-                PolyRing::zero(self.get_elements()[0].get_coeffs().len()),
-                |acc, val| acc.add(&val),
-            )
+        self.iter().zip(other.iter()).map(|(a, b)| a * b).fold(
+            PolyRing::zero(self.get_elements()[0].get_coeffs().len()),
+            |acc, val| &acc + &val,
+        )
     }
+}
 
-    pub fn to_rqvector<const N: usize, const D: usize>(&self) -> RqVector<N, D> {
+impl<const N: usize, const D: usize> From<PolyVector> for RqVector<N, D> {
+    fn from(polys: PolyVector) -> Self {
         let mut rq_vector = RqVector::zero();
-        for (i, poly) in self.elements.iter().enumerate() {
-            rq_vector[i] = Rq::from_vec(poly.get_coeffs().clone());
+        for (i, poly) in polys.elements.iter().enumerate() {
+            rq_vector[i] = poly.get_coeffs().clone().into();
         }
         rq_vector
     }
@@ -260,17 +257,85 @@ impl FromIterator<PolyRing> for PolyVector {
     }
 }
 
+impl Add<&PolyVector> for &PolyVector {
+    type Output = PolyVector;
+    // add two poly vectors
+    fn add(self, other: &PolyVector) -> PolyVector {
+        self.iter().zip(other.iter()).map(|(a, b)| a + b).collect()
+    }
+}
+
+impl Mul<&Zq> for &PolyVector {
+    type Output = PolyVector;
+    // A poly vector multiply by a Zq
+    fn mul(self, other: &Zq) -> PolyVector {
+        self.iter().map(|a| a * other).collect()
+    }
+}
+
+/// A ZqVector is a vector of Zq elements with a flexible size.
+/// Mainly used for store random Zq elements
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ZqVector {
+    coeffs: Vec<Zq>,
+}
+impl ZqVector {
+    pub fn new(coeffs: Vec<Zq>) -> Self {
+        Self { coeffs }
+    }
+
+    pub fn get_coeffs(&self) -> &Vec<Zq> {
+        &self.coeffs
+    }
+
+    pub fn len(&self) -> usize {
+        self.coeffs.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.coeffs.is_empty()
+    }
+
+    pub fn random<R: Rng + CryptoRng>(rng: &mut R, n: usize) -> Self {
+        let uniform = Uniform::new_inclusive(Zq::ZERO, Zq::MAX).unwrap();
+        let mut coeffs = Vec::with_capacity(n);
+        coeffs.extend((0..n).map(|_| uniform.sample(rng)));
+        Self { coeffs }
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &Zq> {
+        self.coeffs.iter()
+    }
+
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut Zq> {
+        self.coeffs.iter_mut()
+    }
+}
+
+impl<const D: usize> From<ZqVector> for Rq<D> {
+    fn from(zqs: ZqVector) -> Self {
+        zqs.get_coeffs().clone().into()
+    }
+}
+
+impl FromIterator<Zq> for ZqVector {
+    fn from_iter<T: IntoIterator<Item = Zq>>(iter: T) -> Self {
+        let coeffs: Vec<Zq> = iter.into_iter().collect();
+        ZqVector::new(coeffs)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn test_conjugate_automorphism() {
-        let poly1: PolyRing = PolyRing::new(vec![Zq::new(1), Zq::new(2), Zq::new(3)]);
+        let poly1: PolyRing = PolyRing::new(vec![Zq::ONE, Zq::TWO, Zq::new(3)]);
         let poly2: PolyRing = PolyRing::new(vec![Zq::new(4), Zq::new(5), Zq::new(6)]);
         let inner_12 = poly1.inner_product(&poly2);
         let conjugated_1 = poly1.conjugate_automorphism();
-        let inner_conjugated_12 = conjugated_1.mul_poly(&poly2);
+        let inner_conjugated_12 = &conjugated_1 * &poly2;
 
         assert_eq!(inner_conjugated_12.len(), PolyRing::DEGREE_BOUND);
         assert_eq!(inner_conjugated_12.get_coeffs()[0], Zq::from(32));
@@ -283,50 +348,49 @@ mod tests {
     }
 
     #[test]
-    fn test_to_rq() {
-        let zq_vector = PolyRing::new(vec![Zq::new(1), Zq::new(2), Zq::new(3)]);
-        let rq_vector = zq_vector.to_rq::<3>();
-        assert_eq!(
-            rq_vector,
-            Rq::from_vec(vec![Zq::new(1), Zq::new(2), Zq::new(3)])
-        );
+    fn test_polyring_to_rq() {
+        let polyring = PolyRing::new(vec![Zq::ONE, Zq::TWO, Zq::new(3)]);
+        let rq_vector: Rq<3> = polyring.into();
+        let expect_rq = Rq::new([Zq::ONE, Zq::TWO, Zq::new(3)]);
+        assert_eq!(rq_vector, expect_rq);
     }
 
     #[test]
-    fn test_to_rq_vector() {
-        let vector = PolyVector::new(vec![PolyRing::new(vec![
-            Zq::new(1),
-            Zq::new(2),
-            Zq::new(3),
-        ])]);
-        let rq_vector = vector.to_rqvector::<1, 3>();
-        assert_eq!(
-            rq_vector[0],
-            Rq::from_vec(vec![Zq::new(1), Zq::new(2), Zq::new(3)])
-        );
+    fn test_zqvector_to_rq() {
+        let zq_vector = ZqVector::new(vec![Zq::ONE, Zq::TWO, Zq::new(3)]);
+        let rq_vector: Rq<3> = zq_vector.into();
+        let expect_rq = Rq::new([Zq::ONE, Zq::TWO, Zq::new(3)]);
+        assert_eq!(rq_vector, expect_rq);
+    }
+
+    #[test]
+    fn test_polyvector_to_rqvector() {
+        let poly_vector = PolyVector::new(vec![PolyRing::new(vec![Zq::ONE, Zq::TWO, Zq::new(3)])]);
+        let rqs: RqVector<1, 3> = poly_vector.into();
+        let expect_rq = Rq::new([Zq::ONE, Zq::TWO, Zq::new(3)]);
+        let expect_rqvector: RqVector<1, 3> = RqVector::from(vec![expect_rq]);
+        assert_eq!(rqs, expect_rqvector);
     }
 
     #[test]
     fn test_scalar_mul_vector_mul_vector() {
-        let vector = PolyVector::new(vec![PolyRing::new(vec![
-            Zq::new(1),
-            Zq::new(2),
-            Zq::new(3),
-        ])]);
+        let vector = PolyVector::new(vec![PolyRing::new(vec![Zq::ONE, Zq::TWO, Zq::new(3)])]);
         let zq = Zq::new(2);
-        let result = vector.scalar_mul_vector(&zq);
-        println!("result: {:?}", result.get_elements());
+        let result = &vector * &zq;
+        let expect = PolyVector::new(vec![PolyRing::new(vec![Zq::TWO, Zq::new(4), Zq::new(6)])]);
+        assert_eq!(result, expect)
     }
 
     #[test]
     fn test_add_poly_vector() {
-        let vector1 = PolyVector::new(vec![PolyRing::new(vec![
-            Zq::new(1),
-            Zq::new(2),
+        let vector1 = PolyVector::new(vec![PolyRing::new(vec![Zq::ONE, Zq::TWO, Zq::new(3)])]);
+        let vector2 = PolyVector::new(vec![PolyRing::new(vec![Zq::new(4), Zq::new(5)])]);
+        let result = &vector1 + &vector2;
+        let expect = PolyVector::new(vec![PolyRing::new(vec![
+            Zq::new(5),
+            Zq::new(7),
             Zq::new(3),
         ])]);
-        let vector2 = PolyVector::new(vec![PolyRing::new(vec![Zq::new(4), Zq::new(5)])]);
-        let result = vector1.add(&vector2);
-        println!("result: {:?}", result.get_elements());
+        assert_eq!(result, expect)
     }
 }

@@ -1,39 +1,43 @@
 use crate::{
-    poly::{PolyRing, PolyVector},
+    poly::{PolyRing, PolyVector, ZqVector},
     zq::Zq,
 };
+
+pub struct SizeParams {
+    size_r: usize,
+    size_n: usize,
+    deg_bound_d: usize,
+    size_k: usize,
+    constraint_l: usize,
+    constraint_k: usize,
+}
+
 /// Calculate aprimes from aprime_l, a_{i,j}^{''k} = \sum_{l=1}^{L}\psi_l^{k}a_{ij}^{'(l)}
 ///
 /// @param: random_psi: \psi_l^k
 /// @param: a_ct: a_{ij}^{'(l)}, each a_{ij} is a ring element (PolyRing)
-/// @param: size_params: Vec<usize> contains size_r, size_n, deg_bound_d, size_k, constraint_l and constraint_k
+/// @param: sp: struct SizeParams
 ///
 /// @return: a_{ij}^{'(k)}, return a vector length k of matrix a_{ij}
 #[rustfmt::skip]
 pub fn calculate_aggr_ct_a(
-    random_psi: &PolyVector,
+    random_psi: &[ZqVector],
     a_ct: &[Vec<PolyVector>],
-    size_params: &[usize],
+    sp: &SizeParams,
 ) -> Vec<Vec<PolyVector>> {
-    let (r, deg_bound_d, k, constraint_l) = (
-        size_params[0],
-        size_params[2],
-        size_params[3],
-        size_params[4],
-    );
-    let aprimes: Vec<Vec<PolyVector>> = (0..k).map(|k| {
-        let psi_k = &random_psi.get_elements()[k];
-        (0..r).map(|i| {
-            (0..r).map(|j| {
+    let aprimes: Vec<Vec<PolyVector>> = (0..sp.size_k).map(|k| {
+        let psi_k = &random_psi[k];
+        (0..sp.size_r).map(|i| {
+            (0..sp.size_r).map(|j| {
                 // calculate a_{ij}^{'(l)} * \psi_l^k
-                (0..constraint_l).map(|l| {
-                    a_ct[l][i].get_elements()[j]
-                        .scalar_mul(&psi_k.get_coeffs()[l])
+                (0..sp.constraint_l).map(|l| {
+                    &a_ct[l][i].get_elements()[j]
+                        * &psi_k.get_coeffs()[l]
                 })
                 .fold(
                     // sum over all l
-                    PolyRing::new(vec![Zq::ZERO; deg_bound_d]),
-                    |acc, val| acc.add(&val),
+                    PolyRing::new(vec![Zq::ZERO; sp.deg_bound_d]),
+                    |acc, val| &acc + &val,
                 )
             }).collect::<PolyVector>()
         }).collect::<Vec<PolyVector>>()
@@ -49,65 +53,58 @@ pub fn calculate_aggr_ct_a(
 /// @param: pi: pi_i^{j}
 /// @param: random_psi: \psi_l^{k}
 /// @param: random_omega: \omega_j^{k}
-/// @param: size_params: Vec<usize> contains size_r, size_n, deg_bound_d, size_k, constraint_l and constraint_k
+/// @param: sp: struct SizeParams
 /// @param: security_level2: 256 in the paper
 ///
 /// return: \phi_{i}^{''(k)}
 #[rustfmt::skip]
 pub fn calculate_aggr_ct_phi(
     phi_ct: &[Vec<PolyVector>],
-    pi: &[PolyVector],
-    random_psi: &PolyVector,
-    random_omega: &PolyVector,
-    size_params: &[usize],
+    pi: &[Vec<ZqVector>],
+    random_psi: &[ZqVector],
+    random_omega: &[ZqVector],
+    sp: &SizeParams,
     security_level2: usize,
 ) -> Vec<Vec<PolyVector>> {
-    let (r, n, deg_bound_d, k, constraint_l) = (
-        size_params[0],
-        size_params[1],
-        size_params[2],
-        size_params[3],
-        size_params[4],
-    );
-    let phi_ct_aggr: Vec<Vec<PolyVector>> = (0..k).map(|k| {
-        (0..r).map(|i| {
+    let phi_ct_aggr: Vec<Vec<PolyVector>> = (0..sp.size_k).map(|k| {
+        (0..sp.size_r).map(|i| {
             // \sum_{l=1}^{L}\psi_l^{k}\phi_{i}^{'(l)}
-            let left_side: PolyVector = (0..constraint_l).map(|l| {
+            let left_side: PolyVector = (0..sp.constraint_l).map(|l| {
                 phi_ct[l][i]
                     .iter()
                     .map(|phi| {
-                        phi.scalar_mul(&random_psi.get_elements()[k].get_coeffs()[l])
+                        phi * &random_psi[k].get_coeffs()[l]
                     }).collect::<PolyVector>()
             })
             .fold(
-                PolyVector::new(vec![PolyRing::new(vec![Zq::ZERO; deg_bound_d]); n]),
-                |acc, val| acc.iter().zip(val.iter()).map(|(a, b)| a.add(b)).collect(),
+                PolyVector::new(vec![PolyRing::new(vec![Zq::ZERO; sp.deg_bound_d]); sp.size_n]),
+                |acc, val| acc.iter().zip(val.iter()).map(|(a, b)| a + b).collect(),
             );
 
             // Calculate the right side: \sum(\omega_j^{k} * \sigma_{-1} * pi_i^{j})
             // Because the length of pi is n*d, so we need to split it into n parts, each part has d elements to do the conjugate automorphism.
             let right_side: PolyVector = (0..security_level2).map(|j| {
-                let omega_j = random_omega.get_elements()[k].get_coeffs()[j];
+                let omega_j = random_omega[k].get_coeffs()[j];
 
-                let poly_vec: PolyVector = (0..n).map(|chunk_index| {
-                    let start = chunk_index * deg_bound_d;
-                    let end = start + deg_bound_d;
+                let poly_vec: PolyVector = (0..sp.size_n).map(|chunk_index| {
+                    let start = chunk_index * sp.deg_bound_d;
+                    let end = start + sp.deg_bound_d;
 
                     let pi_poly = PolyRing::new(
-                        pi[i].get_elements()[j].get_coeffs()[start..end].to_vec(),
+                        pi[i][j].get_coeffs()[start..end].to_vec(),
                     );
                     let pi_poly_conjugate = pi_poly.conjugate_automorphism();
-                    pi_poly_conjugate.scalar_mul(&omega_j)
+                    &pi_poly_conjugate * &omega_j
                 }).collect::<PolyVector>();
 
                 poly_vec
             })
             .fold(
-                PolyVector::new(vec![PolyRing::new(vec![Zq::ZERO; deg_bound_d]); n]),
-                |acc, val| acc.iter().zip(val.iter()).map(|(a, b)| a.add(b)).collect(),
+                PolyVector::new(vec![PolyRing::new(vec![Zq::ZERO; sp.deg_bound_d]); sp.size_n]),
+                |acc, val| acc.iter().zip(val.iter()).map(|(a, b)| a + b).collect(),
             );
 
-            left_side.add(&right_side)
+            &left_side + &right_side
         }).collect::<Vec<PolyVector>>()
     }).collect::<Vec<Vec<PolyVector>>>();
 
@@ -119,7 +116,7 @@ pub fn calculate_aggr_ct_phi(
 /// @param: a_ct_aggr: a_{ij}^{''(k)}
 /// @param: phi_ct_aggr: \phi_{i}^{''(k)}
 /// @param: witness: s_i
-/// @param: size_params: Vec<usize> contains size_r, size_n, deg_bound_d, size_k, constraint_l and constraint_k
+/// @param: sp: struct SizeParams
 ///
 /// @return: b^{''(k)}
 #[rustfmt::skip]
@@ -127,26 +124,25 @@ pub fn calculate_aggr_ct_b(
     a_ct_aggr: &[Vec<PolyVector>],
     phi_ct_aggr: &[Vec<PolyVector>],
     witness: &[PolyVector],
-    size_params: &[usize],
+    sp: &SizeParams,
 ) -> PolyVector {
-    let (r, deg_bound_d, k) = (size_params[0], size_params[2], size_params[3]);
-    let b_primes: PolyVector = (0..k).map(|k| {
-        (0..r).map(|i| {
-            (0..r).map(|j| {
+    let b_primes: PolyVector = (0..sp.size_k).map(|k| {
+        (0..sp.size_r).map(|i| {
+            &(0..sp.size_r).map(|j| {
                 // calculate a_{ij}^{''(k)} * <s_i, s_j>
-                a_ct_aggr[k][i].get_elements()[j]
-                    .mul_poly(&witness[i].inner_product_poly_vector(&witness[j]))
+                &a_ct_aggr[k][i].get_elements()[j]
+                    * &witness[i].inner_product_poly_vector(&witness[j])
             })
             .fold(
                 // sum over all i,j
-                PolyRing::new(vec![Zq::ZERO; deg_bound_d]),
-                |acc, val| acc.add(&val),
+                PolyRing::new(vec![Zq::ZERO; sp.deg_bound_d]),
+                |acc, val| &acc + &val,
             )
             // add \phi_{i}^{''(k)} * w[i]
-            .add(&phi_ct_aggr[k][i].inner_product_poly_vector(&witness[i]))
+            + &phi_ct_aggr[k][i].inner_product_poly_vector(&witness[i])
         }) // sum over all i,j
-        .fold(PolyRing::new(vec![Zq::ZERO; deg_bound_d]), |acc, val| {
-            acc.add(&val)
+        .fold(PolyRing::new(vec![Zq::ZERO; sp.deg_bound_d]), |acc, val| {
+            &acc + &val
         })
     }).collect();
 
@@ -160,7 +156,7 @@ pub fn calculate_aggr_ct_b(
 /// @param: a_ct_aggr: a_{ij}^{''(k)}
 /// @param: random_alpha: alpha_k
 /// @param: random_beta: beta_k
-/// @param: size_params: Vec<usize> contains size_r, size_n, deg_bound_d, size_k, constraint_l and constraint_k
+/// @param: sp: struct SizeParams
 ///
 /// @return: a_i
 #[rustfmt::skip]
@@ -169,26 +165,25 @@ pub fn calculate_aggr_a(
     a_ct_aggr: &[Vec<PolyVector>],
     random_alpha: &PolyVector,
     random_beta: &PolyVector,
-    size_params: &[usize],
+    sp: &SizeParams,
 ) -> Vec<PolyVector> {
-    let (r, k, constraint_k) = (size_params[0], size_params[3], size_params[5]);
-    let a_i: Vec<PolyVector> = (0..r).map(|i| {
-        (0..r).map(|j| {
+    let a_i: Vec<PolyVector> = (0..sp.size_r).map(|i| {
+        (0..sp.size_r).map(|j| {
             // calculate \sum(alpha_k * a_{ij}), k is constraint_k
-            let left_side = (0..constraint_k).map(|k| {
-                a_constraint[k][i].get_elements()[j]
-                    .mul_poly(&random_alpha.get_elements()[k])
+            let left_side = (0..sp.constraint_k).map(|k| {
+                &a_constraint[k][i].get_elements()[j]
+                    * &random_alpha.get_elements()[k]
             })
-            .fold(PolyRing::zero_poly(), |acc, val| acc.add(&val));
+            .fold(PolyRing::zero_poly(), |acc, val| &acc + &val);
 
             // calculate \sum(beta_k * a_{ij}^{''(k)}), k is size k
-            let right_side = (0..k).map(|k| {
-                a_ct_aggr[k][i].get_elements()[j]
-                    .mul_poly(&random_beta.get_elements()[k])
+            let right_side = (0..sp.size_k).map(|k| {
+                &a_ct_aggr[k][i].get_elements()[j]
+                    * &random_beta.get_elements()[k]
             })
-            .fold(PolyRing::zero_poly(), |acc, val| acc.add(&val));
+            .fold(PolyRing::zero_poly(), |acc, val| &acc + &val);
 
-            left_side.add(&right_side)
+            &left_side + &right_side
         }).collect::<PolyVector>()
     }).collect::<Vec<PolyVector>>();
 
@@ -202,7 +197,7 @@ pub fn calculate_aggr_a(
 /// param: phi_ct_aggr: \phi_{i}^{''(k)}
 /// param: random_alpha: alpha_k
 /// param: random_beta: beta_k
-/// param: size_params: Vec<usize> contains size_r, size_n, deg_bound_d, size_k, constraint_l and constraint_k
+/// param: sp: struct SizeParams
 ///
 /// return: phi_i
 #[rustfmt::skip]
@@ -211,42 +206,34 @@ pub fn calculate_aggr_phi(
     phi_ct_aggr: &[Vec<PolyVector>],
     random_alpha: &PolyVector,
     random_beta: &PolyVector,
-    size_params: &[usize],
+    sp: &SizeParams,
 ) -> Vec<PolyVector> {
-    let (r, n, deg_bound_d, k, constraint_k) = (
-        size_params[0],
-        size_params[1],
-        size_params[2],
-        size_params[3],
-        size_params[5],
-    );
-
-    let phi_i: Vec<PolyVector> = (0..r).map(|i| {
+    let phi_i: Vec<PolyVector> = (0..sp.size_r).map(|i| {
         // calculate \sum(alpha_k * \phi_{i}^{k})
-        let left_side: PolyVector = (0..constraint_k).map(|k| {
+        let left_side: PolyVector = (0..sp.constraint_k).map(|k| {
             phi_constraint[k][i]
                 .iter()
-                .map(|phi| phi.mul_poly(&random_alpha.get_elements()[k]))
+                .map(|phi| phi * &random_alpha.get_elements()[k])
                 .collect::<PolyVector>()
         })
         .fold(
-            PolyVector::new(vec![PolyRing::new(vec![Zq::ZERO; deg_bound_d]); n]),
-            |acc, val| acc.iter().zip(val.iter()).map(|(a, b)| a.add(b)).collect(),
+            PolyVector::new(vec![PolyRing::new(vec![Zq::ZERO; sp.deg_bound_d]); sp.size_n]),
+            |acc, val| acc.iter().zip(val.iter()).map(|(a, b)| a + b ).collect(),
         );
 
         // calculate \sum(beta_k * \phi_{i}^{''(k)})
-        let right_side: PolyVector = (0..k).map(|k| {
+        let right_side: PolyVector = (0..sp.size_k).map(|k| {
             phi_ct_aggr[k][i]
                 .iter()
-                .map(|phi| phi.mul_poly(&random_beta.get_elements()[k]))
+                .map(|phi| phi * &random_beta.get_elements()[k])
                 .collect::<PolyVector>()
         })
         .fold(
-            PolyVector::new(vec![PolyRing::new(vec![Zq::ZERO; deg_bound_d]); n]),
-            |acc, val| acc.iter().zip(val.iter()).map(|(a, b)| a.add(b)).collect(),
+            PolyVector::new(vec![PolyRing::new(vec![Zq::ZERO; sp.deg_bound_d]); sp.size_n]),
+            |acc, val| acc.iter().zip(val.iter()).map(|(a, b)| a + b ).collect(),
         );
 
-        left_side.add(&right_side)
+        &left_side + &right_side
     }).collect::<Vec<PolyVector>>();
 
     phi_i
@@ -259,7 +246,7 @@ pub fn calculate_aggr_phi(
 /// @param: b_ct_aggr: b^{''(k)}
 /// @param: random_alpha: alpha_k
 /// @param: random_beta: beta_k
-/// @param: size_params: Vec<usize> contains size_r, size_n, deg_bound_d, size_k, constraint_l and constraint_k
+/// @param: sp: struct SizeParams
 ///
 /// @return: b_i
 pub fn calculate_aggr_b(
@@ -267,18 +254,17 @@ pub fn calculate_aggr_b(
     b_ct_aggr: PolyVector,
     random_alpha: PolyVector,
     random_beta: PolyVector,
-    size_params: &[usize],
+    sp: &SizeParams,
 ) -> PolyRing {
-    let (k, constraint_k) = (size_params[3], size_params[5]);
-    let left_side = (0..constraint_k)
-        .map(|k| b_constraint.get_elements()[k].mul_poly(&random_alpha.get_elements()[k]))
-        .fold(PolyRing::zero_poly(), |acc, val| acc.add(&val));
+    let left_side = (0..sp.constraint_k)
+        .map(|k| &b_constraint.get_elements()[k] * &random_alpha.get_elements()[k])
+        .fold(PolyRing::zero_poly(), |acc, val| &acc + &val);
 
-    let right_side = (0..k)
-        .map(|k| b_ct_aggr.get_elements()[k].mul_poly(&random_beta.get_elements()[k]))
-        .fold(PolyRing::zero_poly(), |acc, val| acc.add(&val));
+    let right_side = (0..sp.size_k)
+        .map(|k| &b_ct_aggr.get_elements()[k] * &random_beta.get_elements()[k])
+        .fold(PolyRing::zero_poly(), |acc, val| &acc + &val);
 
-    left_side.add(&right_side)
+    &left_side + &right_side
 }
 
 /// equation 18: check if \sum(a_{ij} * g_{ij}) + \sum(h_{ii}) - b ?= 0
@@ -305,19 +291,19 @@ pub fn check_relation(
         .map(|(a_i, g_i)| {
             a_i.iter()
                 .zip(g_i.iter())
-                .map(|(a_ij, g_ij)| a_ij.mul_poly(g_ij))
-                .fold(PolyRing::new(vec![Zq::ZERO; d]), |acc, val| acc.add(&val))
+                .map(|(a_ij, g_ij)| a_ij * g_ij)
+                .fold(PolyRing::new(vec![Zq::ZERO; d]), |acc, val| &acc + &val)
         })
-        .fold(PolyRing::new(vec![Zq::ZERO; d]), |acc, val| acc.add(&val));
+        .fold(PolyRing::new(vec![Zq::ZERO; d]), |acc, val| &acc + &val);
 
     let sum_h_ii: PolyRing = (0..r).fold(PolyRing::new(vec![Zq::ZERO; d]), |acc, i| {
-        acc.add(&h[i].get_elements()[i])
+        &acc + &h[i].get_elements()[i]
     });
 
-    let b_primes2 = b_primes.scalar_mul(&Zq::new(2));
-    let sum_a_primes_g2 = sum_a_primes_g.scalar_mul(&Zq::new(2));
+    let b_primes2 = b_primes * &Zq::TWO;
+    let sum_a_primes_g2 = &sum_a_primes_g * &Zq::TWO;
 
-    sum_a_primes_g2.add(&sum_h_ii) == b_primes2
+    &sum_a_primes_g2 + &sum_h_ii == b_primes2
 }
 
 /// calculate b^{k} = \sum(a_{ij}^{k}<s_i, s_j>) + \sum(<phi_{i}^{k}, s_i>), k \in [K]
@@ -338,26 +324,28 @@ pub fn calculate_b_constraint(
     // calculate \sum(a_{ij}^{k}<s_i, s_j>)
     let left_side = (0..size_s).map(|i| {
         (0..size_s).map(|j| {
-            a_constraint[i].get_elements()[j]
-                .mul_poly(&s[i].inner_product_poly_vector(&s[j]))
+            &a_constraint[i].get_elements()[j]
+                * &s[i].inner_product_poly_vector(&s[j])
         })
-        .fold(PolyRing::zero_poly(), |acc, val| acc.add(&val))
+        .fold(PolyRing::zero_poly(), |acc, val| &acc + &val )
     })
-    .fold(PolyRing::zero_poly(), |acc, val| acc.add(&val));
+    .fold(PolyRing::zero_poly(), |acc, val| &acc + &val );
 
     // calculate \sum(<phi_{i}^{k}, s_i>)
     let right_side = (0..size_s).fold(PolyRing::zero_poly(), |acc, i| {
-        acc.add(&phi_constraint[i].inner_product_poly_vector(&s[i]))
+        &acc + &phi_constraint[i].inner_product_poly_vector(&s[i])
     });
 
-    left_side.add(&right_side)
+    &left_side + &right_side
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::jl::ProjectionMatrix;
+    use crate::poly::ZqVector;
     use crate::utils::challenge_set::ChallengeSet;
+    use rand::rng;
 
     #[test]
     /// dummy test for checking the relation, random generated a_aggr and phi_aggr instead of using the corresponding calculation functions.
@@ -400,7 +388,7 @@ mod tests {
                     .map(|j| {
                         let inner_phii_sj = phi_aggr[i].inner_product_poly_vector(&witness_1[j]);
                         let inner_phij_si = phi_aggr[j].inner_product_poly_vector(&witness_1[i]);
-                        inner_phii_sj.add(&inner_phij_si)
+                        &inner_phii_sj + &inner_phij_si
                     })
                     .collect()
             })
@@ -436,7 +424,14 @@ mod tests {
         // ---setup parameters ends---
 
         // size_params contains size_r, size_n, deg_bound_d, size_k, constraint_l to reduce the size of the input parameters.
-        let size_params: Vec<usize> = vec![r, n, deg_bound_d, k, constraint_l, constraint_k];
+        let size_params = SizeParams {
+            size_r: r,
+            size_n: n,
+            deg_bound_d,
+            size_k: k,
+            constraint_l,
+            constraint_k,
+        };
 
         // generate random witness_1 with size: r * s
         let witness_1: Vec<PolyVector> =
@@ -469,10 +464,14 @@ mod tests {
             .collect();
 
         // generate random psi with size: k * constraint_l, each element is Zq
-        let random_psi: PolyVector = PolyVector::random(k, constraint_l);
+        let random_psi: Vec<ZqVector> = (0..k)
+            .map(|_| ZqVector::random(&mut rng(), constraint_l))
+            .collect();
 
         // generate randm omega is with size: k * lambda2, each element is Zq
-        let random_omega: PolyVector = PolyVector::random(k, security_level2);
+        let random_omega: Vec<ZqVector> = (0..k)
+            .map(|_| ZqVector::random(&mut rng(), security_level2))
+            .collect();
 
         // calculate a_{ij}^{''(k)}
         let a_ct_aggr: Vec<Vec<PolyVector>> = calculate_aggr_ct_a(&random_psi, &a_ct, &size_params);
@@ -480,7 +479,7 @@ mod tests {
         // calculate \phi_{i}^{''(k)}
         // \pi is from JL projection, pi contains r matrices and each matrix: security_level2 * (n*d), (security_level2 is 256 in the paper).
         // explicitly set the deg_bound_d to D == deg_bound_d
-        let pi: Vec<PolyVector> = (0..r)
+        let pi: Vec<Vec<ZqVector>> = (0..r)
             .map(|_| ProjectionMatrix::<D>::new(n).get_matrix().clone())
             .collect();
 
@@ -553,7 +552,7 @@ mod tests {
                     .map(|j| {
                         let inner_phii_sj = phi_i[i].inner_product_poly_vector(&witness_1[j]);
                         let inner_phij_si = phi_i[j].inner_product_poly_vector(&witness_1[i]);
-                        inner_phii_sj.add(&inner_phij_si)
+                        &inner_phii_sj + &inner_phij_si
                     })
                     .collect()
             })
