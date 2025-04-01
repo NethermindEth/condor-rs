@@ -1,18 +1,22 @@
-use crate::rq_vector::RqVector;
-use crate::zq::Zq;
+use crate::rq::Rq;
+use crate::{poly::ZqVector, rq_vector::RqVector, zq::Zq};
 use rand::prelude::*;
 use rand::rng;
 
+/// The security level \lambda is 128
+pub const SECURITY_LEVEL: usize = 128;
+/// The size of the projection matrix is 2\lambda
+pub const PROJECTION_MATRIX_SIZE: usize = 2 * SECURITY_LEVEL;
 /// Projection matrix with values in {1,0,-1} mod q
 pub struct ProjectionMatrix<const D: usize> {
-    matrix: Vec<Vec<Zq>>,
+    matrix: Vec<ZqVector>,
 }
 
 impl<const D: usize> ProjectionMatrix<D> {
     /// Defines a matrix of size 256xnxD
     /// n is the size of the vector of polynomials
     pub fn new(n: usize) -> Self {
-        let mut matrix = vec![vec![Zq::ZERO; n * D]; 256];
+        let mut matrix = vec![ZqVector::new(vec![Zq::ZERO; n * D]); PROJECTION_MATRIX_SIZE];
         let mut rng = rng();
         for row in matrix.iter_mut() {
             for elem in row.iter_mut() {
@@ -31,21 +35,21 @@ impl<const D: usize> ProjectionMatrix<D> {
     }
 
     /// Returns the matrix
-    pub fn get_matrix(&self) -> &Vec<Vec<Zq>> {
+    pub fn get_matrix(&self) -> &Vec<ZqVector> {
         &self.matrix
     }
 }
 
 /// Calculate projection vector
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ProjectionVector<const N: usize, const D: usize> {
-    projection: [Zq; 256], // 256-dimensional projection vector
+    projection: Rq<PROJECTION_MATRIX_SIZE>,
 }
 
 impl<const N: usize, const D: usize> ProjectionVector<N, D> {
     /// Calculates Projection
     pub fn new(matrix: &ProjectionMatrix<D>, s_i: &RqVector<N, D>) -> Self {
-        let mut projection = [Zq::ZERO; 256];
+        let mut projection = Rq::new([Zq::ZERO; PROJECTION_MATRIX_SIZE]);
         let coefficients = s_i.concatenate_coefficients();
         for (i, item) in projection.iter_mut().enumerate() {
             *item = matrix.get_matrix()[i]
@@ -58,7 +62,7 @@ impl<const N: usize, const D: usize> ProjectionVector<N, D> {
     }
 
     /// Obtain projection
-    pub fn get_projection(&self) -> &[Zq; 256] {
+    pub fn get_projection(&self) -> &Rq<PROJECTION_MATRIX_SIZE> {
         &self.projection
     }
 
@@ -98,21 +102,33 @@ mod tests {
         let n = 10;
         let matrix = ProjectionMatrix::<4>::new(n);
 
-        assert_eq!(matrix.matrix.len(), 256, "Matrix should have 256 rows");
+        assert_eq!(
+            matrix.matrix.len(),
+            PROJECTION_MATRIX_SIZE,
+            "Matrix should have {} rows",
+            PROJECTION_MATRIX_SIZE
+        );
         assert_eq!(
             matrix.matrix[0].len(),
             n * 4,
-            "Matrix should have n * D columns"
+            "Matrix should have {} columns",
+            n * 4
         );
 
         let n2 = 1;
         let matrix = ProjectionMatrix::<4>::new(n2);
 
-        assert_eq!(matrix.matrix.len(), 256, "Matrix should have 256 rows");
+        assert_eq!(
+            matrix.matrix.len(),
+            PROJECTION_MATRIX_SIZE,
+            "Matrix should have {} rows",
+            PROJECTION_MATRIX_SIZE
+        );
         assert_eq!(
             matrix.matrix[0].len(),
             n2 * 4,
-            "Matrix should have n * D columns"
+            "Matrix should have {} columns",
+            n2 * 4
         );
     }
 
@@ -196,7 +212,9 @@ mod tests {
         let mut matrix = ProjectionMatrix::new(n);
         let mut projection = ProjectionVector::new(&matrix, &polynomials);
         let mut norm_sum = projection.norm_squared();
-        let norm_value = (Zq::new(128) * RqVector::compute_norm_squared(&polynomials)).to_u128();
+        let norm_value = (Zq::new(SECURITY_LEVEL.try_into().unwrap())
+            * RqVector::compute_norm_squared(&polynomials))
+        .to_u128();
         // Run the test multiple times to simulate the probability
         for _ in 0..trials {
             matrix = ProjectionMatrix::new(n);
@@ -218,7 +236,7 @@ mod tests {
             difference < tolerance,
             "Average norm value {} is not equal to {}.",
             average,
-            Zq::new(128) * polynomials.compute_norm_squared(),
+            Zq::new(SECURITY_LEVEL.try_into().unwrap()) * polynomials.compute_norm_squared(),
         );
     }
 

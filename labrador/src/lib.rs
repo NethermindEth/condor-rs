@@ -27,6 +27,12 @@ pub mod rq_matrix;
 
 pub mod rq_vector;
 
+pub mod poly;
+
 pub mod jl;
 
 pub mod hierarchical_commitment;
+
+pub mod utils;
+
+pub mod statement;

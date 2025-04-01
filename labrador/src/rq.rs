@@ -41,6 +41,10 @@ impl<const D: usize> Rq<D> {
         &self.coeffs
     }
 
+    pub fn iter_mut(&mut self) -> std::slice::IterMut<'_, Zq> {
+        self.coeffs.iter_mut()
+    }
+
     /// Polynomial addition
     fn addition(&self, other: &Self) -> Self {
         let mut result = [Zq::ZERO; D];
