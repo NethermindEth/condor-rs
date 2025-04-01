@@ -99,14 +99,29 @@ impl PolyRing {
     /// Compute the operator norm of a polynomial given its coefficients.
     /// The operator norm is defined as the maximum magnitude of the DFT (eigenvalues)
     /// of the coefficient vector.
-    pub fn operator_norm(coeffs: &[f64]) -> f64 {
+    #[allow(clippy::as_conversions)]
+    pub fn operator_norm(poly: &PolyRing) -> f64 {
+        let coeffs = poly.get_coeffs();
         let n = coeffs.len();
         let mut planner = FftPlanner::new();
         let fft = planner.plan_fft_forward(n);
 
         // Convert coefficients into complex numbers (with zero imaginary parts)
-        let mut buffer: Vec<Complex<f64>> =
-            coeffs.iter().map(|&x| Complex { re: x, im: 0.0 }).collect();
+        let mut buffer: Vec<Complex<f64>> = coeffs
+            .iter()
+            .map(|&x| {
+                let half = Zq::MAX.scale_by(Zq::TWO);
+                let converted_value = if x > half {
+                    x.to_u128() as f64 - Zq::MAX.to_u128() as f64 - 1.0
+                } else {
+                    x.to_u128() as f64
+                };
+                Complex {
+                    re: converted_value,
+                    im: 0.0,
+                }
+            })
+            .collect();
 
         // Compute the FFT (this gives the eigenvalues of the circulant matrix)
         fft.process(&mut buffer);
