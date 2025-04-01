@@ -100,8 +100,8 @@ impl PolyRing {
     /// The operator norm is defined as the maximum magnitude of the DFT (eigenvalues)
     /// of the coefficient vector.
     #[allow(clippy::as_conversions)]
-    pub fn operator_norm(poly: &PolyRing) -> f64 {
-        let coeffs = poly.get_coeffs();
+    pub fn operator_norm(&self) -> f64 {
+        let coeffs = self.get_coeffs();
         let n = coeffs.len();
         let mut planner = FftPlanner::new();
         let fft = planner.plan_fft_forward(n);
