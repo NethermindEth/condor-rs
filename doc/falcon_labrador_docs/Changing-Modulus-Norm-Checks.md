@@ -21,7 +21,7 @@ $$
 f(\mathbf{\bar{\mathbf{s}}})=0 \text{ or } ct(f(\mathbf{\bar{\mathbf{s}}})) = 0
 $$
 we can rewrite now the restriction on the size of the witnesses in the accepted format by writing $\epsilon_{0}, \epsilon_{1}X, \epsilon_{2}X^{2}, \epsilon_{3}X^{3} = \epsilon$ and:
-$$ ct(\sigma_{-1}(\epsilon)\epsilon - (\beta^{2}-\sigma_{-1}(\mathbf{s}\_{i1})\mathbf{s}\_{i1}-\sigma_{-1}(\mathbf{s}\_{i2})\mathbf{s}\_{i2})) = 0 \mod q' $$
+$$ct(\sigma_{-1}(\epsilon)\epsilon - (\beta^{2}-\sigma_{-1}(\mathbf{s}\_{i1})\mathbf{s}\_{i1}-\sigma_{-1}(\mathbf{s}\_{i2})\mathbf{s}\_{i2})) = 0 \mod q'$$
 where $\sigma_{-1}$ is the conjugation automorphism. The validity of this dot constraint over $q'$ tells us the bound is valid since the existence of the polynomial $\epsilon$ that follows such constraints implies that $\beta^{2} - \lVert \mathbf{s}\_{i1}\rVert^{2} - \lVert \mathbf{s}\_{i2}\rVert^{2}$ is non-negative.
 
 Besides this new dot constraint, in order to show that both the automorphisms and the epsilon polynomial were correctly calculated inside the constraint, we will need to add small extra dot product constraints.
