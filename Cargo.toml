@@ -5,8 +5,9 @@ repository = "https://github.com/NethermindEth/LaBRADOR-rs"
 license = "Apache-2.0"
 
 [workspace]
-members = [
+members = [ 
     "labrador",
+    "falcon_labrador",
 ]
 resolver = "2"
 default-members = ["labrador"]
