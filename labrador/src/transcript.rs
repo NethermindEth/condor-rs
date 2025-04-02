@@ -1,48 +1,78 @@
-// Example of transcript to try the Poseidon sponge
 use crate::poseidon::PoseidonSponge;
 use crate::zq::Zq;
+use nalgebra::DMatrix;
+use rand::{Rng, rngs::ThreadRng, thread_rng, random,rng}; 
+use blake2::{Blake2b, Digest};
+use generic_array::GenericArray; // Ensure this is imported for GenericArray
+use typenum::U32;
+use std::convert::TryInto;
+
 pub trait Transcript {
     fn new() -> Self;
     fn absorb(&mut self, value: Zq);
     fn get_challenge(&mut self) -> Zq;
 }
 
-// MDS simple example (not cryptographically secure)
-fn simple_mds_like_matrix(size: usize) -> Vec<Vec<Zq>> {
-    let mut matrix = vec![vec![Zq::ZERO; size]; size];
+// Function to compute determinant mod q
+fn determinant_mod_q(matrix: &Vec<Vec<Zq>>, q: u128) -> Zq {
+    let size = matrix.len();
+    let data: Vec<f64> = matrix.iter().flatten().map(|z| z.to_u128() as f64).collect();
+    let mat = DMatrix::from_row_slice(size, size, &data);
 
-    for (i, row) in matrix.iter_mut().enumerate().take(size) {
-        for (j, elem) in row.iter_mut().enumerate().take(size) {
-            *elem = if i == j {
-                Zq::ONE
-            } else if i + j == size - 1 {
-                Zq::new(2)
-            } else {
-                Zq::new(3)
-            };
-        }
-    }
-    matrix
+    let det = mat.determinant().round() as i128 % q as i128;
+    Zq::new(((det + q as i128) % q as i128) as u32)
 }
 
-// ARK simple example (not cryptographically secure)
-fn generate_incremental_round_constants(
-    rounds: usize,
-    state_size: usize,
-    start: u32,
-) -> Vec<Vec<Zq>> {
-    let mut ark = vec![vec![Zq::ZERO; state_size]; rounds];
-    let mut counter = Zq::new(start);
-    for row in ark.iter_mut().take(rounds) {
-        for elem in row.iter_mut().take(state_size) {
-            *elem = counter;
-            counter += Zq::ONE;
+// Function to check if a matrix is invertible in Zq
+fn is_invertible(matrix: &Vec<Vec<Zq>>, q: u128) -> bool {
+    determinant_mod_q(matrix, q) != Zq::new(0)
+}
+
+/// Generates an MDS (Maximum Distance Separable) matrix
+fn mds_matrix(size: usize, q: u128) -> Vec<Vec<Zq>> {
+    let mut rng = rng(); // Use `rng()` instead of `thread_rng()`
+    let mut matrix: Vec<Vec<Zq>>;
+
+    loop {
+        // Generate a random matrix
+        matrix = (0..size)
+            .map(|_| (0..size).map(|_| Zq::new(rng.random_range(1..q) as u32)).collect())
+            .collect();
+
+        // Check if the matrix is invertible
+        if is_invertible(&matrix, q) {
+            break;
+        }
+    }
+
+    matrix
+}
+fn generate_secure_round_constants(rounds: usize, state_size: usize) -> Vec<Vec<Zq>> {
+    let mut ark = vec![vec![Zq::new(0); state_size]; rounds];
+
+    // Set output size to 32 bytes (256 bits) for Blake2b
+    for round in 0..rounds {
+        for state in 0..state_size {
+            let seed: [u8; 4] = random();  // Secure random 4-byte seed
+            
+            // Use Blake2b with the correct output size (32 bytes for 256-bit hash)
+            let mut hasher = Blake2b::<U32>::new(); // Specify the output size type here
+            hasher.update(seed);
+            
+            // Finalize the hash result
+            let hash_result: GenericArray<u8, U32> = hasher.finalize();  // The hash result is the correct size
+            
+            // Extract the first 4 bytes of the hash result
+            let hash_bytes: [u8; 4] = hash_result[..4].try_into().unwrap();  // Extract 4 bytes
+            let constant = u32::from_le_bytes(hash_bytes);  // Convert to u32
+            
+            // Store the constant
+            ark[round][state] = Zq::new(constant);
         }
     }
 
     ark
 }
-
 pub struct PoseidonTranscript {
     sponge: PoseidonSponge, // Transcrip will use the Poseidon sponge
 }
@@ -56,8 +86,8 @@ impl Transcript for PoseidonTranscript {
             5,                                               // full_rounds: usize
             8,                                               // partial_rounds: usize
             8,                                               // alpha: u64
-            simple_mds_like_matrix(16),                      // mds: Vec<Vec<Zq>>
-            generate_incremental_round_constants(16, 16, 1), // ark: Vec<Vec<Zq>>
+            mds_matrix(16,2^(32) - 5),                      // mds: Vec<Vec<Zq>>
+            generate_secure_round_constants(16, 16), // ark: Vec<Vec<Zq>>
         );
 
         //let sponge = PoseidonSponge::new(&params);  // Create the Poseidon sponge with params
