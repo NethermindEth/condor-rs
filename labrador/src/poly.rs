@@ -67,6 +67,24 @@ impl PolyRing {
         Self { coeffs }
     }
 
+    /// Generate random small polynomial with secure RNG implementation
+    pub fn random_ternary<R: Rng + CryptoRng>(rng: &mut R, n: usize) -> Self {
+        let mut coeffs = vec![Zq::ZERO; n];
+
+        for coeff in coeffs.iter_mut() {
+            // Explicitly sample from {-1, 0, 1} with equal probability
+            let val = match rng.random_range(0..3) {
+                0 => Zq::MAX,  // -1 mod q
+                1 => Zq::ZERO, // 0
+                2 => Zq::ONE,  // 1
+                _ => unreachable!(),
+            };
+            *coeff = val;
+        }
+
+        Self::new(coeffs)
+    }
+
     /// Compute the conjugate automorphism \sigma_{-1} of vector based on B) Constraints..., Page 21.
     pub fn conjugate_automorphism(&self) -> PolyRing {
         let q_minus_1 = Zq::MAX;
@@ -99,6 +117,10 @@ impl PolyRing {
     /// Compute the operator norm of a polynomial given its coefficients.
     /// The operator norm is defined as the maximum magnitude of the DFT (eigenvalues)
     /// of the coefficient vector.
+    ///
+    /// Note that: The operator norm only affects the coefficients of the random PolyRings generated from the challenge space.
+    /// Prover and Verifier will not do the operator norm check, because random PolyRings are determined after generation.
+    /// Both party will have access to the same PolyRings through transcript,
     #[allow(clippy::as_conversions)]
     pub fn operator_norm(&self) -> f64 {
         let coeffs = self.get_coeffs();
@@ -236,10 +258,19 @@ impl PolyVector {
     }
 
     // Generate a random polynomial vector with n polynomials of degree m
-    pub fn random(n: usize, m: usize) -> PolyVector {
+    pub fn random(n: usize, m: usize) -> Self {
         let mut vector = PolyVector::new(vec![]);
         vector.elements = (0..n)
             .map(|_| PolyRing::random(&mut rand::rng(), m))
+            .collect();
+        vector
+    }
+
+    /// Generate random small polynomial with secure RNG implementation
+    pub fn random_ternary(n: usize, m: usize) -> Self {
+        let mut vector = PolyVector::new(vec![]);
+        vector.elements = (0..n)
+            .map(|_| PolyRing::random_ternary(&mut rand::rng(), m))
             .collect();
         vector
     }
@@ -249,6 +280,15 @@ impl PolyVector {
             PolyRing::zero(self.get_elements()[0].get_coeffs().len()),
             |acc, val| &acc + &val,
         )
+    }
+
+    // Compute the squared norm of a vector of polynomials
+    pub fn compute_norm_squared(&self) -> Zq {
+        self.elements
+            .iter()
+            .flat_map(|poly| poly.get_coeffs()) // Collect coefficients from all polynomials
+            .map(|coeff| *coeff * *coeff)
+            .sum()
     }
 }
 
@@ -288,6 +328,14 @@ impl Mul<&Zq> for &PolyVector {
     }
 }
 
+impl Mul<&PolyRing> for &PolyVector {
+    type Output = PolyVector;
+    // A poly vector multiple by a PolyRing
+    fn mul(self, other: &PolyRing) -> PolyVector {
+        self.iter().map(|s| s * other).collect()
+    }
+}
+
 /// A ZqVector is a vector of Zq elements with a flexible size.
 /// Mainly used for store random Zq elements
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -297,6 +345,10 @@ pub struct ZqVector {
 impl ZqVector {
     pub fn new(coeffs: Vec<Zq>) -> Self {
         Self { coeffs }
+    }
+
+    pub fn zero() -> Self {
+        Self::new(vec![])
     }
 
     pub fn get_coeffs(&self) -> &Vec<Zq> {

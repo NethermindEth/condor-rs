@@ -35,4 +35,6 @@ pub mod hierarchical_commitment;
 
 pub mod utils;
 
-pub mod statement;
+pub mod prover;
+
+pub mod verifier;
