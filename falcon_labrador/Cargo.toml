@@ -1,0 +1,9 @@
+[package]
+name = "falcon_labrador"
+version.workspace = true
+edition.workspace = true
+repository.workspace = true
+license.workspace = true
+
+[dependencies]
+
