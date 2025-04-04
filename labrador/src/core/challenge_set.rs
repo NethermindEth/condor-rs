@@ -1,4 +1,5 @@
-use crate::{poly::PolyRing, zq::Zq};
+use crate::ring::poly::PolyRing;
+use crate::ring::zq::Zq;
 use rand::prelude::*;
 use rand::seq::SliceRandom;
 

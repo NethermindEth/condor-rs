@@ -1,4 +1,4 @@
-use crate::rq_vector::RqVector;
+use crate::ring::rq_vector::RqVector;
 use rand::{CryptoRng, Rng};
 use std::ops::Mul;
 
@@ -55,8 +55,9 @@ impl<const M: usize, const N: usize, const D: usize> Mul<&RqVector<N, D>> for Rq
 
 #[cfg(test)]
 mod tests {
+    use crate::ring::rq::Rq;
+    use crate::ring::zq::Zq;
     use super::*;
-    use crate::{rq::Rq, zq::Zq};
 
     #[test]
     #[cfg(not(feature = "skip-slow-tests"))]

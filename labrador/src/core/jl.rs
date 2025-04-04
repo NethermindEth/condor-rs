@@ -1,5 +1,7 @@
-use crate::rq::Rq;
-use crate::{poly::ZqVector, rq_vector::RqVector, zq::Zq};
+use crate::ring::poly::ZqVector;
+use crate::ring::rq::Rq;
+use crate::ring::rq_vector::RqVector;
+use crate::ring::zq::Zq;
 use rand::prelude::*;
 use rand::rng;
 
