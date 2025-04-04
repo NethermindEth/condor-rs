@@ -340,9 +340,9 @@ pub fn calculate_b_constraint(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rand::rng;
     use crate::core::challenge_set::ChallengeSet;
     use crate::core::jl::ProjectionMatrix;
+    use rand::rng;
 
     #[test]
     /// dummy test for checking the relation, random generated a_aggr and phi_aggr instead of using the corresponding calculation functions.

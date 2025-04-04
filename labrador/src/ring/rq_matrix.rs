@@ -55,9 +55,9 @@ impl<const M: usize, const N: usize, const D: usize> Mul<&RqVector<N, D>> for Rq
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use crate::ring::rq::Rq;
     use crate::ring::zq::Zq;
-    use super::*;
 
     #[test]
     #[cfg(not(feature = "skip-slow-tests"))]
