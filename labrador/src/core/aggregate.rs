@@ -1,7 +1,5 @@
-use crate::{
-    poly::{PolyRing, PolyVector, ZqVector},
-    zq::Zq,
-};
+use crate::ring::poly::{PolyRing, PolyVector, ZqVector};
+use crate::ring::zq::Zq;
 
 pub struct SizeParams {
     size_r: usize,
@@ -342,9 +340,8 @@ pub fn calculate_b_constraint(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::jl::ProjectionMatrix;
-    use crate::poly::ZqVector;
-    use crate::utils::challenge_set::ChallengeSet;
+    use crate::core::challenge_set::ChallengeSet;
+    use crate::core::jl::ProjectionMatrix;
     use rand::rng;
 
     #[test]

@@ -1,4 +1,4 @@
-use crate::poly::PolyVector;
+use crate::ring::poly::PolyVector;
 
 /// Statement is the input of the prover, which contains the constraints and the witness.
 /// All parameters are from line 1, st(), in the verifier process, page 18 from the paper.
