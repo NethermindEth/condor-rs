@@ -2,9 +2,7 @@
 In order to achieve an improvement in computational complexity, witnesses will be rewritten via a padding scheme. This new format, although increasing both in size and in the number of dot product constraints that are required, will significantly reduce the need for garbage polynomials, thereby providing a general increase in speed.
 
 ## Padding Scheme
-In this padding scheme, witness elements $w\_{1} \dots w\_{N}$ $\in \mathcal{R}\_{q\^{'}}$ along with other elements $w\_{1}\^{'} \dots w\_{N}\^{'} \in \mathcal{R}\_{q\^{'}}$ are such that $\lVert w\_{i} \rVert\_{2}\^{2} = ct(w\_{i}' w\_{i})$.
-
-(An example of $w\_{i}'$ being the conjugate automorphism of $w\_{i}$) can be rewritten as vectors of the form $\vec{u}\_{1}, \dots, \vec{u}\_{\lceil N \rho \rceil} \in \mathcal{R}\_{q'}\^{N}$ and $\vec{u}\_{1}', \dots, \vec{u}\_{\lceil N \rho \rceil}' \in \mathcal{R}\_{q'}\^{N}$ respectively, where $\rho = \lfloor \sqrt{N} \rfloor$.
+In this padding scheme, witness elements $w\_{1} \dots w\_{N}$ $\in \mathcal{R}\_{q\^{'}}$ along with other elements $w\_{1}\^{'} \dots w\_{N}\^{'} \in \mathcal{R}\_{q\^{'}}$ are such that $\lVert w\_{i} \rVert\_{2}\^{2} = ct(w\_{i}' w\_{i})$ (An example of $w\_{i}'$ being the conjugate automorphism of $w\_{i}$) can be rewritten as vectors of the form $\vec{u}\_{1}, \dots, \vec{u}\_{\lceil N \rho \rceil} \in \mathcal{R}\_{q'}\^{N}$ and $\vec{u}\_{1}', \dots, \vec{u}\_{\lceil N \rho \rceil}' \in \mathcal{R}\_{q'}\^{N}$ respectively, where $\rho = \lfloor \sqrt{N} \rfloor$.
 
 After following the padding equations described in the paper, we can think of each vector $\vec{u}\_{i}$ as a vector filled with zeros except for some locations where the original witness polynomials will be located: $\[0, 0, 0, \dots, w_{2\rho +1}, \dots, w_{3\rho}, \dots, 0, 0\]$. We can access each old witness polynomial using the index functions of the form:
 $$index(i) = \lceil i \rho \rceil$$
