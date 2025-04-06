@@ -32,20 +32,47 @@ impl AggregationOne {
         tr: &Challenges,
     ) -> Self {
         // calculate a_{ij}^{''(k)}
-        let a_ct_aggr: Vec<Vec<PolyVector>> = calculate_aggr_ct_a(&tr.psi, &st.a_ct, ep);
+        let a_ct_aggr: Vec<Vec<PolyVector>> = Self::get_a_ct_aggr(&tr.psi, &st.a_ct, ep);
 
         // calculate \phi_{i}^{''(k)}
         let phi_ct_aggr: Vec<Vec<PolyVector>> =
-            calculate_aggr_ct_phi(&st.phi_ct, &tr.pi, &tr.psi, &tr.omega, ep);
+            Self::get_phi_ct_aggr(&st.phi_ct, &tr.pi, &tr.psi, &tr.omega, ep);
 
         // calculate b^{''(k)}
-        let b_ct_aggr: PolyVector = calculate_aggr_ct_b(&a_ct_aggr, &phi_ct_aggr, &witness.s, ep);
+        let b_ct_aggr: PolyVector = Self::get_b_ct_aggr(&a_ct_aggr, &phi_ct_aggr, witness, ep);
 
         Self {
             a_ct_aggr,
             phi_ct_aggr,
             b_ct_aggr,
         }
+    }
+
+    pub fn get_a_ct_aggr(
+        psi: &[ZqVector],
+        a_ct: &[Vec<PolyVector>],
+        ep: &EnvironmentParameters,
+    ) -> Vec<Vec<PolyVector>> {
+        calculate_aggr_ct_a(psi, a_ct, ep)
+    }
+
+    pub fn get_phi_ct_aggr(
+        phi_ct: &[Vec<PolyVector>],
+        pi: &[Vec<ZqVector>],
+        psi: &[ZqVector],
+        omega: &[ZqVector],
+        ep: &EnvironmentParameters,
+    ) -> Vec<Vec<PolyVector>> {
+        calculate_aggr_ct_phi(phi_ct, pi, psi, omega, ep)
+    }
+
+    pub fn get_b_ct_aggr(
+        a_ct_aggr: &[Vec<PolyVector>],
+        phi_ct_aggr: &[Vec<PolyVector>],
+        witness: &Witness,
+        ep: &EnvironmentParameters,
+    ) -> PolyVector {
+        calculate_aggr_ct_b(a_ct_aggr, phi_ct_aggr, &witness.s, ep)
     }
 }
 
@@ -76,7 +103,7 @@ impl AggregationTwo {
         tr: &Challenges,
     ) -> Self {
         // calculate a_i
-        let a_i = calculate_aggr_a(
+        let a_i = Self::get_a_i(
             &st.a_constraint,
             &aggr_one.a_ct_aggr,
             &tr.random_alpha,
@@ -85,7 +112,7 @@ impl AggregationTwo {
         );
 
         // calculate phi_i
-        let phi_i = calculate_aggr_phi(
+        let phi_i = Self::get_phi_i(
             &st.phi_constraint,
             &aggr_one.phi_ct_aggr,
             &tr.random_alpha,
@@ -94,7 +121,7 @@ impl AggregationTwo {
         );
 
         // calculate b_i
-        let b_i = calculate_aggr_b(
+        let b_i = Self::get_b_i(
             &st.b_constraint,
             &aggr_one.b_ct_aggr,
             &tr.random_alpha,
@@ -103,6 +130,36 @@ impl AggregationTwo {
         );
 
         Self { a_i, phi_i, b_i }
+    }
+
+    pub fn get_a_i(
+        a_constraint: &[Vec<PolyVector>],
+        a_ct_aggr: &[Vec<PolyVector>],
+        random_alpha: &PolyVector,
+        random_beta: &PolyVector,
+        ep: &EnvironmentParameters,
+    ) -> Vec<PolyVector> {
+        calculate_aggr_a(a_constraint, a_ct_aggr, random_alpha, random_beta, ep)
+    }
+
+    pub fn get_phi_i(
+        phi_constraint: &[Vec<PolyVector>],
+        phi_ct_aggr: &[Vec<PolyVector>],
+        random_alpha: &PolyVector,
+        random_beta: &PolyVector,
+        ep: &EnvironmentParameters,
+    ) -> Vec<PolyVector> {
+        calculate_aggr_phi(phi_constraint, phi_ct_aggr, random_alpha, random_beta, ep)
+    }
+
+    pub fn get_b_i(
+        b_constraint: &PolyVector,
+        b_ct_aggr: &PolyVector,
+        random_alpha: &PolyVector,
+        random_beta: &PolyVector,
+        ep: &EnvironmentParameters,
+    ) -> PolyRing {
+        calculate_aggr_b(b_constraint, b_ct_aggr, random_alpha, random_beta, ep)
     }
 }
 
@@ -360,45 +417,6 @@ fn calculate_aggr_b(
     &left_side + &right_side
 }
 
-/// equation 18: check if \sum(a_{ij} * g_{ij}) + \sum(h_{ii}) - b ?= 0
-/// in the verifier process, page 18 from the paper.
-///
-/// param: a_primes: a_{ij}^{''(k)}
-/// param: b_primes: b^{''(k)}
-/// param: g: g_{ij}
-/// param: h: h_{ii}
-///
-/// return: true if the relation holds, false otherwise
-pub fn check_relation(
-    a_primes: &[PolyVector],
-    b_primes: &PolyRing,
-    g: &[PolyVector],
-    h: &[PolyVector],
-) -> bool {
-    let r = a_primes.len();
-    let d = a_primes[0].get_elements()[0].get_coeffs().len();
-
-    let sum_a_primes_g: PolyRing = a_primes
-        .iter()
-        .zip(g.iter())
-        .map(|(a_i, g_i)| {
-            a_i.iter()
-                .zip(g_i.iter())
-                .map(|(a_ij, g_ij)| a_ij * g_ij)
-                .fold(PolyRing::new(vec![Zq::ZERO; d]), |acc, val| &acc + &val)
-        })
-        .fold(PolyRing::new(vec![Zq::ZERO; d]), |acc, val| &acc + &val);
-
-    let sum_h_ii: PolyRing = (0..r).fold(PolyRing::new(vec![Zq::ZERO; d]), |acc, i| {
-        &acc + &h[i].get_elements()[i]
-    });
-
-    let b_primes2 = b_primes * &Zq::TWO;
-    let sum_a_primes_g2 = &sum_a_primes_g * &Zq::TWO;
-
-    &sum_a_primes_g2 + &sum_h_ii == b_primes2
-}
-
 /// calculate h_{ij} = 1/2 * (<\phi_i, s_j> + <\phi_j, s_i>), then use base b to decompose the polynomial
 ///
 /// @param: phi_i: phi_i
@@ -426,17 +444,18 @@ pub fn calculate_hij(
 }
 
 /// calculate z = c_1*s_1 + ... + c_r*s_r
+/// or calculate Az = c_1*t_1 + ... + c_r*t_r
 ///
-/// @param: s: witness s_i
+/// @param: x: witness s_i or Ajtai commitments t_i
 /// @param: random_c: c_i from challenge set
 ///
 /// return z
-pub fn calculate_z(s: &[PolyVector], random_c: &PolyVector) -> PolyVector {
-    s.iter()
+pub fn calculate_z(x: &[PolyVector], random_c: &PolyVector) -> PolyVector {
+    x.iter()
         .zip(random_c.iter())
         .map(|(s_row, c_element)| s_row * c_element)
         .fold(
-            PolyVector::new(vec![PolyRing::zero_poly(); s[0].len()]),
+            PolyVector::new(vec![PolyRing::zero_poly(); x[0].len()]),
             |acc, x| &acc + &x,
         )
 }
@@ -445,11 +464,11 @@ pub fn calculate_z(s: &[PolyVector], random_c: &PolyVector) -> PolyVector {
 mod tests {
     use super::*;
     use crate::prover::Challenges;
-
+    use crate::verifier::LabradorVerifier;
     #[test]
     fn test_check_relation_full() {
         // set up example environment, use set1 for testing.
-        let ep = EnvironmentParameters::set_1();
+        let ep = EnvironmentParameters::default();
         // generate a random witness based on ep above
         let witness_1 = Witness::new(&ep);
         // generate public statements based on witness_1
@@ -486,7 +505,7 @@ mod tests {
             .collect();
 
         // check aggregation relation
-        let relation = check_relation(&aggr_2.a_i, &aggr_2.b_i, &g, &h);
+        let relation = LabradorVerifier::check_relation(&aggr_2.a_i, &aggr_2.b_i, &g, &h);
 
         assert!(relation);
 

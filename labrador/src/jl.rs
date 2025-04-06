@@ -1,5 +1,5 @@
 use crate::rq::Rq;
-use crate::{poly::ZqVector, rq_vector::RqVector, zq::Zq};
+use crate::{poly::PolyVector, poly::ZqVector, rq_vector::RqVector, zq::Zq};
 use rand::prelude::*;
 use rand::rng;
 
@@ -71,6 +71,45 @@ impl<const N: usize, const D: usize> ProjectionVector<N, D> {
         self.projection.iter().map(|coeff| *coeff * *coeff).sum()
     }
 }
+
+#[derive(Debug, Clone)]
+pub struct Projections {
+    pub projection: ZqVector,
+}
+
+impl Projections {
+    /// Calculates Projection
+    pub fn new(matrices: &[Vec<ZqVector>], witness: &[PolyVector]) -> Self {
+        let mut projection = ZqVector::new(vec![Zq::ZERO; PROJECTION_MATRIX_SIZE]);
+        let coefficients: Vec<ZqVector> = witness
+            .iter()
+            .map(|s_i| s_i.concatenate_coefficients(PROJECTION_MATRIX_SIZE))
+            .collect();
+
+        for (i, item) in projection.iter_mut().enumerate() {
+            for j in 0..matrices.len() {
+                *item = matrices[j][i]
+                    .iter()
+                    .zip(coefficients[j].iter())
+                    .map(|(m, s)| *m * *s)
+                    .sum::<Zq>();
+            }
+        }
+
+        Projections { projection }
+    }
+
+    /// Obtain projection
+    pub fn get_projection(&self) -> &ZqVector {
+        &self.projection
+    }
+
+    /// Euclidean norm
+    pub fn norm_squared(&self) -> Zq {
+        self.projection.iter().map(|coeff| *coeff * *coeff).sum()
+    }
+}
+
 // Bound verification
 
 // LaBRADOR: Compact Proofs for R1CS from Module-SIS | Page 5 | Proving smallness section

@@ -1,4 +1,4 @@
-use crate::jl::ProjectionMatrix;
+use crate::jl::{ProjectionMatrix, Projections};
 use crate::poly::{PolyVector, ZqVector};
 use crate::utils::{
     aggregate, challenge_set::ChallengeSet, crs::PublicPrams, env_params::EnvironmentParameters,
@@ -13,7 +13,7 @@ const D: usize = 4;
 // All parameters are from tr, line 2 on page 18
 pub struct Proof {
     pub u_1: PolyVector,
-    pub p: ZqVector,
+    pub p: Projections,
     pub b_ct_aggr: PolyVector,
     pub u_2: PolyVector,
     pub z: PolyVector,
@@ -136,7 +136,10 @@ impl<'a> LabradorProver<'a> {
         // Step 2: JL projection starts: ----------------------------------------------------
 
         // JL projection p_j + check p_j = ct(sum(<\sigma_{-1}(pi_i^(j)), s_i>))
-        let p = ZqVector::zero();
+
+        let matrices = &self.tr.pi;
+
+        let p = Projections::new(matrices, &self.witness.s);
 
         // Step 2: JL projection ends: ------------------------------------------------------
 
@@ -183,7 +186,7 @@ mod tests {
     #[test]
     fn test_prove() {
         // set up example environment, use set1 for testing.
-        let ep_1 = EnvironmentParameters::set_1();
+        let ep_1 = EnvironmentParameters::default();
         // generate a random witness based on ep above
         let witness_1 = Witness::new(&ep_1);
         // generate public statements based on witness_1

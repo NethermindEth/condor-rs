@@ -290,6 +290,21 @@ impl PolyVector {
             .map(|coeff| *coeff * *coeff)
             .sum()
     }
+
+    /// Function to concatenate coefficients from multiple Rq into a Vec<Zq>
+    pub fn concatenate_coefficients(&self, s: usize) -> ZqVector {
+        let total_coeffs = self.get_elements().len() * s;
+        let mut concatenated_coeffs: Vec<Zq> = Vec::with_capacity(total_coeffs);
+        // Iterate over each Rq, extracting the coefficients and concatenating them
+        for rq in self.get_elements() {
+            let coeffs = rq.get_coeffs();
+            concatenated_coeffs.extend_from_slice(coeffs);
+        }
+
+        ZqVector {
+            coeffs: concatenated_coeffs,
+        }
+    }
 }
 
 impl<const N: usize, const D: usize> From<PolyVector> for RqVector<N, D> {
@@ -333,6 +348,17 @@ impl Mul<&PolyRing> for &PolyVector {
     // A poly vector multiple by a PolyRing
     fn mul(self, other: &PolyRing) -> PolyVector {
         self.iter().map(|s| s * other).collect()
+    }
+}
+
+impl Mul<&Vec<PolyVector>> for &PolyVector {
+    type Output = PolyVector;
+    // a poly vector mnultiple by a vec<PolyVector>
+    fn mul(self, other: &Vec<PolyVector>) -> PolyVector {
+        other
+            .iter()
+            .map(|o| self.inner_product_poly_vector(o))
+            .collect()
     }
 }
 

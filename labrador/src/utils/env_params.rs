@@ -11,7 +11,7 @@ pub struct EnvironmentParameters {
     // decompose base b
     pub b: usize,
     // the parts of decomposition.
-    pub digits: usize,
+    pub parts: usize,
     // t_1
     pub t_1: usize,
     // t_2
@@ -20,8 +20,7 @@ pub struct EnvironmentParameters {
     pub k: usize,
     pub k_1: usize,
     pub k_2: usize,
-    // security level, \lambda
-    pub lambda: usize,
+    // security level, \lambda = 128, lambda2 = 2 * lambda
     pub lambda2: usize,
     // the log of modulus q, q = 2^(32)
     pub log_q: usize,
@@ -33,20 +32,58 @@ pub struct EnvironmentParameters {
     pub constraint_k: usize,
 }
 
+#[allow(clippy::too_many_arguments)]
 impl EnvironmentParameters {
-    pub fn set_1() -> Self {
+    pub fn new(
+        r: usize,
+        n: usize,
+        beta: Zq,
+        b: usize,
+        parts: usize,
+        t_1: usize,
+        t_2: usize,
+        k: usize,
+        k_1: usize,
+        k_2: usize,
+        lambda2: usize,
+        log_q: usize,
+        deg_bound_d: usize,
+        constraint_l: usize,
+        constraint_k: usize,
+    ) -> Self {
+        Self {
+            r,
+            n,
+            beta,
+            b,
+            parts,
+            t_1,
+            t_2,
+            k,
+            k_1,
+            k_2,
+            lambda2,
+            log_q,
+            deg_bound_d,
+            constraint_l,
+            constraint_k,
+        }
+    }
+}
+
+impl Default for EnvironmentParameters {
+    fn default() -> Self {
         Self {
             r: 4,
             n: 4,
             beta: Zq::new(70),
             b: 4,
-            digits: 3,
+            parts: 3,
             t_1: 3,
             t_2: 3,
             k: 4,
             k_1: 5,
             k_2: 5,
-            lambda: 128,
             lambda2: 256,
             log_q: 32,
             deg_bound_d: 4,
