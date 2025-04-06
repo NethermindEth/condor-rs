@@ -1,18 +1,16 @@
 use crate::poseidon::PoseidonSponge;
 use crate::zq::Zq;
-use rand::{Rng, random,rng}; 
 use blake2::{Blake2b, Digest};
 use generic_array::GenericArray;
-use typenum::U32;
+use rand::{random, rng, Rng};
 use std::convert::TryInto;
-
+use typenum::U32;
 
 pub trait Transcript {
     fn new() -> Self;
     fn absorb(&mut self, value: Zq);
     fn get_challenge(&mut self) -> Zq;
 }
-
 
 /// Generates an MDS (Maximum Distance Separable) matrix using a Cauchy matrix
 fn cauchy_mds_matrix(size: usize) -> Vec<Vec<Zq>> {
@@ -32,8 +30,8 @@ fn cauchy_mds_matrix(size: usize) -> Vec<Vec<Zq>> {
     // Sample unique y values with additional constraint
     while y_vals.len() < size {
         let candidate = Zq::new(rng.random_range(1..u32::MAX));
-        let valid = !y_vals.contains(&candidate)
-            && !x_vals.iter().any(|x| *x + candidate == Zq::ZERO);
+        let valid =
+            !y_vals.contains(&candidate) && !x_vals.iter().any(|x| *x + candidate == Zq::ZERO);
         if valid {
             y_vals.push(candidate);
         }
@@ -78,26 +76,25 @@ fn generate_secure_round_constants(rounds: usize, state_size: usize) -> Vec<Vec<
         }
     }
 
-    ark 
+    ark
 }
 
 pub struct PoseidonTranscript {
-    sponge: PoseidonSponge, 
+    sponge: PoseidonSponge,
 }
 
 impl Transcript for PoseidonTranscript {
     fn new() -> Self {
         // Parameters are just examples for now
         let sponge = crate::poseidon::PoseidonSponge::new(
-            8,                                               // rate: usize
-            8,                                               // capacity: usize
-            5,                                               // full_rounds: usize
-            8,                                               // partial_rounds: usize
-            8,                                               // alpha: u64
-            cauchy_mds_matrix(16),                      // mds: Vec<Vec<Zq>>
+            8,                                       // rate: usize
+            8,                                       // capacity: usize
+            5,                                       // full_rounds: usize
+            8,                                       // partial_rounds: usize
+            8,                                       // alpha: u64
+            cauchy_mds_matrix(16),                   // mds: Vec<Vec<Zq>>
             generate_secure_round_constants(16, 16), // ark: Vec<Vec<Zq>>
         );
-
 
         Self { sponge }
     }
