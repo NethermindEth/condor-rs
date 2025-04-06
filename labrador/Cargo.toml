@@ -6,6 +6,7 @@ repository.workspace = true
 license.workspace = true
 
 [dependencies]
+zerocopy = "0.8"
 rand = {version = "0.9", default-features = false, features = ["thread_rng", "unbiased"] }
 thiserror = {version = "1.0", default-features = false }
 nalgebra = "0.32"
