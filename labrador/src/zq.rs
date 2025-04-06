@@ -51,6 +51,46 @@ impl Zq {
 
         result
     }
+    
+/// Calculates the modular inverse of an element using the Extended Euclidean Algorithm
+/// Returns zero if no inverse exists
+pub fn inv(self) -> Self {
+    let mut a = self.value;
+    let mut x0: u32 = 0;
+    let mut x1: u32 = 1;
+    let mut q: u32 = 4294967291; // modulus 2^32 - 5 (Zq needs to be a field)
+    let original_q = q;
+
+    while a != 0 {
+        let quotient = q.wrapping_div(a);  
+        let remainder = q.wrapping_rem(a);  
+
+        let new_x0 = x1.wrapping_sub(quotient.wrapping_mul(x0)); 
+        let new_x1 = x0;
+
+       
+        x0 = new_x0;
+        x1 = new_x1;
+        q = a;
+        a = remainder;
+    }
+
+    // If gcd(a, q) != 1, no inverse exists
+    if q != 1 {
+        return Zq::ZERO;
+    }
+
+    // result is within the range [0, original q)
+    let result = (x1.wrapping_rem(original_q).wrapping_add(original_q)) 
+        .wrapping_rem(original_q);
+
+    Zq::new(result) 
+}
+
+
+
+
+
 }
 
 // Macro to generate arithmetic trait implementations
