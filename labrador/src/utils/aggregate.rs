@@ -424,23 +424,35 @@ fn calculate_aggr_b(
 /// @param: ep: struct SizeParams
 ///
 /// return h_{ij}
+#[rustfmt::skip]
 pub fn calculate_hij(
     phi_i: &[PolyVector],
     s: &[PolyVector],
     ep: &EnvironmentParameters,
 ) -> Vec<PolyVector> {
-    (0..ep.r)
-        .map(|i| {
-            (0..ep.r)
-                .map(|j| {
-                    let left_side = &phi_i[i].inner_product_poly_vector(&s[j]);
-                    let right_side = &phi_i[j].inner_product_poly_vector(&s[i]);
-                    left_side + right_side
-                })
-                .collect()
-        })
-        .collect()
-    // Todo: decompose h: h{ij} = h_{ij}^0 + ... + h_{ij}^(t_1-1)*b_1^(t_1-1)
+    (0..ep.r).map(|i| {
+        (0..ep.r).map(|j| {
+            let left_side = &phi_i[i].inner_product_poly_vector(&s[j]);
+            let right_side = &phi_i[j].inner_product_poly_vector(&s[i]);
+            left_side + right_side
+        }).collect()
+    }).collect()
+}
+
+/// calculate garbage polynomial g = <s_i, s_j>
+///
+/// @param: phi_i: phi_i
+/// @param: s: witness s_i
+/// @param: r: size_r
+///
+/// return g_{ij}
+#[rustfmt::skip]
+pub fn calculate_gij(s: &[PolyVector], r: usize) -> Vec<PolyVector> {
+    (0..r).map(|i| {
+        (0..r).map(|j| 
+            s[i].inner_product_poly_vector(&s[j])
+        ).collect()
+    }).collect()
 }
 
 /// calculate z = c_1*s_1 + ... + c_r*s_r
@@ -458,6 +470,83 @@ pub fn calculate_z(x: &[PolyVector], random_c: &PolyVector) -> PolyVector {
             PolyVector::new(vec![PolyRing::zero_poly(); x[0].len()]),
             |acc, x| &acc + &x,
         )
+}
+
+pub fn decompose_and_aggregate(x_i: &[PolyVector], b: Zq, parts: usize) -> Vec<Vec<PolyVector>> {
+    let x_ij: Vec<Vec<PolyVector>> = x_i
+        .iter()
+        .map(|i| PolyVector::decompose(i, b, parts))
+        .collect();
+    x_ij
+}
+
+/// calculate u_ = \sum(B_ik * t_i^(k)) + sum(C_ijk * g_ij^(k))
+pub fn calculate_u_1(
+    b: &[Vec<Vec<PolyVector>>],
+    c: &[Vec<Vec<Vec<PolyVector>>>],
+    t_i: &[Vec<PolyVector>],
+    g_ij: &[Vec<PolyVector>],
+    ep: &EnvironmentParameters,
+) -> PolyVector {
+    let mut u_1 = vec![PolyRing::zero(ep.r); ep.k_1];
+    // calculate left side
+    println!("{}", t_i.len());
+    println!("{}", t_i[0].len());
+    println!("{}", t_i[0][0].len());
+    println!("{}", t_i[0][0].get_elements().len());
+    println!("----------------------------------");
+    println!("{}", b.len());
+    println!("{}", b[0].len());
+    println!("{}", b[0][0].len());
+    for i in 0..ep.r {
+        for k in 0..ep.t_1 {
+            let b_ik_t_ik = &t_i[i][k] * &b[i][k];
+            u_1 = u_1
+                .iter()
+                .zip(b_ik_t_ik.iter())
+                .map(|(a, b)| a + b)
+                .collect();
+        }
+    }
+    println!("left is fine");
+    // calculate right side
+    for i in 0..ep.r {
+        for j in i..ep.r {
+            for k in 0..ep.t_2 {
+                let c_ijk_g_ij = &g_ij[i][j] * &c[i][j][k];
+                u_1 = u_1
+                    .iter()
+                    .zip(c_ijk_g_ij.iter())
+                    .map(|(a, b)| a + b)
+                    .collect();
+            }
+        }
+    }
+
+    PolyVector::new(u_1)
+}
+
+pub fn calculate_u_2(
+    d: &[Vec<Vec<Vec<PolyVector>>>],
+    h_ij: &[Vec<PolyVector>],
+    ep: &EnvironmentParameters,
+) -> PolyVector {
+    // Pre-collect the iterator over (i, j, k) triples into a vector.
+    let flat_vec: Vec<(usize, usize, usize)> = (0..ep.r)
+        .flat_map(|i| (i..ep.r).flat_map(move |j| (0..ep.t_2).map(move |k| (i, j, k))))
+        .collect();
+
+    // Use the collected triples to perform the fold.
+    flat_vec.into_iter().fold(
+        PolyVector::new(vec![PolyRing::new(vec![Zq::ZERO; ep.deg_bound_d]); ep.n]),
+        |acc, (i, j, k)| {
+            let d_ijk_h_ij = &h_ij[i][j] * &d[i][j][k];
+            acc.iter()
+                .zip(d_ijk_h_ij.iter())
+                .map(|(a, b)| a + b)
+                .collect::<PolyVector>()
+        },
+    )
 }
 
 #[cfg(test)]

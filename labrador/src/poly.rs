@@ -1,4 +1,4 @@
-use std::ops::{Add, Mul};
+use std::ops::{Add, Mul, Sub};
 
 use crate::{rq::Rq, rq_vector::RqVector, zq::Zq};
 use rand::distr::{Distribution, Uniform};
@@ -74,7 +74,7 @@ impl PolyRing {
         for coeff in coeffs.iter_mut() {
             // Explicitly sample from {-1, 0, 1} with equal probability
             let val = match rng.random_range(0..3) {
-                0 => Zq::MAX,  // -1 mod q
+                0 => Zq::TWO,  // 2
                 1 => Zq::ZERO, // 0
                 2 => Zq::ONE,  // 1
                 _ => unreachable!(),
@@ -154,6 +154,42 @@ impl PolyRing {
             .map(|c| c.norm())
             .fold(0.0, |max, x| max.max(x))
     }
+
+    /// Decomposes a polynomial into base-B representation:
+    /// p = p⁽⁰⁾ + p⁽¹⁾·B + p⁽²⁾·B² + ... + p⁽ᵗ⁻¹⁾·B^(t-1)
+    /// Where each p⁽ⁱ⁾ has small coefficients, using centered representatives
+    pub fn decompose(&self, base: Zq, num_parts: usize) -> PolyVector {
+        let mut parts = Vec::with_capacity(num_parts);
+        let mut current = self.clone();
+
+        for i in 0..num_parts {
+            if i == num_parts - 1 {
+                parts.push(current.clone());
+            } else {
+                // Extract low part (mod base, centered around 0)
+                let mut low_coeffs = vec![Zq::ZERO; self.len()];
+
+                for (j, coeff) in current.get_coeffs().iter().enumerate() {
+                    low_coeffs[j] = coeff.centered_mod(base);
+                }
+
+                let low_part = Self::new(low_coeffs);
+                parts.push(low_part.clone());
+
+                // Update current
+                current = &current - &low_part;
+
+                // Scale by base
+                let mut scaled_coeffs = vec![Zq::ZERO; self.len()];
+                for (j, coeff) in current.get_coeffs().iter().enumerate() {
+                    scaled_coeffs[j] = coeff.scale_by(base);
+                }
+                current = Self::new(scaled_coeffs);
+            }
+        }
+
+        PolyVector::new(parts)
+    }
 }
 
 impl<const D: usize> From<PolyRing> for Rq<D> {
@@ -181,6 +217,24 @@ impl Add<&PolyRing> for &PolyRing {
             }
             if i < other.get_coeffs().len() {
                 *coeff += other.get_coeffs()[i];
+            }
+        }
+        PolyRing::new(coeffs)
+    }
+}
+
+impl Sub<&PolyRing> for &PolyRing {
+    type Output = PolyRing;
+    /// Sub two polynomials with flexible degree
+    fn sub(self, other: &PolyRing) -> PolyRing {
+        let max_degree = self.get_coeffs().len().max(other.get_coeffs().len());
+        let mut coeffs = vec![Zq::ZERO; max_degree];
+        for (i, coeff) in coeffs.iter_mut().enumerate().take(max_degree) {
+            if i < self.get_coeffs().len() {
+                *coeff += self.get_coeffs()[i];
+            }
+            if i < other.get_coeffs().len() {
+                *coeff -= other.get_coeffs()[i];
             }
         }
         PolyRing::new(coeffs)
@@ -305,6 +359,12 @@ impl PolyVector {
             coeffs: concatenated_coeffs,
         }
     }
+
+    pub fn decompose(&self, b: Zq, parts: usize) -> Vec<PolyVector> {
+        self.iter()
+            .map(|i| PolyRing::decompose(i, b, parts))
+            .collect()
+    }
 }
 
 impl<const N: usize, const D: usize> From<PolyVector> for RqVector<N, D> {
@@ -357,7 +417,7 @@ impl Mul<&Vec<PolyVector>> for &PolyVector {
     fn mul(self, other: &Vec<PolyVector>) -> PolyVector {
         other
             .iter()
-            .map(|o| self.inner_product_poly_vector(o))
+            .map(|o| o.inner_product_poly_vector(self))
             .collect()
     }
 }
@@ -394,6 +454,24 @@ impl ZqVector {
         let mut coeffs = Vec::with_capacity(n);
         coeffs.extend((0..n).map(|_| uniform.sample(rng)));
         Self { coeffs }
+    }
+
+    /// Generate random small polynomial with secure RNG implementation
+    pub fn random_ternary<R: Rng + CryptoRng>(rng: &mut R, n: usize) -> Self {
+        let mut coeffs = vec![Zq::ZERO; n];
+
+        for coeff in coeffs.iter_mut() {
+            // Explicitly sample from {-1, 0, 1} with equal probability
+            let val = match rng.random_range(0..3) {
+                0 => Zq::TWO,  // 2
+                1 => Zq::ZERO, // 0
+                2 => Zq::ONE,  // 1
+                _ => unreachable!(),
+            };
+            *coeff = val;
+        }
+
+        Self::new(coeffs)
     }
 
     pub fn iter(&self) -> impl Iterator<Item = &Zq> {

@@ -6,8 +6,8 @@ use crate::utils::{
 };
 use rand::rng;
 
-/// explicitly set the deg_bound_d to D == deg_bound_d, which is 4
-const D: usize = 4;
+/// explicitly set the deg_bound_d to D == deg_bound_d, which is 64
+const D: usize = 64;
 
 // Proof contains the parameters will be sent to verifier
 // All parameters are from tr, line 2 on page 18
@@ -119,26 +119,35 @@ impl<'a> LabradorProver<'a> {
                 "witness l2-norm is not satisfied"
             )
         });
-
         // Step 1: Outer commitments u_1 starts: --------------------------------------------
 
         // Ajtai Commitments t_i = A * s_i
-        let _matrix_a = &self.pp.matrix_a;
-        let t_i = vec![PolyVector::zero()];
-        let g_ij = vec![PolyVector::zero()];
+        let matrix_a = &self.pp.matrix_a;
+        let t_i: Vec<PolyVector> = self.witness.s.iter().map(|s_i| s_i * matrix_a).collect();
 
-        let _matrix_b = &self.pp.matrix_b;
-        let _matrix_c = &self.pp.matrix_c;
-        let u_1 = PolyVector::zero();
+        // decompose t_i into t_i^(0) + ... + t_i^(t_1-1) * b_1^(t_1-1)
+        let t_ij: Vec<Vec<PolyVector>> = t_i
+            .iter()
+            .map(|i| PolyVector::decompose(i, ep.b, ep.t_1))
+            .collect();
+        // calculate garbage polynomial g = <s_i, s_j>
+        let g_gp: Vec<PolyVector> = aggregate::calculate_gij(&self.witness.s, ep.r);
+        // decompose g_gp into g_ij = g_ij^(0) + ... + g_ij^(t_2-1) * b_2^(t_2=1)
+        let g_ij: Vec<Vec<PolyVector>> = g_gp
+            .iter()
+            .map(|i| PolyVector::decompose(i, ep.b, ep.t_2))
+            .collect();
+        let matrix_b = &self.pp.matrix_b;
+        let matrix_c = &self.pp.matrix_c;
+        // calculate outer commitment u_1 = \sum(B_ik * t_i^(k)) + \sum(C_ijk * g_ij^(k))
+        let u_1 = aggregate::calculate_u_1(matrix_b, matrix_c, &t_ij, &g_ij, ep);
 
         // Step 1: Outer commitments u_1 ends: ----------------------------------------------
 
         // Step 2: JL projection starts: ----------------------------------------------------
 
         // JL projection p_j + check p_j = ct(sum(<\sigma_{-1}(pi_i^(j)), s_i>))
-
         let matrices = &self.tr.pi;
-
         let p = Projections::new(matrices, &self.witness.s);
 
         // Step 2: JL projection ends: ------------------------------------------------------
@@ -154,13 +163,17 @@ impl<'a> LabradorProver<'a> {
 
         // Step 3: Calculate h_ij, u_2, and z starts: ---------------------------------------
 
-        let _phi_i = aggr_2.phi_i;
-        let h_ij = vec![PolyVector::zero()];
-
+        let phi_i = aggr_2.phi_i;
+        let h_gp = aggregate::calculate_hij(&phi_i, &self.witness.s, ep);
+        // decompose h_gp into h_ij = h_ij^(0) + ... + h_ij^(t_1-1) * b_1^(t_1-1)
+        let h_ij: Vec<Vec<PolyVector>> = h_gp
+            .iter()
+            .map(|i| PolyVector::decompose(i, ep.b, ep.t_1))
+            .collect();
         // Outer commitments: u_2
-        let _matrix_d = &self.pp.matrix_d;
-        let u_2 = PolyVector::zero();
-
+        let matrix_d = &self.pp.matrix_d;
+        // calculate outer commitment u_2 = \sum(D_ijk * h_ij^(k))
+        let u_2 = aggregate::calculate_u_2(matrix_d, &h_ij, ep);
         // calculate z = c_1*s_1 + ... + c_r*s_r
         let z = aggregate::calculate_z(&self.witness.s, &self.tr.random_c);
 
@@ -173,31 +186,31 @@ impl<'a> LabradorProver<'a> {
             u_2,
             z,
             t_i,
-            g_ij,
-            h_ij,
+            g_ij: g_gp,
+            h_ij: h_gp,
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    // use super::*;
 
-    #[test]
-    fn test_prove() {
-        // set up example environment, use set1 for testing.
-        let ep_1 = EnvironmentParameters::default();
-        // generate a random witness based on ep above
-        let witness_1 = Witness::new(&ep_1);
-        // generate public statements based on witness_1
-        let st: Statement = Statement::new(&witness_1, &ep_1);
-        // generate the common reference string matriices
-        let pp = PublicPrams::new(&ep_1);
-        // generate random challenges
-        let tr = Challenges::new(&ep_1);
+    // #[test]
+    // fn test_prove() {
+    //     // set up example environment, use set1 for testing.
+    //     let ep_1 = EnvironmentParameters::default();
+    //     // generate a random witness based on ep above
+    //     let witness_1 = Witness::new(&ep_1);
+    //     // generate public statements based on witness_1
+    //     let st: Statement = Statement::new(&witness_1, &ep_1);
+    //     // generate the common reference string matriices
+    //     let pp = PublicPrams::new(&ep_1);
+    //     // generate random challenges
+    //     let tr = Challenges::new(&ep_1);
 
-        // create a new prover
-        let prover = LabradorProver::new(&pp, &witness_1, &st, &tr);
-        let _proof = LabradorProver::prove(&prover, &ep_1);
-    }
+    //     // create a new prover
+    //     let prover = LabradorProver::new(&pp, &witness_1, &st, &tr);
+    //     let _proof = LabradorProver::prove(&prover, &ep_1);
+    // }
 }

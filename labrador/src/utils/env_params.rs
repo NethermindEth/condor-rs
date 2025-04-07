@@ -9,9 +9,8 @@ pub struct EnvironmentParameters {
     // witness norm bound beta
     pub beta: Zq,
     // decompose base b
-    pub b: usize,
+    pub b: Zq,
     // the parts of decomposition.
-    pub parts: usize,
     // t_1
     pub t_1: usize,
     // t_2
@@ -38,8 +37,7 @@ impl EnvironmentParameters {
         r: usize,
         n: usize,
         beta: Zq,
-        b: usize,
-        parts: usize,
+        b: Zq,
         t_1: usize,
         t_2: usize,
         k: usize,
@@ -56,7 +54,6 @@ impl EnvironmentParameters {
             n,
             beta,
             b,
-            parts,
             t_1,
             t_2,
             k,
@@ -75,18 +72,17 @@ impl Default for EnvironmentParameters {
     fn default() -> Self {
         Self {
             r: 4,
-            n: 4,
-            beta: Zq::new(70),
-            b: 4,
-            parts: 3,
-            t_1: 3,
-            t_2: 3,
+            n: 5,
+            beta: Zq::new(1000),
+            b: Zq::new(4),
+            t_1: 16,
+            t_2: 16,
             k: 4,
             k_1: 5,
             k_2: 5,
             lambda2: 256,
             log_q: 32,
-            deg_bound_d: 4,
+            deg_bound_d: 64,
             constraint_l: 5,
             constraint_k: 5,
         }
