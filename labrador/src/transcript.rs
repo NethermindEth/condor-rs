@@ -49,7 +49,7 @@ fn cauchy_mds_matrix(size: usize) -> Vec<Vec<Zq>> {
 
     matrix
 }
-
+// Generates ARK matrix
 fn generate_secure_round_constants(rounds: usize, state_size: usize) -> Vec<Vec<Zq>> {
     // Create a matrix to store constants for each round and state position
     let mut ark = vec![vec![Zq::new(0); state_size]; rounds];
