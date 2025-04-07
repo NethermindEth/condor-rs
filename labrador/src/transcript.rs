@@ -39,9 +39,10 @@ fn cauchy_mds_matrix(size: usize) -> Vec<Vec<Zq>> {
 
     // Construct the Cauchy matrix
     let mut matrix = vec![vec![Zq::ZERO; size]; size];
-    for i in 0..size {
-        for j in 0..size {
-            let denom = x_vals[i] + y_vals[j];
+
+    for (i, &x_val) in x_vals.iter().enumerate() {
+        for (j, &y_val) in y_vals.iter().enumerate() {
+            let denom = x_val + y_val;
             matrix[i][j] = denom.inv();
         }
     }
@@ -53,8 +54,10 @@ fn generate_secure_round_constants(rounds: usize, state_size: usize) -> Vec<Vec<
     // Create a matrix to store constants for each round and state position
     let mut ark = vec![vec![Zq::new(0); state_size]; rounds];
 
-    for round in 0..rounds {
-        for state in 0..state_size {
+    // Iterate over the rows (rounds)
+    for row in ark.iter_mut().take(rounds) {
+        // Iterate over the states in the current row using `iter_mut` for mutable access
+        for state in row.iter_mut().take(state_size) {
             // 4 random bytes to use as input (seed)
             let seed: [u8; 4] = random();
 
@@ -71,8 +74,8 @@ fn generate_secure_round_constants(rounds: usize, state_size: usize) -> Vec<Vec<
             // Convert those 4 bytes into a u32 value
             let constant = u32::from_le_bytes(hash_bytes);
 
-            // Store the constant in the matrix as a Zq element
-            ark[round][state] = Zq::new(constant);
+            // Store the constant in the matrix
+            *state = Zq::new(constant);
         }
     }
 
