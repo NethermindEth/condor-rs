@@ -39,6 +39,12 @@ Docs for `labrador`:
 ```sh
 RUSTDOCFLAGS="--html-in-header katex-header.html" cargo doc --no-deps -p labrador --open
 ```
+Docs for `falcon aggregation with labrador`:
+
+```sh
+RUSTDOCFLAGS="--html-in-header katex-header.html" cargo doc --no-deps -p falcon_labrador --open
+```
+
 
 ## License
 

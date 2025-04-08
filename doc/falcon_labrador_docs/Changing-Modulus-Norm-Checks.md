@@ -13,7 +13,7 @@ $$\mathbf{s}\_{i1}+\mathbf{hs}\_{i2}+qv_{i} - H(r,m) = 0$$
 Since adding multiples of $q$ to the restriction doesn't affect the original formulation $\mod q$, then this restriction continues to be valid in $\mathcal{R}\_{q}$. In order to answer how big $q'$ needs to be so that the witness vectors (including the new one) don't wrap around, we need to prove that the witnesses are small enough.
 
 Now, in order to find an equivalent restriction for the restriction on the size of the witnesses, we will rewrite $\lVert (\mathbf{s}\_{i1}, \mathbf{s}\_{i2}) \rVert_{2} \leq \beta$ as:
-$$\lVert \mathbf{s}\_{i1}\rVert^{2}+ \lVert \mathbf{s}\_{2}\rVert^{2} \leq \beta^{2}$$
+$$\lVert \mathbf{s}\_{i1}\rVert^{2}+ \lVert \mathbf{s}\_{i2}\rVert^{2} \leq \beta^{2}$$
 Where $\lVert . \rVert$ is still the Euclidean norm. Because we know that $\beta^{2} - \lVert \mathbf{s}\_{i1}\rVert^{2} - \lVert \mathbf{s}\_{i2}\rVert^{2}$ is non-negative, we can use Lagrange’s four-square theorem to rewrite it as a sum of four squared numbers $\epsilon_{0}^{2}, \epsilon_{1}^{2}, \epsilon_{2}^{2}, \epsilon_{3}^{2}$.
 
 Because all dot product constraints in LaBRADOR are of the form:
