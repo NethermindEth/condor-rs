@@ -127,31 +127,23 @@ impl PoseidonSponge {
     // Absorb input into the sponge
     pub fn absorb(&mut self, input: &[Zq]) {
         let mut remaining_elements = input;
-        let mut absorb_index = 0;
 
-        loop {
-            // Absorb elements if space is available in the rate part
-            if absorb_index + remaining_elements.len() <= self.rate {
-                for (i, elem) in remaining_elements.iter().enumerate() {
-                    self.state[self.capacity + i + absorb_index] += *elem;
-                }
-                self.permute();
-                return;
-            }
+        while !remaining_elements.is_empty() {
+            // Determine how many elements we can absorb in this round
+            let num_elements_to_absorb = self.rate.min(remaining_elements.len());
 
-            // If too many elements to absorbe fill up the rate portion and permute if necessary
-            let num_elements_absorbed = self.rate - absorb_index;
-            for (i, elem) in remaining_elements
-                .iter()
-                .take(num_elements_absorbed)
-                .enumerate()
-            {
-                self.state[self.capacity + i + absorb_index] += *elem;
-            }
+            // Calculate where to copy into the state
+            let dest_start = self.capacity;
+            let dest_range = dest_start..dest_start + num_elements_to_absorb;
 
+            // Overwrite part of the rate section with new input
+            self.state[dest_range].copy_from_slice(&remaining_elements[..num_elements_to_absorb]);
+
+            // Advance the remaining input
+            remaining_elements = &remaining_elements[num_elements_to_absorb..];
+
+            // Permute the state after each block
             self.permute();
-            remaining_elements = &remaining_elements[num_elements_absorbed..];
-            absorb_index = 0;
         }
     }
 
