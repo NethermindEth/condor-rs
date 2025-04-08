@@ -71,12 +71,12 @@ impl EnvironmentParameters {
 impl Default for EnvironmentParameters {
     fn default() -> Self {
         Self {
-            r: 4,
+            r: 3,
             n: 5,
-            beta: Zq::new(1000),
-            b: Zq::new(4),
-            t_1: 16,
-            t_2: 16,
+            beta: Zq::new(65535),
+            b: Zq::new(16),
+            t_1: 4,
+            t_2: 4,
             k: 4,
             k_1: 5,
             k_2: 5,

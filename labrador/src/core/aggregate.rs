@@ -470,15 +470,7 @@ pub fn calculate_z(x: &[PolyVector], random_c: &PolyVector) -> PolyVector {
         )
 }
 
-pub fn decompose_and_aggregate(x_i: &[PolyVector], b: Zq, parts: usize) -> Vec<Vec<PolyVector>> {
-    let x_ij: Vec<Vec<PolyVector>> = x_i
-        .iter()
-        .map(|i| PolyVector::decompose(i, b, parts))
-        .collect();
-    x_ij
-}
-
-/// calculate u_ = \sum(B_ik * t_i^(k)) + sum(C_ijk * g_ij^(k))
+/// line 19, page 18: calculate u_1 = \sum(B_ik * t_i^(k)) + sum(C_ijk * g_ij^(k))
 pub fn calculate_u_1(
     b: &[Vec<Vec<PolyVector>>],
     c: &[Vec<Vec<Vec<PolyVector>>>],
@@ -488,14 +480,6 @@ pub fn calculate_u_1(
 ) -> PolyVector {
     let mut u_1 = vec![PolyRing::zero(ep.r); ep.k_1];
     // calculate left side
-    println!("{}", t_i.len());
-    println!("{}", t_i[0].len());
-    println!("{}", t_i[0][0].len());
-    println!("{}", t_i[0][0].get_elements().len());
-    println!("----------------------------------");
-    println!("{}", b.len());
-    println!("{}", b[0].len());
-    println!("{}", b[0][0].len());
     for i in 0..ep.r {
         for k in 0..ep.t_1 {
             let b_ik_t_ik = &t_i[i][k] * &b[i][k];
@@ -506,7 +490,6 @@ pub fn calculate_u_1(
                 .collect();
         }
     }
-    println!("left is fine");
     // calculate right side
     for i in 0..ep.r {
         for j in i..ep.r {
@@ -524,17 +507,17 @@ pub fn calculate_u_1(
     PolyVector::new(u_1)
 }
 
+/// line 20, page 18: calculate u_2 = \sum(D_ijk * h_ij^(k))
 pub fn calculate_u_2(
     d: &[Vec<Vec<Vec<PolyVector>>>],
     h_ij: &[Vec<PolyVector>],
     ep: &EnvironmentParameters,
 ) -> PolyVector {
-    // Pre-collect the iterator over (i, j, k) triples into a vector.
+    // Pre-collect the iterator over (i, j, k) into a vector.
     let flat_vec: Vec<(usize, usize, usize)> = (0..ep.r)
         .flat_map(|i| (i..ep.r).flat_map(move |j| (0..ep.t_2).map(move |k| (i, j, k))))
         .collect();
 
-    // Use the collected triples to perform the fold.
     flat_vec.into_iter().fold(
         PolyVector::new(vec![PolyRing::new(vec![Zq::ZERO; ep.deg_bound_d]); ep.n]),
         |acc, (i, j, k)| {
@@ -595,7 +578,5 @@ mod tests {
         let relation = LabradorVerifier::check_relation(&aggr_2.a_i, &aggr_2.b_i, &g, &h);
 
         assert!(relation);
-
-        // let z = calculate_z(&witness_1, &random_c);
     }
 }

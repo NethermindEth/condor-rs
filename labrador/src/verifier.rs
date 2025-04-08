@@ -37,7 +37,6 @@ impl<'a> LabradorVerifier<'a> {
         // 3. line 14: check norm_sum(z, t, g, h) <= (beta')^2
 
         // decompose z into z = z^(0) + z^(1) * b, only two parts.
-
         let z_ij = PolyVector::decompose(&proof.z, ep.b, 2);
         let t_ij: Vec<Vec<PolyVector>> = proof
             .t_i
@@ -60,12 +59,7 @@ impl<'a> LabradorVerifier<'a> {
         let norm_t_ij = Self::norm_squared(&t_ij);
         let norm_g_ij = Self::norm_squared(&g_ij);
         let norm_h_ij = Self::norm_squared(&h_ij);
-        println!("{:?}", norm_z_ij);
-        println!("{:?}", norm_t_ij);
-        println!("{:?}", norm_g_ij);
-        println!("{:?}", norm_h_ij);
         let norm_sum = norm_z_ij + norm_t_ij + norm_g_ij + norm_h_ij;
-        println!("{:?}", norm_sum);
 
         assert!(norm_sum <= ep.beta * ep.beta);
 
@@ -148,6 +142,7 @@ impl<'a> LabradorVerifier<'a> {
         true
     }
 
+    /// calculate the right hand side of line 16 or line 17, \sum(g_ij * c_i * c_j) or \sum(h_ij * c_i * c_j)
     #[rustfmt::skip]
     fn calculate_gh_ci_cj(x_ij: &[PolyVector], random_c: &PolyVector, r: usize) -> PolyRing {
         (0..r).map(|i| {
@@ -158,6 +153,7 @@ impl<'a> LabradorVerifier<'a> {
             }).fold(PolyRing::zero_poly(), |acc, x| &acc + &x)
     }
 
+    /// calculate the left hand side of line 17, \sum(<\phi_z, z> * c_i)
     fn calculate_phi_z_c(phi: &[PolyVector], c: &PolyVector, z: &PolyVector) -> PolyRing {
         phi.iter()
             .zip(c.iter())
@@ -173,7 +169,7 @@ impl<'a> LabradorVerifier<'a> {
         })
     }
 
-    /// line 18: check if \sum(a_{ij} * g_{ij}) + \sum(h_{ii}) - b ?= 0
+    /// line 18, page 18: check if \sum(a_{ij} * g_{ij}) + \sum(h_{ii}) - b ?= 0
     /// in the verifier process, page 18 from the paper.
     ///
     /// param: a_primes: a_{ij}^{''(k)}
@@ -215,29 +211,29 @@ impl<'a> LabradorVerifier<'a> {
 
 #[cfg(test)]
 mod tests {
-    // use super::*;
-    // use crate::prover::{LabradorProver, Witness};
+    use super::*;
+    use crate::prover::{LabradorProver, Witness};
 
-    // #[test]
-    // fn test_verify() {
-    //     // set up example environment, use set1 for testing.
-    //     let ep_1 = EnvironmentParameters::default();
-    //     // generate a random witness based on ep above
-    //     let witness_1 = Witness::new(&ep_1);
-    //     // generate public statements based on witness_1
-    //     let st: Statement = Statement::new(&witness_1, &ep_1);
-    //     // generate the common reference string matriices
-    //     let pp = PublicPrams::new(&ep_1);
-    //     // generate random challenges
-    //     let tr = Challenges::new(&ep_1);
+    #[test]
+    fn test_verify() {
+        // set up example environment, use set1 for testing.
+        let ep_1 = EnvironmentParameters::default();
+        // generate a random witness based on ep above
+        let witness_1 = Witness::new(&ep_1);
+        // generate public statements based on witness_1
+        let st: Statement = Statement::new(&witness_1, &ep_1);
+        // generate the common reference string matriices
+        let pp = PublicPrams::new(&ep_1);
+        // generate random challenges
+        let tr = Challenges::new(&ep_1);
 
-    //     // create a new prover
-    //     let prover = LabradorProver::new(&pp, &witness_1, &st, &tr);
-    //     let proof = prover.prove(&ep_1);
+        // create a new prover
+        let prover = LabradorProver::new(&pp, &witness_1, &st, &tr);
+        let proof = prover.prove(&ep_1);
 
-    //     // create a new verifier
-    //     let verifier = LabradorVerifier::new(&pp, &st, &tr);
-    //     let result = verifier.verify(&proof, &ep_1);
-    //     assert!(result)
-    // }
+        // create a new verifier
+        let verifier = LabradorVerifier::new(&pp, &st, &tr);
+        let result = verifier.verify(&proof, &ep_1);
+        assert!(result)
+    }
 }

@@ -111,6 +111,7 @@ impl<'a> LabradorProver<'a> {
         }
     }
 
+    /// all prove steps are from page 17
     pub fn prove(&self, ep: &EnvironmentParameters) -> Proof {
         // check the L2 norm of the witness
         // not sure whether this should be handled during the proving or managed by the witness generator.
@@ -164,7 +165,7 @@ impl<'a> LabradorProver<'a> {
 
         // Aggregation ends: ----------------------------------------------------------------
 
-        // Step 3: Calculate h_ij, u_2, and z starts: ---------------------------------------
+        // Step 4: Calculate h_ij, u_2, and z starts: ---------------------------------------
 
         let phi_i = aggr_2.phi_i;
         let h_gp = aggregate::calculate_hij(&phi_i, &self.witness.s, ep);
@@ -180,7 +181,7 @@ impl<'a> LabradorProver<'a> {
         // calculate z = c_1*s_1 + ... + c_r*s_r
         let z = aggregate::calculate_z(&self.witness.s, &self.tr.random_c);
 
-        // Step 3: Calculate h_ij, u_2, and z ends: -----------------------------------------
+        // Step 4: Calculate h_ij, u_2, and z ends: -----------------------------------------
 
         Proof {
             u_1,
@@ -197,23 +198,23 @@ impl<'a> LabradorProver<'a> {
 
 #[cfg(test)]
 mod tests {
-    // use super::*;
+    use super::*;
 
-    // #[test]
-    // fn test_prove() {
-    //     // set up example environment, use set1 for testing.
-    //     let ep_1 = EnvironmentParameters::default();
-    //     // generate a random witness based on ep above
-    //     let witness_1 = Witness::new(&ep_1);
-    //     // generate public statements based on witness_1
-    //     let st: Statement = Statement::new(&witness_1, &ep_1);
-    //     // generate the common reference string matriices
-    //     let pp = PublicPrams::new(&ep_1);
-    //     // generate random challenges
-    //     let tr = Challenges::new(&ep_1);
+    #[test]
+    fn test_prove() {
+        // set up example environment parameters, use default set for testing.
+        let ep_1 = EnvironmentParameters::default();
+        // generate a random witness based on environment parameters above
+        let witness_1 = Witness::new(&ep_1);
+        // generate public statement based on witness_1
+        let st: Statement = Statement::new(&witness_1, &ep_1);
+        // generate the common reference string matriices A, B, C, D
+        let pp = PublicPrams::new(&ep_1);
+        // generate random challenges used between prover and verifier.
+        let tr = Challenges::new(&ep_1);
 
-    //     // create a new prover
-    //     let prover = LabradorProver::new(&pp, &witness_1, &st, &tr);
-    //     let _proof = LabradorProver::prove(&prover, &ep_1);
-    // }
+        // create a new prover
+        let prover = LabradorProver::new(&pp, &witness_1, &st, &tr);
+        let _proof = LabradorProver::prove(&prover, &ep_1);
+    }
 }

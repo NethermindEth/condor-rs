@@ -347,7 +347,7 @@ impl PolyVector {
             .sum()
     }
 
-    /// Function to concatenate coefficients from multiple Rq into a Vec<Zq>
+    /// Function to concatenate coefficients from multiple Polyrings into a Vec<Zq>
     pub fn concatenate_coefficients(&self, s: usize) -> ZqVector {
         let total_coeffs = self.get_elements().len() * s;
         let mut concatenated_coeffs: Vec<Zq> = Vec::with_capacity(total_coeffs);
@@ -564,6 +564,15 @@ mod tests {
             Zq::new(7),
             Zq::new(3),
         ])]);
+        assert_eq!(result, expect)
+    }
+
+    #[test]
+    fn test_sub_polyring() {
+        let vector1 = PolyRing::new(vec![Zq::ONE, Zq::TWO, Zq::new(3)]);
+        let vector2 = PolyRing::new(vec![Zq::new(4), Zq::new(5)]);
+        let result = &vector1 - &vector2;
+        let expect = PolyRing::new(vec![Zq::MAX - Zq::TWO, Zq::MAX - Zq::TWO, Zq::new(3)]);
         assert_eq!(result, expect)
     }
 }
