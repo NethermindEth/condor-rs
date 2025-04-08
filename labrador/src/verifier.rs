@@ -1,8 +1,9 @@
-use crate::poly::{PolyRing, PolyVector};
+use crate::core::{
+    aggregate, crs::PublicPrams, env_params::EnvironmentParameters, statement::Statement,
+};
 use crate::prover::{Challenges, Proof};
-use crate::utils::aggregate;
-use crate::utils::{crs::PublicPrams, env_params::EnvironmentParameters, statement::Statement};
-use crate::zq::Zq;
+use crate::ring::poly::{PolyRing, PolyVector};
+use crate::ring::zq::Zq;
 
 pub struct LabradorVerifier<'a> {
     pub pp: &'a PublicPrams,

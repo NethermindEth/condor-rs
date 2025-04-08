@@ -1,12 +1,10 @@
-use crate::{
-    ajtai_commitment::{
-        AjtaiCommitment, AjtaiParameters, CommitError, Opening, ParameterError, VerificationError,
-    },
-    rq::Rq,
-    rq_matrix::RqMatrix,
-    rq_vector::RqVector,
-    zq::Zq,
+use crate::commitments::ajtai_commitment::{
+    AjtaiCommitment, AjtaiParameters, CommitError, Opening, ParameterError, VerificationError,
 };
+use crate::ring::rq::Rq;
+use crate::ring::rq_matrix::RqMatrix;
+use crate::ring::rq_vector::RqVector;
+use crate::ring::zq::Zq;
 use thiserror::Error;
 
 #[derive(Debug, Error)]

@@ -1,5 +1,5 @@
-use crate::rq::Rq;
-use crate::zq::Zq;
+use crate::ring::rq::Rq;
+use crate::ring::zq::Zq;
 use core::ops::{Index, IndexMut, Mul};
 use core::slice::Iter;
 use rand::{CryptoRng, Rng};
@@ -109,7 +109,6 @@ impl<const N: usize, const D: usize> Mul for &RqVector<N, D> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{rq::Rq, zq::Zq};
 
     use super::*;
 

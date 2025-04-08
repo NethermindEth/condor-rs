@@ -1,4 +1,4 @@
-use crate::zq::Zq;
+use crate::ring::zq::Zq;
 
 // Example Environment parameters used for LaBRADOR, can be expanded as required by testing.
 pub struct EnvironmentParameters {

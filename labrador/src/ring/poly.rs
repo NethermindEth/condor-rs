@@ -1,6 +1,8 @@
 use std::ops::{Add, Mul, Sub};
 
-use crate::{rq::Rq, rq_vector::RqVector, zq::Zq};
+use crate::ring::rq::Rq;
+use crate::ring::rq_vector::RqVector;
+use crate::ring::zq::Zq;
 use rand::distr::{Distribution, Uniform};
 use rand::{CryptoRng, Rng};
 use rustfft::{num_complex::Complex, FftPlanner};

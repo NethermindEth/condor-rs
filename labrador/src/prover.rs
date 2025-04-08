@@ -1,9 +1,12 @@
-use crate::jl::{ProjectionMatrix, Projections};
-use crate::poly::{PolyVector, ZqVector};
-use crate::utils::{
-    aggregate, challenge_set::ChallengeSet, crs::PublicPrams, env_params::EnvironmentParameters,
+use crate::core::{
+    aggregate,
+    challenge_set::ChallengeSet,
+    crs::PublicPrams,
+    env_params::EnvironmentParameters,
+    jl::{ProjectionMatrix, Projections},
     statement::Statement,
 };
+use crate::ring::poly::{PolyVector, ZqVector};
 use rand::rng;
 
 /// explicitly set the deg_bound_d to D == deg_bound_d, which is 64

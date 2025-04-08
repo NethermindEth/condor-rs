@@ -1,9 +1,7 @@
-use crate::{
-    poly::{PolyRing, PolyVector, ZqVector},
-    prover::{Challenges, Witness},
-    utils::{env_params::EnvironmentParameters, statement::Statement},
-    zq::Zq,
-};
+use crate::core::{env_params::EnvironmentParameters, statement::Statement};
+use crate::prover::{Challenges, Witness};
+use crate::ring::poly::{PolyRing, PolyVector, ZqVector};
+use crate::ring::zq::Zq;
 
 /// First step of aggregation
 pub struct AggregationOne {

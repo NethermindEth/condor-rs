@@ -1,6 +1,6 @@
-use crate::poly::{PolyRing, PolyVector, ZqVector};
+use crate::core::env_params::EnvironmentParameters;
 use crate::prover::Witness;
-use crate::utils::env_params::EnvironmentParameters;
+use crate::ring::poly::{PolyRing, PolyVector, ZqVector};
 
 /// Statement is the input of the prover, which contains the constraints.
 /// All parameters are from line 1, st, in the verifier process, page 18 from the paper.

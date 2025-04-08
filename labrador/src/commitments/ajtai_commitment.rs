@@ -1,4 +1,6 @@
-use crate::{rq_matrix::RqMatrix, rq_vector::RqVector, zq::Zq};
+use crate::ring::rq_matrix::RqMatrix;
+use crate::ring::rq_vector::RqVector;
+use crate::ring::zq::Zq;
 use thiserror::Error;
 
 // Error types with documentation
@@ -199,7 +201,7 @@ impl<const M: usize, const N: usize, const D: usize> AjtaiCommitment<M, N, D> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::rq::Rq;
+    use crate::ring::rq::Rq;
 
     const TEST_M: usize = 8;
     const TEST_N: usize = 8;

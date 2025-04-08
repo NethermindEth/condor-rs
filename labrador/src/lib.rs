@@ -17,24 +17,8 @@
 // Amortization
 #![doc = include_str!("../doc/amortization.md")]
 
-pub mod rq;
-
-pub mod zq;
-
-pub mod ajtai_commitment;
-
-pub mod rq_matrix;
-
-pub mod rq_vector;
-
-pub mod poly;
-
-pub mod jl;
-
-pub mod hierarchical_commitment;
-
-pub mod utils;
-
+pub mod commitments;
+pub mod core;
 pub mod prover;
-
+pub mod ring;
 pub mod verifier;

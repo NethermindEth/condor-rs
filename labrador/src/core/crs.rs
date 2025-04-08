@@ -1,5 +1,5 @@
-use crate::poly::PolyVector;
-use crate::utils::{challenge_set::ChallengeSet, env_params::EnvironmentParameters};
+use crate::core::{challenge_set::ChallengeSet, env_params::EnvironmentParameters};
+use crate::ring::poly::PolyVector;
 
 pub struct PublicPrams {
     // A \in R_q^(k*n)

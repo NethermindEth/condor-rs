@@ -18,7 +18,7 @@
 // Further operations and optimizations will be added in future versions.
 
 // We use the Zq ring
-use crate::zq::Zq;
+use crate::ring::zq::Zq;
 use core::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 use rand::distr::{Distribution, Uniform};
 use rand::{CryptoRng, Rng};

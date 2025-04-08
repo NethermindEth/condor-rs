@@ -1,9 +1,7 @@
-use labrador::jl::verify_upper_bound;
-use labrador::jl::ProjectionMatrix;
-use labrador::jl::ProjectionVector;
-use labrador::rq::Rq;
-use labrador::rq_vector::RqVector;
-use labrador::zq::Zq;
+use labrador::core::jl::{verify_upper_bound, ProjectionMatrix, ProjectionVector};
+use labrador::ring::rq::Rq;
+use labrador::ring::rq_vector::RqVector;
+use labrador::ring::zq::Zq;
 use rand::rng;
 
 const D: usize = 4; // Degree of polynomials in S_i
