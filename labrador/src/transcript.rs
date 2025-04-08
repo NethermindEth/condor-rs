@@ -97,7 +97,7 @@ impl Transcript for PoseidonTranscript {
             8,                                       // partial_rounds: usize
             8,                                       // alpha: u64
             cauchy_mds_matrix(16),                   // mds: Vec<Vec<Zq>>
-            generate_secure_round_constants(16, 16), // ark: Vec<Vec<Zq>>
+            generate_secure_round_constants(13, 16), // ark: Vec<Vec<Zq>>
         );
 
         Self { sponge }

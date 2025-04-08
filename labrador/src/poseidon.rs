@@ -88,7 +88,7 @@ impl PoseidonSponge {
 
     // Apply the MDS (Maximum Distance Separable) matrix
     fn apply_mds(&self, state: &mut [Zq]) {
-        let mut new_state = vec![Zq::ZERO; state.len()];
+        let mut new_state = state.to_vec();
 
         // Matrix multiplication with the state for diffusion
         for (i, _cur) in state.iter().enumerate() {
