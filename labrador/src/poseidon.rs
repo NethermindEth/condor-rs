@@ -19,6 +19,11 @@
 //
 
 use crate::zq::Zq;
+#[derive(Debug, thiserror::Error)]
+pub enum SpongeError {
+    #[error("Squeeze request of {requested} exceeds rate {rate}")]
+    OversizedSqueeze { requested: usize, rate: usize },
+}
 
 #[derive(Clone, Debug)]
 /// Struct for the Poseidon sponge
@@ -148,12 +153,13 @@ impl PoseidonSponge {
     }
 
     // Squeeze output from the sponge
-    pub fn squeeze(&mut self, num_elements: usize) -> Vec<Zq> {
+    pub fn squeeze(&mut self, num_elements: usize) -> Result<Vec<Zq>, SpongeError> {
         // Check if the requested number of elements exceeds the rate.
         if num_elements > self.rate {
-            println!("Error: Requested number of elements exceeds the rate");
-            // Return empty vector
-            return Vec::new();
+            return Err(SpongeError::OversizedSqueeze {
+                requested: num_elements,
+                rate: self.rate,
+            });
         }
 
         let mut output = vec![Zq::ZERO; num_elements];
@@ -166,7 +172,7 @@ impl PoseidonSponge {
                     &self.state[self.capacity + squeeze_index
                         ..self.capacity + remaining_elements.len() + squeeze_index],
                 );
-                return output;
+                return Ok(output);
             }
             // Reset squeeze index in case we need to squeeze again to fill the output
             let num_elements_squeezed = self.rate - squeeze_index;

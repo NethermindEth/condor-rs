@@ -1,4 +1,5 @@
 use crate::poseidon::PoseidonSponge;
+use crate::poseidon::SpongeError;
 use crate::zq::Zq;
 use blake2::{Blake2b, Digest};
 use generic_array::GenericArray;
@@ -9,7 +10,7 @@ use typenum::U32;
 pub trait Transcript {
     fn new() -> Self;
     fn absorb(&mut self, value: Zq);
-    fn get_challenge(&mut self) -> Zq;
+    fn get_challenge(&mut self) -> Result<Zq, SpongeError>;
 }
 
 /// Generates an MDS (Maximum Distance Separable) matrix using a Cauchy matrix
@@ -105,10 +106,12 @@ impl Transcript for PoseidonTranscript {
     fn absorb(&mut self, value: Zq) {
         self.sponge.absorb(&[value]); // Absorb the field value into the sponge
     }
+    fn get_challenge(&mut self) -> Result<Zq, SpongeError> {
+        let squeezed_elements = self.sponge.squeeze(1);
 
-    fn get_challenge(&mut self) -> Zq {
-        // Squeeze the sponge to get the challenge (a Zq value)
-        let squeezed_elements = self.sponge.squeeze(1); // we squeeze one number (as an example)
-        squeezed_elements[0] + Zq::ONE // Return challenge + 1 as an example challenge
+        match squeezed_elements {
+            Ok(vec) => Ok(vec[0] + Zq::ONE), // // Example: return first challenge + 1
+            Err(err) => Err(err),            // Propagate the SpongeError
+        }
     }
 }

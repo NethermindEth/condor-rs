@@ -82,5 +82,5 @@ fn main() {
     let challenge = transcript.get_challenge();
 
     // Print the challenge
-    println!("Challenge: {}", challenge);
+    println!("Challenge: {:?}", challenge);
 }
