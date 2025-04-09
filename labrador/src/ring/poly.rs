@@ -76,7 +76,7 @@ impl PolyRing {
         for coeff in coeffs.iter_mut() {
             // Explicitly sample from {-1, 0, 1} with equal probability
             let val = match rng.random_range(0..3) {
-                0 => Zq::TWO,  // 2
+                0 => Zq::MAX,  // -1 mod q
                 1 => Zq::ZERO, // 0
                 2 => Zq::ONE,  // 1
                 _ => unreachable!(),
@@ -435,8 +435,8 @@ impl ZqVector {
         Self { coeffs }
     }
 
-    pub fn zero() -> Self {
-        Self::new(vec![])
+    pub fn zero(len: usize) -> Self {
+        Self::new(vec![Zq::ZERO; len])
     }
 
     pub fn get_coeffs(&self) -> &Vec<Zq> {
@@ -458,30 +458,21 @@ impl ZqVector {
         Self { coeffs }
     }
 
-    /// Generate random small polynomial with secure RNG implementation
-    pub fn random_ternary<R: Rng + CryptoRng>(rng: &mut R, n: usize) -> Self {
-        let mut coeffs = vec![Zq::ZERO; n];
-
-        for coeff in coeffs.iter_mut() {
-            // Explicitly sample from {-1, 0, 1} with equal probability
-            let val = match rng.random_range(0..3) {
-                0 => Zq::TWO,  // 2
-                1 => Zq::ZERO, // 0
-                2 => Zq::ONE,  // 1
-                _ => unreachable!(),
-            };
-            *coeff = val;
-        }
-
-        Self::new(coeffs)
-    }
-
     pub fn iter(&self) -> impl Iterator<Item = &Zq> {
         self.coeffs.iter()
     }
 
     pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut Zq> {
         self.coeffs.iter_mut()
+    }
+
+    /// Dot product between coefficients
+    pub fn inner_product(&self, other: &Self) -> Zq {
+        self.coeffs
+            .iter()
+            .zip(other.coeffs.iter())
+            .map(|(&a, &b)| a * b)
+            .fold(Zq::ZERO, |acc, x| acc + x)
     }
 }
 

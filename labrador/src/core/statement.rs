@@ -65,7 +65,7 @@ impl Statement {
 
         // calculate b^l with size: constraint_l
         let b_constraint_l: PolyVector = (0..ep.constraint_l)
-            .map(|l| calculate_b_constraint(&witness.s, &a_constraint[l], &phi_constraint[l]))
+            .map(|l| calculate_b_constraint(&witness.s, &a_ct[l], &phi_ct[l]))
             .collect();
 
         // calculate b_0^l

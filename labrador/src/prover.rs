@@ -1,16 +1,31 @@
-use crate::core::{
-    aggregate,
-    challenge_set::ChallengeSet,
-    crs::PublicPrams,
-    env_params::EnvironmentParameters,
-    jl::{ProjectionMatrix, Projections},
-    statement::Statement,
-};
 use crate::ring::poly::{PolyVector, ZqVector};
+use crate::ring::zq::Zq;
+use crate::{
+    core::{
+        aggregate,
+        challenge_set::ChallengeSet,
+        crs::PublicPrams,
+        env_params::EnvironmentParameters,
+        jl::{ProjectionMatrix, Projections},
+        statement::Statement,
+    },
+    ring::poly::PolyRing,
+};
 use rand::rng;
 
 /// explicitly set the deg_bound_d to D == deg_bound_d, which is 64
 const D: usize = 64;
+
+#[derive(Debug)]
+pub enum ProverError {
+    /// Indicates that the L2 norm (squared) of the witness exceeded the allowed threshold.
+    WitnessL2NormViolated { norm_squared: Zq, allowed: Zq },
+    ProjectionError {
+        index: usize,
+        expected: Zq,
+        computed: Zq,
+    },
+}
 
 // Proof contains the parameters will be sent to verifier
 // All parameters are from tr, line 2 on page 18
@@ -48,9 +63,7 @@ impl Challenges {
             .collect();
 
         // \pi is from JL projection, pi contains r matrices and each matrix: security_level2 * (n*d), (security_level2 is 256 in the paper).
-        let pi: Vec<Vec<ZqVector>> = (0..ep.r)
-            .map(|_| ProjectionMatrix::<D>::new(ep.n).get_matrix().clone())
-            .collect();
+        let pi: Vec<Vec<ZqVector>> = Self::get_pi(ep.r, ep.n);
 
         // generate random alpha and beta from challenge set
         let cs_alpha: ChallengeSet = ChallengeSet::new(ep.deg_bound_d);
@@ -74,6 +87,12 @@ impl Challenges {
             random_beta,
             random_c,
         }
+    }
+
+    pub fn get_pi(r: usize, n: usize) -> Vec<Vec<ZqVector>> {
+        (0..r)
+            .map(|_| ProjectionMatrix::<D>::new(n).get_matrix().clone())
+            .collect()
     }
 }
 pub struct Witness {
@@ -112,17 +131,10 @@ impl<'a> LabradorProver<'a> {
     }
 
     /// all prove steps are from page 17
-    pub fn prove(&self, ep: &EnvironmentParameters) -> Proof {
+    pub fn prove(&self, ep: &EnvironmentParameters) -> Result<Proof, ProverError> {
         // check the L2 norm of the witness
         // not sure whether this should be handled during the proving or managed by the witness generator.
-        let beta2 = ep.beta * ep.beta;
-        self.witness.s.iter().for_each(|polys| {
-            let witness_l2norm_squared = PolyVector::compute_norm_squared(polys);
-            assert!(
-                witness_l2norm_squared <= beta2,
-                "witness l2-norm is not satisfied"
-            )
-        });
+        Self::check_witness_l2norm(self, ep).unwrap();
         // Step 1: Outer commitments u_1 starts: --------------------------------------------
 
         // Ajtai Commitments t_i = A * s_i
@@ -153,6 +165,7 @@ impl<'a> LabradorProver<'a> {
         // JL projection p_j + check p_j = ct(sum(<\sigma_{-1}(pi_i^(j)), s_i>))
         let matrices = &self.tr.pi;
         let p = Projections::new(matrices, &self.witness.s);
+        Self::check_projection(self, p.get_projection(), ep).unwrap();
 
         // Step 2: JL projection ends: ------------------------------------------------------
 
@@ -183,7 +196,7 @@ impl<'a> LabradorProver<'a> {
 
         // Step 4: Calculate h_ij, u_2, and z ends: -----------------------------------------
 
-        Proof {
+        Ok(Proof {
             u_1,
             p,
             b_ct_aggr: aggr_1.b_ct_aggr,
@@ -192,7 +205,68 @@ impl<'a> LabradorProver<'a> {
             t_i,
             g_ij: g_gp,
             h_ij: h_gp,
+        })
+    }
+
+    /// check p_j? = ct(sum(<σ−1(pi_i^(j)), s_i>))
+    fn check_projection(
+        &self,
+        p: &ZqVector,
+        ep: &EnvironmentParameters,
+    ) -> Result<bool, ProverError> {
+        let s_coeffs: Vec<ZqVector> = self
+            .witness
+            .s
+            .iter()
+            .map(|s_i| {
+                s_i.iter()
+                    .flat_map(|s_i_p| s_i_p.get_coeffs().clone())
+                    .collect()
+            })
+            .collect();
+
+        for (j, &p_j) in p.iter().enumerate() {
+            let mut poly = PolyRing::new(vec![Zq::ZERO; ep.deg_bound_d]);
+            for (i, s_i) in s_coeffs.iter().enumerate() {
+                poly = (0..ep.n)
+                    .map(|chunk_index| {
+                        let start = chunk_index * ep.deg_bound_d;
+                        let end = start + ep.deg_bound_d;
+                        let s_i_poly = PolyRing::new(s_i.get_coeffs()[start..end].to_vec());
+                        let pi_poly =
+                            PolyRing::new(self.tr.pi[i][j].get_coeffs()[start..end].to_vec());
+                        let pi_poly_conjugate = pi_poly.conjugate_automorphism();
+                        &pi_poly_conjugate * &s_i_poly
+                    })
+                    .fold(PolyRing::new(vec![Zq::ZERO; ep.deg_bound_d]), |acc, val| {
+                        &acc + &val
+                    });
+            }
+            if poly.get_coeffs()[0] != p_j {
+                return Err(ProverError::ProjectionError {
+                    index: j,
+                    expected: p_j,
+                    computed: poly.get_coeffs().first().copied().unwrap_or(Zq::ZERO),
+                });
+            }
         }
+
+        Ok(true)
+    }
+
+    /// check the L2 norm of the witness, || s_i || <= beta
+    fn check_witness_l2norm(&self, ep: &EnvironmentParameters) -> Result<bool, ProverError> {
+        let beta2 = ep.beta * ep.beta;
+        for polys in &self.witness.s {
+            let witness_l2norm_squared = PolyVector::compute_norm_squared(polys);
+            if witness_l2norm_squared > beta2 {
+                return Err(ProverError::WitnessL2NormViolated {
+                    norm_squared: witness_l2norm_squared,
+                    allowed: beta2,
+                });
+            }
+        }
+        Ok(true)
     }
 }
 
@@ -208,13 +282,13 @@ mod tests {
         let witness_1 = Witness::new(&ep_1);
         // generate public statement based on witness_1
         let st: Statement = Statement::new(&witness_1, &ep_1);
-        // generate the common reference string matriices A, B, C, D
+        // generate the common reference string matrices A, B, C, D
         let pp = PublicPrams::new(&ep_1);
         // generate random challenges used between prover and verifier.
         let tr = Challenges::new(&ep_1);
 
         // create a new prover
         let prover = LabradorProver::new(&pp, &witness_1, &st, &tr);
-        let _proof = LabradorProver::prove(&prover, &ep_1);
+        let _proof = prover.prove(&ep_1).unwrap();
     }
 }

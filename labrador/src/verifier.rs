@@ -5,6 +5,36 @@ use crate::prover::{Challenges, Proof};
 use crate::ring::poly::{PolyRing, PolyVector};
 use crate::ring::zq::Zq;
 
+#[derive(Debug)]
+pub enum VerifierError {
+    NotSymmetric {
+        i: usize,
+        j: usize,
+        expected: PolyRing,
+        found: PolyRing,
+    },
+    NormSumExceeded {
+        norm: Zq,
+        allowed: Zq,
+    },
+    AzError {
+        computed: PolyVector,
+        expected: PolyVector,
+    },
+    ZInnerError {
+        computed: PolyRing,
+        expected: PolyRing,
+    },
+    PhiError {
+        computed: PolyRing,
+        expected: PolyRing,
+    },
+    RelationCheckFailed,
+    OuterCommitError {
+        computed: PolyVector,
+        expected: PolyVector,
+    },
+}
 pub struct LabradorVerifier<'a> {
     pub pp: &'a PublicPrams,
     pub st: &'a Statement,
@@ -17,20 +47,31 @@ impl<'a> LabradorVerifier<'a> {
     }
 
     /// All check conditions are from page 18
-    pub fn verify(&self, proof: &Proof, ep: &EnvironmentParameters) -> bool {
+    pub fn verify(&self, proof: &Proof, ep: &EnvironmentParameters) -> Result<bool, VerifierError> {
         // 1. line 08: check g_ij ?= g_ji
         // 2. line 09: check h_ij ?= h_ji
-
         for i in 0..ep.r {
             for j in (i + 1)..ep.r {
-                assert_eq!(
-                    proof.g_ij[i].get_elements()[j],
-                    proof.g_ij[j].get_elements()[i]
-                );
-                assert_eq!(
-                    proof.h_ij[i].get_elements()[j],
-                    proof.h_ij[j].get_elements()[i]
-                );
+                let g_ij = &proof.g_ij[i].get_elements()[j];
+                let g_ji = &proof.g_ij[j].get_elements()[i];
+                if g_ij != g_ji {
+                    return Err(VerifierError::NotSymmetric {
+                        i,
+                        j,
+                        expected: g_ji.clone(),
+                        found: g_ij.clone(),
+                    });
+                }
+                let h_ij = &proof.h_ij[i].get_elements()[j];
+                let h_ji = &proof.h_ij[j].get_elements()[i];
+                if h_ij != h_ji {
+                    return Err(VerifierError::NotSymmetric {
+                        i,
+                        j,
+                        expected: h_ji.clone(),
+                        found: h_ij.clone(),
+                    });
+                }
             }
         }
 
@@ -61,21 +102,36 @@ impl<'a> LabradorVerifier<'a> {
         let norm_h_ij = Self::norm_squared(&h_ij);
         let norm_sum = norm_z_ij + norm_t_ij + norm_g_ij + norm_h_ij;
 
-        assert!(norm_sum <= ep.beta * ep.beta);
+        if norm_sum > ep.beta * ep.beta {
+            return Err(VerifierError::NormSumExceeded {
+                norm: norm_sum,
+                allowed: ep.beta * ep.beta,
+            });
+        }
 
         // 4. line 15: check Az ?= c_1 * t_1 + ... + c_r * t_r
 
         let az = &proof.z * &self.pp.matrix_a;
         let ct_sum: PolyVector = aggregate::calculate_z(&proof.t_i, &self.tr.random_c);
 
-        assert_eq!(az, ct_sum);
+        if az != ct_sum {
+            return Err(VerifierError::AzError {
+                computed: az,
+                expected: ct_sum,
+            });
+        }
 
         // 5. lne 16: check <z, z> ?= \sum(g_ij * c_i * c_j)
 
-        let z_inner = &proof.z.inner_product_poly_vector(&proof.z);
+        let z_inner = proof.z.inner_product_poly_vector(&proof.z);
         let sum_gij_cij = Self::calculate_gh_ci_cj(&proof.g_ij, &self.tr.random_c, ep.r);
 
-        assert_eq!(z_inner, &sum_gij_cij);
+        if z_inner != sum_gij_cij {
+            return Err(VerifierError::ZInnerError {
+                computed: z_inner,
+                expected: sum_gij_cij,
+            });
+        }
 
         // 6. line 17: check \sum(<\phi_i, z>c_i) ?= \sum(h_ij * c_i * c_j)
 
@@ -97,7 +153,12 @@ impl<'a> LabradorVerifier<'a> {
         let sum_hij_cij = Self::calculate_gh_ci_cj(&proof.h_ij, &self.tr.random_c, ep.r);
 
         // Left side multiple by 2 because of when we calculate h_ij, we didn't apply the division (divided by 2)
-        assert_eq!(&sum_phi_z_c * &Zq::TWO, sum_hij_cij);
+        if &sum_phi_z_c * &Zq::TWO != sum_hij_cij {
+            return Err(VerifierError::PhiError {
+                computed: &sum_phi_z_c * &Zq::TWO,
+                expected: sum_hij_cij,
+            });
+        }
 
         // 7. line 18: check \sum(a_ij * g_ij) + \sum(h_ii) - b ?= 0
 
@@ -117,12 +178,9 @@ impl<'a> LabradorVerifier<'a> {
             ep,
         );
 
-        assert!(Self::check_relation(
-            &a_primes,
-            &b_primes,
-            &proof.g_ij,
-            &proof.h_ij
-        ));
+        if !Self::check_relation(&a_primes, &b_primes, &proof.g_ij, &proof.h_ij) {
+            return Err(VerifierError::RelationCheckFailed);
+        }
 
         // 8. line 19: u_1 ?= \sum(\sum(B_ik * t_i^(k))) + \sum(\sum(C_ijk * g_ij^(k)))
 
@@ -130,27 +188,40 @@ impl<'a> LabradorVerifier<'a> {
         let outer_commit_u_1 =
             aggregate::calculate_u_1(&self.pp.matrix_b, &self.pp.matrix_c, &t_ij, &g_ij, ep);
 
-        assert_eq!(u_1, &outer_commit_u_1);
+        if u_1 != &outer_commit_u_1 {
+            return Err(VerifierError::OuterCommitError {
+                computed: u_1.clone(),
+                expected: outer_commit_u_1,
+            });
+        }
 
         // 9. line 20: u_2 ?= \sum(\sum(D_ijk * h_ij^(k)))
 
         let u_2 = &proof.u_2;
         let outer_commit_u_2 = aggregate::calculate_u_2(&self.pp.matrix_d, &h_ij, ep);
 
-        assert_eq!(u_2, &outer_commit_u_2);
+        if u_2 != &outer_commit_u_2 {
+            return Err(VerifierError::OuterCommitError {
+                computed: u_2.clone(),
+                expected: outer_commit_u_2,
+            });
+        }
 
-        true
+        Ok(true)
     }
 
     /// calculate the right hand side of line 16 or line 17, \sum(g_ij * c_i * c_j) or \sum(h_ij * c_i * c_j)
-    #[rustfmt::skip]
     fn calculate_gh_ci_cj(x_ij: &[PolyVector], random_c: &PolyVector, r: usize) -> PolyRing {
-        (0..r).map(|i| {
-            (0..r).map(|j| {
-                &(&x_ij[i].get_elements()[j] * &random_c.get_elements()[i])
-                    * &random_c.get_elements()[j]
-                }).fold(PolyRing::zero_poly(), |acc, x| &acc + &x)
-            }).fold(PolyRing::zero_poly(), |acc, x| &acc + &x)
+        (0..r)
+            .map(|i| {
+                (0..r)
+                    .map(|j| {
+                        &(&x_ij[i].get_elements()[j] * &random_c.get_elements()[i])
+                            * &random_c.get_elements()[j]
+                    })
+                    .fold(PolyRing::zero_poly(), |acc, x| &acc + &x)
+            })
+            .fold(PolyRing::zero_poly(), |acc, x| &acc + &x)
     }
 
     /// calculate the left hand side of line 17, \sum(<\phi_z, z> * c_i)
@@ -216,24 +287,24 @@ mod tests {
 
     #[test]
     fn test_verify() {
-        // set up example environment, use set1 for testing.
+        // set up example environment, use default set for testing.
         let ep_1 = EnvironmentParameters::default();
         // generate a random witness based on ep above
         let witness_1 = Witness::new(&ep_1);
         // generate public statements based on witness_1
         let st: Statement = Statement::new(&witness_1, &ep_1);
-        // generate the common reference string matriices
+        // generate the common reference string matrices
         let pp = PublicPrams::new(&ep_1);
         // generate random challenges
         let tr = Challenges::new(&ep_1);
 
         // create a new prover
         let prover = LabradorProver::new(&pp, &witness_1, &st, &tr);
-        let proof = prover.prove(&ep_1);
+        let proof = prover.prove(&ep_1).unwrap();
 
         // create a new verifier
         let verifier = LabradorVerifier::new(&pp, &st, &tr);
         let result = verifier.verify(&proof, &ep_1);
-        assert!(result)
+        assert!(result.unwrap());
     }
 }
