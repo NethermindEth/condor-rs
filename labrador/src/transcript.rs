@@ -43,7 +43,7 @@ fn cauchy_mds_matrix(size: usize) -> Vec<Vec<Zq>> {
     for (i, &x_val) in x_vals.iter().enumerate() {
         for (j, &y_val) in y_vals.iter().enumerate() {
             let denom = x_val + y_val;
-            matrix[i][j] = denom.inv();
+            matrix[i][j] = denom.inv().expect("Inverse must exist here");
         }
     }
 
