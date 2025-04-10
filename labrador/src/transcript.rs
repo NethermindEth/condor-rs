@@ -1,11 +1,10 @@
 use crate::poseidon::PoseidonSponge;
 use crate::poseidon::{PoseidonError, SpongeError};
 use crate::zq::Zq;
-use blake2::{Blake2b, Digest};
-use generic_array::GenericArray;
+use blake2::Blake2b256;
+use blake2::Digest;
 use rand::{random, rng, Rng};
 use std::convert::TryInto;
-use typenum::U32;
 
 pub trait Transcript {
     fn new() -> Self;
@@ -63,14 +62,19 @@ fn generate_secure_round_constants(rounds: usize, state_size: usize) -> Vec<Vec<
             let seed: [u8; 4] = random();
 
             // Hasher based on Blake2b
-            let mut hasher = Blake2b::<U32>::new();
+            let mut hasher = Blake2b256::new();
             hasher.update(seed);
 
             // Get the hash output
-            let hash_result: GenericArray<u8, U32> = hasher.finalize();
+            let hash_result: [u8; 32] = hasher
+                .finalize()
+                .try_into()
+                .expect("Blake2b256 should return 32 bytes");
 
             // Take the first 4 bytes of the hash
-            let hash_bytes: [u8; 4] = hash_result[..4].try_into().unwrap();
+            let hash_bytes: [u8; 4] = hash_result[..4]
+                .try_into()
+                .expect("can cast a slice into an array");
 
             // Convert those 4 bytes into a u32 value
             let constant = u32::from_le_bytes(hash_bytes);

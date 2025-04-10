@@ -9,9 +9,7 @@ license.workspace = true
 zerocopy = "0.8"
 rand = {version = "0.9", default-features = false, features = ["thread_rng", "unbiased"] }
 thiserror = {version = "1.0", default-features = false }
-blake2 = "0.10"
-typenum = "1.16"
-generic-array = "0.14"
+blake2 = "0.11.0-pre.5"
 [features]
 skip-slow-tests = []
 
