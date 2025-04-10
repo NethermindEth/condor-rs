@@ -83,21 +83,23 @@ pub struct Projections {
 impl Projections {
     /// Calculates Projection
     pub fn new(matrices: &[Vec<ZqVector>], witness: &[PolyVector]) -> Self {
-        let mut projection = ZqVector::new(vec![Zq::ZERO; PROJECTION_MATRIX_SIZE]);
+        let mut temp = Vec::with_capacity(PROJECTION_MATRIX_SIZE);
         let coefficients: Vec<ZqVector> = witness
             .iter()
             .map(|s_i| s_i.concatenate_coefficients(PROJECTION_MATRIX_SIZE))
             .collect();
 
-        for (i, item) in projection.iter_mut().enumerate() {
-            for j in 0..matrices.len() {
-                *item = matrices[j][i]
-                    .iter()
-                    .zip(coefficients[j].iter())
-                    .map(|(m, s)| *m * *s)
-                    .sum::<Zq>();
+        for j in 0..PROJECTION_MATRIX_SIZE {
+            let mut sum = Zq::ZERO;
+            for i in 0..matrices.len() {
+                let pi = &matrices[i][j];
+                let s_i = &coefficients[i];
+                let inner = pi.inner_product(s_i);
+                sum += inner;
             }
+            temp.push(sum);
         }
+        let projection = ZqVector::new(temp);
 
         Projections { projection }
     }

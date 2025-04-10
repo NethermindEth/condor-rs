@@ -1,16 +1,13 @@
+use crate::core::{
+    aggregate,
+    challenge_set::ChallengeSet,
+    crs::PublicPrams,
+    env_params::EnvironmentParameters,
+    jl::{ProjectionMatrix, Projections},
+    statement::Statement,
+};
 use crate::ring::poly::{PolyVector, ZqVector};
 use crate::ring::zq::Zq;
-use crate::{
-    core::{
-        aggregate,
-        challenge_set::ChallengeSet,
-        crs::PublicPrams,
-        env_params::EnvironmentParameters,
-        jl::{ProjectionMatrix, Projections},
-        statement::Statement,
-    },
-    ring::poly::PolyRing,
-};
 use rand::rng;
 
 /// explicitly set the deg_bound_d to D == deg_bound_d, which is 64
@@ -165,7 +162,10 @@ impl<'a> LabradorProver<'a> {
         // JL projection p_j + check p_j = ct(sum(<\sigma_{-1}(pi_i^(j)), s_i>))
         let matrices = &self.tr.pi;
         let p = Projections::new(matrices, &self.witness.s);
-        Self::check_projection(self, p.get_projection(), ep).unwrap();
+
+        // Notice that this check is resource-intensive due to the multiplication of two ZqVector<256> instances,
+        // followed by the removal of high-degree terms. It might not be a necessary check.
+        Self::check_projection(self, p.get_projection()).unwrap();
 
         // Step 2: JL projection ends: ------------------------------------------------------
 
@@ -209,11 +209,7 @@ impl<'a> LabradorProver<'a> {
     }
 
     /// check p_j? = ct(sum(<σ−1(pi_i^(j)), s_i>))
-    fn check_projection(
-        &self,
-        p: &ZqVector,
-        ep: &EnvironmentParameters,
-    ) -> Result<bool, ProverError> {
+    fn check_projection(&self, p: &ZqVector) -> Result<bool, ProverError> {
         let s_coeffs: Vec<ZqVector> = self
             .witness
             .s
@@ -226,27 +222,18 @@ impl<'a> LabradorProver<'a> {
             .collect();
 
         for (j, &p_j) in p.iter().enumerate() {
-            let mut poly = PolyRing::new(vec![Zq::ZERO; ep.deg_bound_d]);
+            let mut poly = ZqVector::zero(p.len());
             for (i, s_i) in s_coeffs.iter().enumerate() {
-                poly = (0..ep.n)
-                    .map(|chunk_index| {
-                        let start = chunk_index * ep.deg_bound_d;
-                        let end = start + ep.deg_bound_d;
-                        let s_i_poly = PolyRing::new(s_i.get_coeffs()[start..end].to_vec());
-                        let pi_poly =
-                            PolyRing::new(self.tr.pi[i][j].get_coeffs()[start..end].to_vec());
-                        let pi_poly_conjugate = pi_poly.conjugate_automorphism();
-                        &pi_poly_conjugate * &s_i_poly
-                    })
-                    .fold(PolyRing::new(vec![Zq::ZERO; ep.deg_bound_d]), |acc, val| {
-                        &acc + &val
-                    });
+                let pi_ele = &self.tr.pi[i][j];
+                let pi_ele_ca = &pi_ele.conjugate_automorphism();
+                poly = &poly + &(pi_ele_ca * s_i);
             }
+
             if poly.get_coeffs()[0] != p_j {
                 return Err(ProverError::ProjectionError {
                     index: j,
                     expected: p_j,
-                    computed: poly.get_coeffs().first().copied().unwrap_or(Zq::ZERO),
+                    computed: poly.get_coeffs()[0],
                 });
             }
         }

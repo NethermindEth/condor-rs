@@ -13,6 +13,11 @@ pub enum VerifierError {
         expected: PolyRing,
         found: PolyRing,
     },
+    B0Mismatch {
+        index: usize,
+        expected: Zq,
+        computed: Zq,
+    },
     NormSumExceeded {
         norm: Zq,
         allowed: Zq,
@@ -74,6 +79,9 @@ impl<'a> LabradorVerifier<'a> {
                 }
             }
         }
+
+        // check b_0^{''(k)} ?= <omega^(k),p> + \sum(psi_l^(k) * b_0^{'(l)})
+        Self::check_b_0_aggr(self, proof, ep).unwrap();
 
         // 3. line 14: check norm_sum(z, t, g, h) <= (beta')^2
 
@@ -277,6 +285,30 @@ impl<'a> LabradorVerifier<'a> {
         let sum_a_primes_g2 = &sum_a_primes_g * &Zq::TWO;
 
         &sum_a_primes_g2 + &sum_h_ii == b_primes2
+    }
+
+    fn check_b_0_aggr(
+        &self,
+        proof: &Proof,
+        ep: &EnvironmentParameters,
+    ) -> Result<bool, VerifierError> {
+        for k in 0..ep.k {
+            let b_0_poly = proof.b_ct_aggr.get_elements()[k].get_coeffs()[0];
+            let mut b_0: Zq = (0..ep.constraint_l)
+                .map(|l| self.tr.psi[k].get_coeffs()[l] * self.st.b_0_ct.get_coeffs()[l])
+                .sum();
+            let inner_omega_p = self.tr.omega[k].inner_product(proof.p.get_projection());
+            b_0 += inner_omega_p;
+            if b_0 != b_0_poly {
+                return Err(VerifierError::B0Mismatch {
+                    index: k,
+                    expected: b_0_poly,
+                    computed: b_0,
+                });
+            }
+        }
+
+        Ok(true)
     }
 }
 
