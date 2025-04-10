@@ -1,5 +1,5 @@
 use crate::poseidon::PoseidonSponge;
-use crate::poseidon::{SpongeError,PoseidonError};
+use crate::poseidon::{PoseidonError, SpongeError};
 use crate::zq::Zq;
 use blake2::{Blake2b, Digest};
 use generic_array::GenericArray;
@@ -107,7 +107,7 @@ impl Transcript for PoseidonTranscript {
         self.sponge.absorb(&[value])?; // ? Propagates the error if it occurs
         Ok(())
     }
-    
+
     fn get_challenge(&mut self) -> Result<Zq, SpongeError> {
         let squeezed_elements = self.sponge.squeeze(1);
 

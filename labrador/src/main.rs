@@ -1,18 +1,18 @@
 use labrador::jl::verify_upper_bound;
 use labrador::jl::ProjectionMatrix;
 use labrador::jl::ProjectionVector;
+use labrador::poseidon::PoseidonError;
 use labrador::rq::Rq;
 use labrador::rq_vector::RqVector;
 use labrador::transcript::PoseidonTranscript;
 use labrador::transcript::Transcript;
 use labrador::zq::Zq;
 use rand::rng;
-use labrador::poseidon::PoseidonError;
 
 const D: usize = 4; // Degree of polynomials in S_i
 const N: usize = 5; // Size of S_i
 
-fn main()->Result<(), PoseidonError> {
+fn main() -> Result<(), PoseidonError> {
     // Example poly_ring
     let p1: Rq<D> = vec![Zq::new(1)].into();
     let p2: Rq<D> = vec![Zq::new(2), Zq::new(1), Zq::new(1)].into();
@@ -78,7 +78,6 @@ fn main()->Result<(), PoseidonError> {
     // Absorb values
     transcript.absorb(Zq::new(42))?;
     transcript.absorb(Zq::new(9))?;
-    
 
     // Get a challenge based on the current state
     let challenge = transcript.get_challenge();

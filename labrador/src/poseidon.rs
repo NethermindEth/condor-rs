@@ -30,7 +30,6 @@ pub enum PoseidonError {
     EmptyInput,
 }
 
-
 #[derive(Clone, Debug)]
 /// Struct for the Poseidon sponge
 pub struct PoseidonSponge {
@@ -139,12 +138,12 @@ impl PoseidonSponge {
     pub fn absorb(&mut self, input: &[Zq]) -> Result<(), PoseidonError> {
         let mut remaining = input;
         let mut position = 0;
-    
+
         while !remaining.is_empty() {
             let available_space = self.rate - position;
             let elements_to_absorb = remaining.len().min(available_space);
             let elements_to_process = &remaining[..elements_to_absorb];
-            
+
             for (i, elem) in elements_to_process.iter().enumerate() {
                 let target_index = self.capacity + position + i;
                 if target_index >= self.state.len() {
@@ -152,21 +151,20 @@ impl PoseidonSponge {
                 }
                 self.state[target_index] += *elem;
             }
-            
+
             remaining = &remaining[elements_to_absorb..];
-            
+
             if remaining.is_empty() {
                 self.permute();
                 return Ok(());
             }
-            
+
             self.permute();
             position = 0;
         }
-        
+
         Ok(())
     }
-    
 
     // Squeeze output from the sponge
     pub fn squeeze(&mut self, num_elements: usize) -> Result<Vec<Zq>, SpongeError> {
