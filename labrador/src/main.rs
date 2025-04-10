@@ -7,11 +7,12 @@ use labrador::transcript::PoseidonTranscript;
 use labrador::transcript::Transcript;
 use labrador::zq::Zq;
 use rand::rng;
+use labrador::poseidon::PoseidonError;
 
 const D: usize = 4; // Degree of polynomials in S_i
 const N: usize = 5; // Size of S_i
 
-fn main() {
+fn main()->Result<(), PoseidonError> {
     // Example poly_ring
     let p1: Rq<D> = vec![Zq::new(1)].into();
     let p2: Rq<D> = vec![Zq::new(2), Zq::new(1), Zq::new(1)].into();
@@ -75,12 +76,14 @@ fn main() {
     let mut transcript: PoseidonTranscript = Transcript::new(); // state starts at 0
 
     // Absorb values
-    transcript.absorb(Zq::new(42));
-    transcript.absorb(Zq::new(9));
+    transcript.absorb(Zq::new(42))?;
+    transcript.absorb(Zq::new(9))?;
+    
 
     // Get a challenge based on the current state
     let challenge = transcript.get_challenge();
 
     // Print the challenge
     println!("Challenge: {:?}", challenge);
+    Ok(())
 }

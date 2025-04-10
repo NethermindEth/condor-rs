@@ -24,6 +24,12 @@ pub enum SpongeError {
     #[error("Squeeze request of {requested} exceeds rate {rate}")]
     OversizedSqueeze { requested: usize, rate: usize },
 }
+#[derive(Debug)]
+pub enum PoseidonError {
+    OutOfBounds(usize),
+    EmptyInput,
+}
+
 
 #[derive(Clone, Debug)]
 /// Struct for the Poseidon sponge
@@ -36,8 +42,8 @@ pub struct PoseidonSponge {
     full_rounds: usize, // Number of full rounds (S-box is applied to every element of the state)
     partial_rounds: usize, // Number of partial rounds (S-box is applied to first element of the state)
     alpha: u64,            // Exponent for the S-box
-    mds: Vec<Vec<Zq>>,     // MDS matrix
-    ark: Vec<Vec<Zq>>,     // Round constants
+    mds: Vec<Vec<Zq>>,     // MDS matrix [[Zq; RATE + CAPACITY]; RATE + CAPACITY]
+    ark: Vec<Vec<Zq>>,     // Round constants [[Zq; RATE + CAPACITY]; FULL_ROUNDS + PARTIAL_ROUNDS]
 }
 
 impl PoseidonSponge {
@@ -130,27 +136,37 @@ impl PoseidonSponge {
     }
 
     // Absorb input into the sponge
-    pub fn absorb(&mut self, input: &[Zq]) {
-        let mut remaining_elements = input;
-
-        while !remaining_elements.is_empty() {
-            // Determine how many elements we can absorb in this round
-            let num_elements_to_absorb = self.rate.min(remaining_elements.len());
-
-            // Calculate where to copy into the state
-            let dest_start = self.capacity;
-            let dest_range = dest_start..dest_start + num_elements_to_absorb;
-
-            // Overwrite part of the rate section with new input
-            self.state[dest_range].copy_from_slice(&remaining_elements[..num_elements_to_absorb]);
-
-            // Advance the remaining input
-            remaining_elements = &remaining_elements[num_elements_to_absorb..];
-
-            // Permute the state after each block
+    pub fn absorb(&mut self, input: &[Zq]) -> Result<(), PoseidonError> {
+        let mut remaining = input;
+        let mut position = 0;
+    
+        while !remaining.is_empty() {
+            let available_space = self.rate - position;
+            let elements_to_absorb = remaining.len().min(available_space);
+            let elements_to_process = &remaining[..elements_to_absorb];
+            
+            for (i, elem) in elements_to_process.iter().enumerate() {
+                let target_index = self.capacity + position + i;
+                if target_index >= self.state.len() {
+                    return Err(PoseidonError::OutOfBounds(target_index));
+                }
+                self.state[target_index] += *elem;
+            }
+            
+            remaining = &remaining[elements_to_absorb..];
+            
+            if remaining.is_empty() {
+                self.permute();
+                return Ok(());
+            }
+            
             self.permute();
+            position = 0;
         }
+        
+        Ok(())
     }
+    
 
     // Squeeze output from the sponge
     pub fn squeeze(&mut self, num_elements: usize) -> Result<Vec<Zq>, SpongeError> {

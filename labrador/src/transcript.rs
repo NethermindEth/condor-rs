@@ -1,5 +1,5 @@
 use crate::poseidon::PoseidonSponge;
-use crate::poseidon::SpongeError;
+use crate::poseidon::{SpongeError,PoseidonError};
 use crate::zq::Zq;
 use blake2::{Blake2b, Digest};
 use generic_array::GenericArray;
@@ -9,7 +9,7 @@ use typenum::U32;
 
 pub trait Transcript {
     fn new() -> Self;
-    fn absorb(&mut self, value: Zq);
+    fn absorb(&mut self, value: Zq) -> Result<(), PoseidonError>;
     fn get_challenge(&mut self) -> Result<Zq, SpongeError>;
 }
 
@@ -103,9 +103,11 @@ impl Transcript for PoseidonTranscript {
         Self { sponge }
     }
 
-    fn absorb(&mut self, value: Zq) {
-        self.sponge.absorb(&[value]); // Absorb the field value into the sponge
+    fn absorb(&mut self, value: Zq) -> Result<(), PoseidonError> {
+        self.sponge.absorb(&[value])?; // ? Propagates the error if it occurs
+        Ok(())
     }
+    
     fn get_challenge(&mut self) -> Result<Zq, SpongeError> {
         let squeezed_elements = self.sponge.squeeze(1);
 
