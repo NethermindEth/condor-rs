@@ -66,10 +66,7 @@ fn generate_secure_round_constants(rounds: usize, state_size: usize) -> Vec<Vec<
             hasher.update(seed);
 
             // Get the hash output
-            let hash_result: [u8; 32] = hasher
-                .finalize()
-                .try_into()
-                .expect("Blake2b256 should return 32 bytes");
+            let hash_result: [u8; 32] = hasher.finalize().into();
 
             // Take the first 4 bytes of the hash
             let hash_bytes: [u8; 4] = hash_result[..4]
