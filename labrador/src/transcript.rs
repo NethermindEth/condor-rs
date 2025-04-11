@@ -4,17 +4,17 @@ use crate::zq::Zq;
 use blake2::Blake2b256;
 use blake2::Digest;
 use rand::distr::{Distribution, Uniform};
-use rand::{random, CryptoRng, RngCore};
+use rand::{random, CryptoRng};
 use std::convert::TryInto;
 
 pub trait Transcript {
-    fn new(rng: &mut (impl RngCore + CryptoRng)) -> Self;
+    fn new(rng: &mut impl CryptoRng) -> Self;
     fn absorb(&mut self, value: Zq) -> Result<(), PoseidonError>;
     fn get_challenge(&mut self) -> Result<Zq, SpongeError>;
 }
 
 /// Generates an MDS (Maximum Distance Separable) matrix using a Cauchy matrix
-fn cauchy_mds_matrix<R: RngCore + CryptoRng>(mut rng: R, size: usize) -> Vec<Vec<Zq>> {
+fn cauchy_mds_matrix<R: CryptoRng>(mut rng: R, size: usize) -> Vec<Vec<Zq>> {
     let uniform = Uniform::new_inclusive(Zq::ZERO, Zq::MAX).unwrap();
 
     let mut x_vals = Vec::new();
@@ -91,7 +91,7 @@ pub struct PoseidonTranscript {
 }
 
 impl Transcript for PoseidonTranscript {
-    fn new(rng: &mut (impl RngCore + CryptoRng)) -> Self {
+    fn new(rng: &mut impl CryptoRng) -> Self {
         let sponge = crate::poseidon::PoseidonSponge::new(
             8,
             8,
