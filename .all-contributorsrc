@@ -92,6 +92,15 @@
       "contributions": [
         "review"
       ]
+    },
+    {
+      "login": "earthling1984",
+      "name": "Mithun Vaidhyanathan",
+      "avatar_url": "https://avatars.githubusercontent.com/u/19665196?v=4",
+      "profile": "https://github.com/earthling1984",
+      "contributions": [
+        "research"
+      ]
     }
   ],
   "contributorsPerLine": 7,

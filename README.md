@@ -65,6 +65,7 @@ Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/d
     <tr>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/v0-e"><img src="https://avatars.githubusercontent.com/u/134806759?v=4?s=100" width="100px;" alt="v0-e"/><br /><sub><b>v0-e</b></sub></a><br /><a href="https://github.com/NethermindEth/condor-rs/pulls?q=is%3Apr+reviewed-by%3Av0-e" title="Reviewed Pull Requests">👀</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://maksimryndin.github.io/"><img src="https://avatars.githubusercontent.com/u/16288656?v=4?s=100" width="100px;" alt="maksimryndin"/><br /><sub><b>maksimryndin</b></sub></a><br /><a href="https://github.com/NethermindEth/condor-rs/pulls?q=is%3Apr+reviewed-by%3Amaksimryndin" title="Reviewed Pull Requests">👀</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/earthling1984"><img src="https://avatars.githubusercontent.com/u/19665196?v=4?s=100" width="100px;" alt="Mithun Vaidhyanathan"/><br /><sub><b>Mithun Vaidhyanathan</b></sub></a><br /><a href="#research-earthling1984" title="Research">🔬</a></td>
     </tr>
   </tbody>
   <tfoot>
