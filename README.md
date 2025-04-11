@@ -69,6 +69,7 @@ Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/d
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/smartprogrammer93"><img src="https://avatars.githubusercontent.com/u/33181301?v=4?s=100" width="100px;" alt="Ahmad Bitar"/><br /><sub><b>Ahmad Bitar</b></sub></a><br /><a href="#ideas-smartprogrammer93" title="Ideas, Planning, & Feedback">🤔</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/HendrikWaldner"><img src="https://avatars.githubusercontent.com/u/33893964?v=4?s=100" width="100px;" alt="HendrikWaldner"/><br /><sub><b>HendrikWaldner</b></sub></a><br /><a href="#research-HendrikWaldner" title="Research">🔬</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://www.linkedin.com/in/aragirtas"><img src="https://avatars.githubusercontent.com/u/95563727?v=4?s=100" width="100px;" alt="Ahmet Ramazan Agirtas"/><br /><sub><b>Ahmet Ramazan Agirtas</b></sub></a><br /><a href="#research-ahmetramazan" title="Research">🔬</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/mpzajac"><img src="https://avatars.githubusercontent.com/u/25900405?v=4?s=100" width="100px;" alt="mpzajac"/><br /><sub><b>mpzajac</b></sub></a><br /><a href="#research-mpzajac" title="Research">🔬</a></td>
     </tr>
   </tbody>
   <tfoot>
