@@ -55,6 +55,7 @@ Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/d
   <tbody>
     <tr>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/frozenspider"><img src="https://avatars.githubusercontent.com/u/2077017?v=4?s=100" width="100px;" alt="Alex Abdugafarov"/><br /><sub><b>Alex Abdugafarov</b></sub></a><br /><a href="https://github.com/NethermindEth/condor-rs/commits?author=frozenspider" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/mattsuffern"><img src="https://avatars.githubusercontent.com/u/135047609?v=4?s=100" width="100px;" alt="Mateo Suffern"/><br /><sub><b>Mateo Suffern</b></sub></a><br /><a href="https://github.com/NethermindEth/condor-rs/commits?author=mattsuffern" title="Code">💻</a></td>
     </tr>
   </tbody>
   <tfoot>
