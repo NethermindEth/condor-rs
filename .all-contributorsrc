@@ -73,6 +73,15 @@
       "contributions": [
         "review"
       ]
+    },
+    {
+      "login": "v0-e",
+      "name": "v0-e",
+      "avatar_url": "https://avatars.githubusercontent.com/u/134806759?v=4",
+      "profile": "https://github.com/v0-e",
+      "contributions": [
+        "review"
+      ]
     }
   ],
   "contributorsPerLine": 7,

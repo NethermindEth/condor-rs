@@ -62,6 +62,9 @@ Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/d
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/JamesEBall"><img src="https://avatars.githubusercontent.com/u/73405337?v=4?s=100" width="100px;" alt="James Ball"/><br /><sub><b>James Ball</b></sub></a><br /><a href="#ideas-JamesEBall" title="Ideas, Planning, & Feedback">🤔</a> <a href="#fundingFinding-JamesEBall" title="Funding Finding">🔍</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/omibo"><img src="https://avatars.githubusercontent.com/u/42227752?v=4?s=100" width="100px;" alt="Omid Bodaghi"/><br /><sub><b>Omid Bodaghi</b></sub></a><br /><a href="https://github.com/NethermindEth/condor-rs/pulls?q=is%3Apr+reviewed-by%3Aomibo" title="Reviewed Pull Requests">👀</a></td>
     </tr>
+    <tr>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/v0-e"><img src="https://avatars.githubusercontent.com/u/134806759?v=4?s=100" width="100px;" alt="v0-e"/><br /><sub><b>v0-e</b></sub></a><br /><a href="https://github.com/NethermindEth/condor-rs/pulls?q=is%3Apr+reviewed-by%3Av0-e" title="Reviewed Pull Requests">👀</a></td>
+    </tr>
   </tbody>
   <tfoot>
     <tr>
