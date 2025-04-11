@@ -11,12 +11,12 @@
   "commitConvention": "none",
   "contributors": [
     {
-      "login": "frozenspider",
-      "name": "Alex Abdugafarov",
-      "avatar_url": "https://avatars.githubusercontent.com/u/2077017?v=4",
-      "profile": "https://github.com/frozenspider",
+      "login": "JamesEBall",
+      "name": "James Ball",
+      "avatar_url": "https://avatars.githubusercontent.com/u/73405337?v=4",
+      "profile": "https://github.com/JamesEBall",
       "contributions": [
-        "code"
+        "projectManagement"
       ]
     },
     {
@@ -56,6 +56,15 @@
       ]
     },
     {
+      "login": "omibo",
+      "name": "Omid Bodaghi",
+      "avatar_url": "https://avatars.githubusercontent.com/u/42227752?v=4",
+      "profile": "https://github.com/omibo",
+      "contributions": [
+        "review"
+      ]
+    },
+    {
       "login": "NiDimi",
       "name": "Nick Dimitriou",
       "avatar_url": "https://avatars.githubusercontent.com/u/81875532?v=4",
@@ -66,27 +75,6 @@
       ]
     },
     {
-      "login": "JamesEBall",
-      "name": "James Ball",
-      "avatar_url": "https://avatars.githubusercontent.com/u/73405337?v=4",
-      "profile": "https://github.com/JamesEBall",
-      "contributions": [
-        "ideas",
-        "projectManagement",
-        "fundingFinding",
-        "research"
-      ]
-    },
-    {
-      "login": "omibo",
-      "name": "Omid Bodaghi",
-      "avatar_url": "https://avatars.githubusercontent.com/u/42227752?v=4",
-      "profile": "https://github.com/omibo",
-      "contributions": [
-        "review"
-      ]
-    },
-    {
       "login": "v0-e",
       "name": "v0-e",
       "avatar_url": "https://avatars.githubusercontent.com/u/134806759?v=4",
@@ -94,6 +82,15 @@
       "contributions": [
         "projectManagement",
         "review"
+      ]
+    },
+    {
+      "login": "frozenspider",
+      "name": "Alex Abdugafarov",
+      "avatar_url": "https://avatars.githubusercontent.com/u/2077017?v=4",
+      "profile": "https://github.com/frozenspider",
+      "contributions": [
+        "code"
       ]
     },
     {
