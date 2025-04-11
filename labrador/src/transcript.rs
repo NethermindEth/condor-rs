@@ -3,7 +3,8 @@ use crate::poseidon::{PoseidonError, SpongeError};
 use crate::zq::Zq;
 use blake2::Blake2b256;
 use blake2::Digest;
-use rand::{random, rng, Rng};
+use rand::distr::{Distribution, Uniform};
+use rand::{random, rng};
 use std::convert::TryInto;
 
 pub trait Transcript {
@@ -15,13 +16,14 @@ pub trait Transcript {
 /// Generates an MDS (Maximum Distance Separable) matrix using a Cauchy matrix
 fn cauchy_mds_matrix(size: usize) -> Vec<Vec<Zq>> {
     let mut rng = rng();
+    let uniform = Uniform::new_inclusive(Zq::ZERO, Zq::MAX).unwrap();
 
     let mut x_vals = Vec::new();
     let mut y_vals = Vec::new();
 
     // Sample unique x values
     while x_vals.len() < size {
-        let candidate = Zq::new(rng.random_range(1..u32::MAX));
+        let candidate = uniform.sample(&mut rng);
         if !x_vals.contains(&candidate) {
             x_vals.push(candidate);
         }
@@ -29,7 +31,7 @@ fn cauchy_mds_matrix(size: usize) -> Vec<Vec<Zq>> {
 
     // Sample unique y values with additional constraint
     while y_vals.len() < size {
-        let candidate = Zq::new(rng.random_range(1..u32::MAX));
+        let candidate = uniform.sample(&mut rng);
         let valid =
             !y_vals.contains(&candidate) && !x_vals.iter().any(|x| *x + candidate == Zq::ZERO);
         if valid {
@@ -49,6 +51,7 @@ fn cauchy_mds_matrix(size: usize) -> Vec<Vec<Zq>> {
 
     matrix
 }
+
 // Generates ARK matrix
 fn generate_secure_round_constants(rounds: usize, state_size: usize) -> Vec<Vec<Zq>> {
     // Create a matrix to store constants for each round and state position
