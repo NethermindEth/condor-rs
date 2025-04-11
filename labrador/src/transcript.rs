@@ -4,18 +4,17 @@ use crate::zq::Zq;
 use blake2::Blake2b256;
 use blake2::Digest;
 use rand::distr::{Distribution, Uniform};
-use rand::{random, rng};
+use rand::{random, CryptoRng, RngCore};
 use std::convert::TryInto;
 
 pub trait Transcript {
-    fn new() -> Self;
+    fn new(rng: &mut (impl RngCore + CryptoRng)) -> Self;
     fn absorb(&mut self, value: Zq) -> Result<(), PoseidonError>;
     fn get_challenge(&mut self) -> Result<Zq, SpongeError>;
 }
 
 /// Generates an MDS (Maximum Distance Separable) matrix using a Cauchy matrix
-fn cauchy_mds_matrix(size: usize) -> Vec<Vec<Zq>> {
-    let mut rng = rng();
+fn cauchy_mds_matrix<R: RngCore + CryptoRng>(mut rng: R, size: usize) -> Vec<Vec<Zq>> {
     let uniform = Uniform::new_inclusive(Zq::ZERO, Zq::MAX).unwrap();
 
     let mut x_vals = Vec::new();
@@ -92,16 +91,15 @@ pub struct PoseidonTranscript {
 }
 
 impl Transcript for PoseidonTranscript {
-    fn new() -> Self {
-        // Parameters are just examples for now
+    fn new(rng: &mut (impl RngCore + CryptoRng)) -> Self {
         let sponge = crate::poseidon::PoseidonSponge::new(
-            8,                                       // rate: usize
-            8,                                       // capacity: usize
-            5,                                       // full_rounds: usize
-            8,                                       // partial_rounds: usize
-            8,                                       // alpha: u64
-            cauchy_mds_matrix(16),                   // mds: Vec<Vec<Zq>>
-            generate_secure_round_constants(13, 16), // ark: Vec<Vec<Zq>>
+            8,
+            8,
+            5,
+            8,
+            8,
+            cauchy_mds_matrix(rng, 16),
+            generate_secure_round_constants(13, 16),
         );
 
         Self { sponge }

@@ -73,7 +73,7 @@ fn main() -> Result<(), PoseidonError> {
     println!("{}", verify_upper_bound(projection, beta));
 
     // very basic transcript example
-    let mut transcript: PoseidonTranscript = Transcript::new(); // state starts at 0
+    let mut transcript: PoseidonTranscript = Transcript::new(&mut rng); // state starts at 0
 
     // Absorb values
     transcript.absorb(Zq::new(42))?;
