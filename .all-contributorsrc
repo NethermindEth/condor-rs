@@ -137,6 +137,15 @@
       "contributions": [
         "research"
       ]
+    },
+    {
+      "login": "matthew-a-klein",
+      "name": "Matthew Klein",
+      "avatar_url": "https://avatars.githubusercontent.com/u/96837318?v=4",
+      "profile": "https://matthewklein.co.uk/",
+      "contributions": [
+        "research"
+      ]
     }
   ],
   "contributorsPerLine": 7,
