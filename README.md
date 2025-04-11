@@ -73,6 +73,7 @@ Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/d
     </tr>
     <tr>
       <td align="center" valign="top" width="14.28%"><a href="https://matthewklein.co.uk/"><img src="https://avatars.githubusercontent.com/u/96837318?v=4?s=100" width="100px;" alt="Matthew Klein"/><br /><sub><b>Matthew Klein</b></sub></a><br /><a href="#research-matthew-a-klein" title="Research">🔬</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/GustaveCharles"><img src="https://avatars.githubusercontent.com/u/91184289?v=4?s=100" width="100px;" alt="GustaveCharles"/><br /><sub><b>GustaveCharles</b></sub></a><br /><a href="#research-GustaveCharles" title="Research">🔬</a></td>
     </tr>
   </tbody>
   <tfoot>
