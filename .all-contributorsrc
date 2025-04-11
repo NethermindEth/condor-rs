@@ -45,6 +45,15 @@
       "contributions": [
         "code"
       ]
+    },
+    {
+      "login": "NiDimi",
+      "name": "Nick Dimitriou",
+      "avatar_url": "https://avatars.githubusercontent.com/u/81875532?v=4",
+      "profile": "https://github.com/NiDimi",
+      "contributions": [
+        "review"
+      ]
     }
   ],
   "contributorsPerLine": 7,

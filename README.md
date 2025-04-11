@@ -58,6 +58,7 @@ Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/d
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/mattsuffern"><img src="https://avatars.githubusercontent.com/u/135047609?v=4?s=100" width="100px;" alt="Mateo Suffern"/><br /><sub><b>Mateo Suffern</b></sub></a><br /><a href="https://github.com/NethermindEth/condor-rs/commits?author=mattsuffern" title="Code">💻</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/pycckuu"><img src="https://avatars.githubusercontent.com/u/1489583?v=4?s=100" width="100px;" alt="Igor Markelov"/><br /><sub><b>Igor Markelov</b></sub></a><br /><a href="https://github.com/NethermindEth/condor-rs/commits?author=pycckuu" title="Code">💻</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/Yue-Zhou1"><img src="https://avatars.githubusercontent.com/u/78064891?v=4?s=100" width="100px;" alt="Yue Zhou"/><br /><sub><b>Yue Zhou</b></sub></a><br /><a href="https://github.com/NethermindEth/condor-rs/commits?author=Yue-Zhou1" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/NiDimi"><img src="https://avatars.githubusercontent.com/u/81875532?v=4?s=100" width="100px;" alt="Nick Dimitriou"/><br /><sub><b>Nick Dimitriou</b></sub></a><br /><a href="https://github.com/NethermindEth/condor-rs/pulls?q=is%3Apr+reviewed-by%3ANiDimi" title="Reviewed Pull Requests">👀</a></td>
     </tr>
   </tbody>
   <tfoot>
