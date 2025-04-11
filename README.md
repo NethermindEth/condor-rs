@@ -76,6 +76,7 @@ Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/d
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/GustaveCharles"><img src="https://avatars.githubusercontent.com/u/91184289?v=4?s=100" width="100px;" alt="GustaveCharles"/><br /><sub><b>GustaveCharles</b></sub></a><br /><a href="#research-GustaveCharles" title="Research">🔬</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://sites.google.com/view/luca-dallava/"><img src="https://avatars.githubusercontent.com/u/94935046?v=4?s=100" width="100px;" alt="Luca Dall'Ava"/><br /><sub><b>Luca Dall'Ava</b></sub></a><br /><a href="#research-Luca-DallAva" title="Research">🔬</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/mounikapratapa"><img src="https://avatars.githubusercontent.com/u/43151963?v=4?s=100" width="100px;" alt="Mounika Pratapa"/><br /><sub><b>Mounika Pratapa</b></sub></a><br /><a href="#research-mounikapratapa" title="Research">🔬</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://sites.google.com/view/agarreta"><img src="https://avatars.githubusercontent.com/u/97292142?v=4?s=100" width="100px;" alt="albert_g"/><br /><sub><b>albert_g</b></sub></a><br /><a href="#research-albert-garreta" title="Research">🔬</a></td>
     </tr>
   </tbody>
   <tfoot>

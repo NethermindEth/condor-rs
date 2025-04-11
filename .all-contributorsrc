@@ -173,6 +173,15 @@
       "contributions": [
         "research"
       ]
+    },
+    {
+      "login": "albert-garreta",
+      "name": "albert_g",
+      "avatar_url": "https://avatars.githubusercontent.com/u/97292142?v=4",
+      "profile": "https://sites.google.com/view/agarreta",
+      "contributions": [
+        "research"
+      ]
     }
   ],
   "contributorsPerLine": 7,
