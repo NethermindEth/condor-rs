@@ -26,7 +26,9 @@
       "profile": "https://github.com/mattsuffern",
       "contributions": [
         "doc",
-        "code"
+        "code",
+        "review",
+        "test"
       ]
     },
     {
@@ -35,7 +37,10 @@
       "avatar_url": "https://avatars.githubusercontent.com/u/1489583?v=4",
       "profile": "https://github.com/pycckuu",
       "contributions": [
-        "code"
+        "doc",
+        "code",
+        "review",
+        "test"
       ]
     },
     {
@@ -44,7 +49,10 @@
       "avatar_url": "https://avatars.githubusercontent.com/u/78064891?v=4",
       "profile": "https://github.com/Yue-Zhou1",
       "contributions": [
-        "code"
+        "doc",
+        "code",
+        "review",
+        "test"
       ]
     },
     {
@@ -53,7 +61,8 @@
       "avatar_url": "https://avatars.githubusercontent.com/u/81875532?v=4",
       "profile": "https://github.com/NiDimi",
       "contributions": [
-        "review"
+        "review",
+        "design"
       ]
     },
     {
@@ -63,6 +72,7 @@
       "profile": "https://github.com/JamesEBall",
       "contributions": [
         "ideas",
+        "projectManagement",
         "fundingFinding",
         "research"
       ]
@@ -82,7 +92,8 @@
       "avatar_url": "https://avatars.githubusercontent.com/u/134806759?v=4",
       "profile": "https://github.com/v0-e",
       "contributions": [
-        "review"
+        "review",
+        "projectManagement"
       ]
     },
     {
