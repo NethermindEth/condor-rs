@@ -55,7 +55,10 @@ impl Zq {
     /// Calculates the modular inverse of an element using the Extended Euclidean Algorithm.
     /// Returns `None` if no inverse exists.
     pub fn inv(self) -> Option<Self> {
-        let mut a = self.value as u128;
+        let mut a: u128 = self
+            .value
+            .try_into()
+            .expect("Failed to convert value to u128");
         let mut x0: u128 = 0;
         let mut x1: u128 = 1;
         let mut q: u128 = 4294967291; // modulus 2^32 - 5
@@ -82,7 +85,9 @@ impl Zq {
         let result =
             (x1.wrapping_rem(original_q).wrapping_add(original_q)).wrapping_rem(original_q);
 
-        Some(Zq::new((result) as u32))
+        Some(Zq::new(
+            result.try_into().expect("Failed to convert result to u32"),
+        ))
     }
 }
 
