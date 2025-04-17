@@ -1,0 +1,204 @@
+{
+  "projectName": "condor-rs",
+  "projectOwner": "NethermindEth",
+  "repoType": "github",
+  "repoHost": "https://github.com",
+  "files": [
+    "README.md"
+  ],
+  "imageSize": 100,
+  "commit": true,
+  "commitConvention": "none",
+  "contributors": [
+    {
+      "login": "JamesEBall",
+      "name": "James Ball",
+      "avatar_url": "https://avatars.githubusercontent.com/u/73405337?v=4",
+      "profile": "https://github.com/JamesEBall",
+      "contributions": [
+        "projectManagement",
+        "ideas",
+        "research",
+        "fundingFinding"
+      ]
+    },
+    {
+      "login": "mattsuffern",
+      "name": "Mateo Suffern",
+      "avatar_url": "https://avatars.githubusercontent.com/u/135047609?v=4",
+      "profile": "https://github.com/mattsuffern",
+      "contributions": [
+        "doc",
+        "code",
+        "review",
+        "test"
+      ]
+    },
+    {
+      "login": "pycckuu",
+      "name": "Igor Markelov",
+      "avatar_url": "https://avatars.githubusercontent.com/u/1489583?v=4",
+      "profile": "https://github.com/pycckuu",
+      "contributions": [
+        "code",
+        "doc",
+        "review",
+        "test"
+      ]
+    },
+    {
+      "login": "Yue-Zhou1",
+      "name": "Yue Zhou",
+      "avatar_url": "https://avatars.githubusercontent.com/u/78064891?v=4",
+      "profile": "https://github.com/Yue-Zhou1",
+      "contributions": [
+        "code",
+        "doc",
+        "review",
+        "test"
+      ]
+    },
+    {
+      "login": "omibo",
+      "name": "Omid Bodaghi",
+      "avatar_url": "https://avatars.githubusercontent.com/u/42227752?v=4",
+      "profile": "https://github.com/omibo",
+      "contributions": [
+        "review",
+        "doc"
+      ]
+    },
+    {
+      "login": "NiDimi",
+      "name": "Nick Dimitriou",
+      "avatar_url": "https://avatars.githubusercontent.com/u/81875532?v=4",
+      "profile": "https://github.com/NiDimi",
+      "contributions": [
+        "review",
+        "design"
+      ]
+    },
+    {
+      "login": "v0-e",
+      "name": "v0-e",
+      "avatar_url": "https://avatars.githubusercontent.com/u/134806759?v=4",
+      "profile": "https://github.com/v0-e",
+      "contributions": [
+        "projectManagement",
+        "review"
+      ]
+    },
+    {
+      "login": "frozenspider",
+      "name": "Alex Abdugafarov",
+      "avatar_url": "https://avatars.githubusercontent.com/u/2077017?v=4",
+      "profile": "https://github.com/frozenspider",
+      "contributions": [
+        "code"
+      ]
+    },
+    {
+      "login": "maksimryndin",
+      "name": "maksimryndin",
+      "avatar_url": "https://avatars.githubusercontent.com/u/16288656?v=4",
+      "profile": "https://maksimryndin.github.io/",
+      "contributions": [
+        "review"
+      ]
+    },
+    {
+      "login": "earthling1984",
+      "name": "Mithun Vaidhyanathan",
+      "avatar_url": "https://avatars.githubusercontent.com/u/19665196?v=4",
+      "profile": "https://github.com/earthling1984",
+      "contributions": [
+        "research"
+      ]
+    },
+    {
+      "login": "matthew-a-klein",
+      "name": "Matthew Klein",
+      "avatar_url": "https://avatars.githubusercontent.com/u/96837318?v=4",
+      "profile": "https://matthewklein.co.uk/",
+      "contributions": [
+        "research"
+      ]
+    },
+    {
+      "login": "GustaveCharles",
+      "name": "GustaveCharles",
+      "avatar_url": "https://avatars.githubusercontent.com/u/91184289?v=4",
+      "profile": "https://github.com/GustaveCharles",
+      "contributions": [
+        "research"
+      ]
+    },
+    {
+      "login": "Luca-DallAva",
+      "name": "Luca Dall'Ava",
+      "avatar_url": "https://avatars.githubusercontent.com/u/94935046?v=4",
+      "profile": "https://sites.google.com/view/luca-dallava/",
+      "contributions": [
+        "research"
+      ]
+    },
+    {
+      "login": "mounikapratapa",
+      "name": "Mounika Pratapa",
+      "avatar_url": "https://avatars.githubusercontent.com/u/43151963?v=4",
+      "profile": "https://github.com/mounikapratapa",
+      "contributions": [
+        "research"
+      ]
+    },
+    {
+      "login": "smartprogrammer93",
+      "name": "Ahmad Bitar",
+      "avatar_url": "https://avatars.githubusercontent.com/u/33181301?v=4",
+      "profile": "https://github.com/smartprogrammer93",
+      "contributions": [
+        "ideas"
+      ]
+    },
+    {
+      "login": "HendrikWaldner",
+      "name": "HendrikWaldner",
+      "avatar_url": "https://avatars.githubusercontent.com/u/33893964?v=4",
+      "profile": "https://github.com/HendrikWaldner",
+      "contributions": [
+        "research"
+      ]
+    },
+    {
+      "login": "ahmetramazan",
+      "name": "Ahmet Ramazan Agirtas",
+      "avatar_url": "https://avatars.githubusercontent.com/u/95563727?v=4",
+      "profile": "https://www.linkedin.com/in/aragirtas",
+      "contributions": [
+        "research"
+      ]
+    },
+    {
+      "login": "mpzajac",
+      "name": "mpzajac",
+      "avatar_url": "https://avatars.githubusercontent.com/u/25900405?v=4",
+      "profile": "https://github.com/mpzajac",
+      "contributions": [
+        "research",
+        "projectManagement",
+        "fundingFinding"
+      ]
+    },
+    {
+      "login": "albert-garreta",
+      "name": "albert_g",
+      "avatar_url": "https://avatars.githubusercontent.com/u/97292142?v=4",
+      "profile": "https://sites.google.com/view/agarreta",
+      "contributions": [
+        "research"
+      ]
+    }
+  ],
+  "contributorsPerLine": 7,
+  "linkToUsage": true
+}
