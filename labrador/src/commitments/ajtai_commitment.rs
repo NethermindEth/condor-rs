@@ -211,7 +211,6 @@ mod tests {
     // Test helpers
     mod test_utils {
         use super::*;
-        use crate::ring::rq::Rq;
 
         pub fn valid_witness(scheme: &TestAjtai) -> RqVector<TEST_N, TEST_D> {
             vec![Rq::new([scheme.witness_bound(); TEST_D]); TEST_N].into()
