@@ -15,6 +15,10 @@ The implemented changes to LaBRADOR consist of the following steps:
 - Reformulating Constraints
 - Working over Subring
 
+## Assumption
+We assume a user aims to aggregate $N$ signatures, with $i$ indexing each signature, message, and public key. 
+For instance, $m\_i$ denotes the $i$-th message to be signed, $(\mathbf{s}\_{i\_1}, \mathbf{s}\_{i\_2})$ represents its signatures, and $pk\_i$ is the corresponding public key.
+
 
 ## Notation
 Throughout this documentation let $q$ denote the modulus, and let $\mathbb{Z}_q$ be the ring of integers modulo $q$.  
