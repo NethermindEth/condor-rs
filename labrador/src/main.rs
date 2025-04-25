@@ -1,18 +1,19 @@
+use blake2::digest::block_buffer::Error;
 use labrador::jl::verify_upper_bound;
 use labrador::jl::ProjectionMatrix;
 use labrador::jl::ProjectionVector;
-use labrador::poseidon::PoseidonError;
+// use labrador::poseidon::PoseidonError;
 use labrador::rq::Rq;
 use labrador::rq_vector::RqVector;
-use labrador::transcript::PoseidonTranscript;
-use labrador::transcript::Transcript;
+// use labrador::transcript::PoseidonTranscript;
+// use labrador::transcript::Transcript;
 use labrador::zq::Zq;
 use rand::rng;
 
 const D: usize = 4; // Degree of polynomials in S_i
 const N: usize = 5; // Size of S_i
 
-fn main() -> Result<(), PoseidonError> {
+fn main() -> Result<(), Error> {
     // Example poly_ring
     let p1: Rq<D> = vec![Zq::new(1)].into();
     let p2: Rq<D> = vec![Zq::new(2), Zq::new(1), Zq::new(1)].into();
@@ -72,17 +73,17 @@ fn main() -> Result<(), PoseidonError> {
     let beta = polynomials.compute_norm_squared();
     println!("{}", verify_upper_bound(projection, beta));
 
-    // very basic transcript example
-    let mut transcript: PoseidonTranscript = Transcript::new(&mut rng); // state starts at 0
+    // // very basic transcript example
+    // let mut transcript: PoseidonTranscript = Transcript::new(&mut rng); // state starts at 0
 
-    // Absorb values
-    transcript.absorb(Zq::new(42))?;
-    transcript.absorb(Zq::new(9))?;
+    // // Absorb values
+    // transcript.absorb(Zq::new(42))?;
+    // transcript.absorb(Zq::new(9))?;
 
-    // Get a challenge based on the current state
-    let challenge = transcript.get_challenge();
+    // // Get a challenge based on the current state
+    // let challenge = transcript.get_challenge();
 
-    // Print the challenge
-    println!("Challenge: {:?}", challenge);
+    // // Print the challenge
+    // println!("Challenge: {:?}", challenge);
     Ok(())
 }
