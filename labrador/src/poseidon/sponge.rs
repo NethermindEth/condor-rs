@@ -1,6 +1,125 @@
-// use crate::zq::Zq;
+use std::ops::Index;
 
-// use super::permutation::PoseidonPermutation;
+use super::{
+    constants::SpongeConstants,
+    permutation::PoseidonPermutation,
+};
+use crate::zq::Zq;
+
+#[derive(Debug)]
+pub enum PoseidonError {
+    OutOfBounds(usize),
+    EmptyInput,
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum SpongeError {
+    #[error("Squeeze request of {requested} exceeds rate {rate}")]
+    OversizedSqueeze { requested: usize, rate: usize },
+}
+
+pub struct PoseidonHash<S: SpongeConstants> {
+    input: Vec<Zq>,
+    output: Vec<Zq>,
+    permutation: PoseidonPermutation<S>,
+}
+
+impl<S> PoseidonHash<S>
+where
+    S: SpongeConstants,
+    S::ArkArray: Index<usize>,
+    S::MdsArray: Index<usize>,
+    <S::ArkArray as Index<usize>>::Output: Index<usize, Output = Zq>,
+    <S::MdsArray as Index<usize>>::Output: Index<usize, Output = Zq>,
+{
+    pub fn new(input: Vec<Zq>, permutation: PoseidonPermutation<S>) -> Self {
+        Self {
+            input,
+            output: vec![],
+            permutation,
+        }
+    }
+
+    // Absorb input into the sponge
+    fn absorb(&mut self) -> Result<(), PoseidonError> {
+        let mut remaining = self.input.clone();
+        let mut position = 0;
+
+        while !remaining.is_empty() {
+            let available_space = S::RATE - position;
+            let elements_to_absorb = remaining.len().min(available_space);
+            let elements_to_process = &remaining[..elements_to_absorb];
+
+            for (i, elem) in elements_to_process.iter().enumerate() {
+                let target_index = S::CAPACITY + position + i;
+                if target_index >= self.permutation.state.len() {
+                    return Err(PoseidonError::OutOfBounds(target_index));
+                }
+                self.permutation.state[target_index] += *elem;
+            }
+
+            remaining = (&remaining[elements_to_absorb..]).to_vec();
+
+            if remaining.is_empty() {
+                self.permutation.permute();
+                return Ok(());
+            }
+            self.permutation.permute();
+            position = 0;
+        }
+
+        Ok(())
+    }
+
+    // Squeeze output from the sponge
+    pub fn squeez(&mut self) -> Result<Vec<Zq>, SpongeError> {
+        // Check if the requested number of elements exceeds the rate.
+        if S::OUTPUT_LENGTH > S::RATE {
+            return Err(SpongeError::OversizedSqueeze {
+                requested: S::OUTPUT_LENGTH,
+                rate: S::RATE,
+            });
+        }
+
+        let mut output = vec![Zq::ZERO; S::OUTPUT_LENGTH];
+        let mut remaining_elements = output.as_mut_slice();
+        let mut squeeze_index = 0;
+        // Loop until we return the expected amount
+        loop {
+            if squeeze_index + remaining_elements.len() <= S::RATE {
+                remaining_elements.copy_from_slice(
+                    &self.permutation.state[S::CAPACITY + squeeze_index
+                        ..S::CAPACITY + remaining_elements.len() + squeeze_index],
+                );
+                return Ok(output);
+            }
+            // Reset squeeze index in case we need to squeeze again to fill the output
+            let num_elements_squeezed = S::RATE - squeeze_index;
+            remaining_elements[..num_elements_squeezed].copy_from_slice(
+                &self.permutation.state[S::CAPACITY + squeeze_index
+                    ..S::CAPACITY + num_elements_squeezed + squeeze_index],
+            );
+
+            remaining_elements = &mut remaining_elements[num_elements_squeezed..];
+            self.permutation.permute();
+            squeeze_index = 0;
+        }
+    }
+
+    pub fn compute_hash(&mut self) -> &Vec<Zq> {
+        if self.output.is_empty() {
+            let _ = self.absorb();
+            let _ = self.squeez();
+        }
+        &self.output
+    }
+
+    fn reset(&mut self) {
+        self.input = vec![];
+        self.output = vec![];
+        self.permutation = PoseidonPermutation::new();
+    }
+}
 
 // #[derive(Debug, thiserror::Error)]
 // pub enum SpongeError {

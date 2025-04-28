@@ -3,6 +3,7 @@ use crate::zq::Zq;
 use std::marker::PhantomData;
 use std::ops::Index;
 
+#[derive(Default)]
 pub struct PoseidonPermutation<P: PermutationConstants> {
     pub state: Vec<Zq>,
     _marker: PhantomData<P>,
@@ -24,10 +25,8 @@ where
     }
 
     pub fn apply_round_constants(&mut self, round_num: usize) {
-        let ark = P::ark();
         for (i, elem) in self.state.iter_mut().enumerate() {
-            // adds diffusion (non-linearity)
-            *elem += ark[round_num][i];
+            *elem += P::ARK[round_num][i];
         }
     }
 
@@ -44,19 +43,17 @@ where
     }
 
     pub fn apply_mds(&mut self) {
-        let mds = P::mds();
-        let mut new_state = self.state.clone();
+        let mut old_state = self.state.clone();
         // Matrix multiplication with the state for diffusion
         for (i, _cur) in self.state.iter().enumerate() {
             let mut sum = Zq::ZERO;
             for (j, elem) in self.state.iter().enumerate() {
                 // matrix multiplication
-                sum += *elem * mds[i][j];
+                sum += *elem * P::MDS[i][j];
             }
-            new_state[i] = sum;
+            old_state[i] = sum;
         }
-
-        self.state = new_state;
+        self.state = old_state;
     }
 
     pub fn permute(&mut self) {
