@@ -15,6 +15,14 @@ pub struct PoseidonPermutation<
     pub mds: [[Zq; WIDTH]; WIDTH],
 }
 
+impl<const WIDTH: usize, const ROUNDS: usize, const PARTIAL_ROUNDS: usize, const ALPHA: u64> Default
+    for PoseidonPermutation<WIDTH, ROUNDS, PARTIAL_ROUNDS, ALPHA>
+{
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<const WIDTH: usize, const ROUNDS: usize, const PARTIAL_ROUNDS: usize, const ALPHA: u64>
     PoseidonPermutation<WIDTH, ROUNDS, PARTIAL_ROUNDS, ALPHA>
 {
@@ -125,10 +133,10 @@ impl<const WIDTH: usize, const ROUNDS: usize, const PARTIAL_ROUNDS: usize, const
     }
 
     fn apply_mds(&mut self) {
-        let mut old_state = self.state.clone();
+        let mut old_state = self.state;
         // Matrix multiplication with the state for diffusion
         for (i, _cur) in self.state.iter().enumerate() {
-            let mut sum = Zq::ZERO;
+            let mut sum: Zq = Zq::ZERO;
             for (j, elem) in self.state.iter().enumerate() {
                 // matrix multiplication
                 sum += *elem * self.mds[i][j];

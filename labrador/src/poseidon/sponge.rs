@@ -46,6 +46,13 @@ impl<
         }
     }
 
+    pub fn default(
+        input: Vec<Zq>,
+        permutation: PoseidonPermutation<WIDTH, ROUNDS, PARTIAL_ROUNDS, ALPHA>,
+    ) -> Self {
+        Self::new(input, permutation)
+    }
+
     // Absorb input into the sponge
     fn absorb(&mut self) -> Result<(), PoseidonError> {
         let mut remaining = self.input.clone();
@@ -64,7 +71,7 @@ impl<
                 self.permutation.state[target_index] += *elem;
             }
 
-            remaining = (&remaining[elements_to_absorb..]).to_vec();
+            remaining = (remaining[elements_to_absorb..]).to_vec();
 
             if remaining.is_empty() {
                 self.permutation.permute();
