@@ -4,14 +4,32 @@ use blake2::Digest;
 use rand::distr::{Distribution, Uniform};
 use rand::{random, rng, CryptoRng};
 
+/// A configurable implementation of the *Poseidon* permutation.
+///
+/// The permutation operates over a fixed–width state `WIDTH` of field
+/// elements [`Zq`], runs for `ROUNDS` total rounds, of which
+/// `PARTIAL_ROUNDS` are **partial rounds** (S-box is applied to **only one**
+/// state word, and uses an S-box of the form \(x \mapsto x^{ALPHA}\).
+///
+/// # Type Parameters
+/// * `WIDTH` – Number of field elements in the internal state.
+/// * `ROUNDS` – Total rounds executed by [`permute`]; including partial rounds.
+/// * `PARTIAL_ROUNDS` – Number of *partial* rounds; the remaining
+///   \(ROUNDS-\text{PARTIAL_ROUNDS}\) are *full* rounds.
+/// * `ALPHA` – Exponent used by the power S-box.
+///
+/// The round constants (ARK) and MDS matrix are generated from fresh randomness at construction time.
 pub struct PoseidonPermutation<
     const WIDTH: usize,
     const ROUNDS: usize,
     const PARTIAL_ROUNDS: usize,
     const ALPHA: u64,
 > {
+    /// Current permutation state.
     pub state: [Zq; WIDTH],
+    /// Round keys (ARK) – `ROUNDS × WIDTH` matrix.
     pub ark: [[Zq; WIDTH]; ROUNDS],
+    /// MDS matrix (`WIDTH × WIDTH`) used to mix the state every round.
     pub mds: [[Zq; WIDTH]; WIDTH],
 }
 
@@ -26,6 +44,11 @@ impl<const WIDTH: usize, const ROUNDS: usize, const PARTIAL_ROUNDS: usize, const
 impl<const WIDTH: usize, const ROUNDS: usize, const PARTIAL_ROUNDS: usize, const ALPHA: u64>
     PoseidonPermutation<WIDTH, ROUNDS, PARTIAL_ROUNDS, ALPHA>
 {
+    /// Constructs a fresh permutation instance with **zero** initial state and
+    /// randomly generated ARK and MDS parameters.
+    ///
+    /// ARK and MDS generation works for testing porpuses,
+    /// but their correctness and security needs careful consideration.
     pub fn new() -> Self {
         Self {
             state: [Zq::ZERO; WIDTH],
@@ -34,6 +57,11 @@ impl<const WIDTH: usize, const ROUNDS: usize, const PARTIAL_ROUNDS: usize, const
         }
     }
 
+    /// Constructs a permutation whose *parameterisation* (ARK & MDS) is fully
+    /// specified by the caller.
+    ///
+    /// This constructor is the preferred choice for reproducible behaviour in
+    /// tests or when deploying standard Poseidon instances.
     pub fn new_with_ark_mds(ark: [[Zq; WIDTH]; ROUNDS], mds: [[Zq; WIDTH]; WIDTH]) -> Self {
         Self {
             state: [Zq::ZERO; WIDTH],
@@ -114,24 +142,31 @@ impl<const WIDTH: usize, const ROUNDS: usize, const PARTIAL_ROUNDS: usize, const
         matrix
     }
 
+    // Adds the *round constants* (`ARK`) for the given round number to the
+    /// current state **in‑place**.
     fn apply_round_constants(&mut self, round_num: usize) {
         for (i, elem) in self.state.iter_mut().enumerate() {
             *elem += self.ark[round_num][i];
         }
     }
 
+    /// Applies the S‑box \(x \mapsto x^{ALPHA}\) to the state.
+    ///
+    /// * When `is_full_round == true` the exponentiation is applied to **every**
+    ///   lane.
+    /// * Otherwise *only the first* state element (`state[0]`) is transformed –
+    ///   this corresponds to a **partial round** in the Poseidon/Hades design.
     fn apply_s_box(&mut self, is_full_round: bool) {
         if is_full_round {
             for elem in &mut self.state {
-                // Apply transformation to each element of state
                 *elem = elem.pow(ALPHA);
             }
         } else {
-            // Apply transformation only to the first element
             self.state[0] = self.state[0].pow(ALPHA);
         }
     }
 
+    /// Multiplies the state by the MDS matrix.
     fn apply_mds(&mut self) {
         let mut old_state = self.state;
         // Matrix multiplication with the state for diffusion
@@ -146,21 +181,27 @@ impl<const WIDTH: usize, const ROUNDS: usize, const PARTIAL_ROUNDS: usize, const
         self.state = old_state;
     }
 
+    /// Executes the complete Poseidon permutation on the internal state.
+    ///
+    /// Each round performs, in order:
+    /// 1. Add‑round‑constants (ARK)
+    /// 2. S‑box (either full or partial)
+    /// 3. MDS multiplication
     pub fn permute(&mut self) {
         let full_rounds_half = (ROUNDS - PARTIAL_ROUNDS) / 2;
-        // full round ark/S-box/mds
+        // --- first half of full rounds --------------------------------------------------------
         for i in 0..full_rounds_half {
             self.apply_round_constants(i);
             self.apply_s_box(true);
             self.apply_mds();
         }
-        // partial round ark/S-box/mds
+        // --- partial rounds -------------------------------------------------------------------
         for i in full_rounds_half..(full_rounds_half + PARTIAL_ROUNDS) {
             self.apply_round_constants(i);
             self.apply_s_box(false); // Apply the S-box to the first element only
             self.apply_mds();
         }
-        // full round ark/S-box/mds
+        // --- second half of full rounds -------------------------------------------------------
         for i in (full_rounds_half + PARTIAL_ROUNDS)..(ROUNDS) {
             self.apply_round_constants(i);
             self.apply_s_box(true);
@@ -314,7 +355,7 @@ mod tests {
         permutation.permute();
 
         // Assert
-        assert_eq!(permutation.state[0], Zq::new(256)); // 2^(2→4→16→256)
-        assert_eq!(permutation.state[1], Zq::new(81)); // 3^(2→9→9→81)
+        assert_eq!(permutation.state[0], Zq::new(256));
+        assert_eq!(permutation.state[1], Zq::new(81));
     }
 }

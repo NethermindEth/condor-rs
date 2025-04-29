@@ -2,13 +2,19 @@ use crate::zq::Zq;
 
 use super::{permutation::PoseidonPermutation, sponge::PoseidonSponge};
 
-/// These values are chosen to make the hash function cryptographically secure
+// ===========================================================================
+// Poseidon parameter set – hard-coded for Fiat–Shamir transcripts
+// ===========================================================================
+//
+// The ARK (add-round-key) and MDS matrices below were *generated once* and are
+// embedded so that every prover/verifier derives the **same** challenges.
 const WIDTH: usize = 9;
 const RATE: usize = 1;
 const OUTPUT_LEN: usize = 1;
 const ROUNDS: usize = 28;
 const PARTIAL_ROUNDS: usize = 20;
 const ALPHA: u64 = 3;
+// Hard‑coded round constants (ARK) and MDS matrix.  Generated off‑line.
 const ARK: [[Zq; WIDTH]; ROUNDS] = [
     [
         Zq::new(2773654128),
@@ -421,10 +427,20 @@ const MDS: [[Zq; WIDTH]; WIDTH] = [
     ],
 ];
 
-/// Permutation and sponge type defined to work over field with 32-bit prime
+/// Convenience type aliases for the fixed permutation + sponge
 type Perm = PoseidonPermutation<WIDTH, ROUNDS, PARTIAL_ROUNDS, ALPHA>;
 type Sponge = PoseidonSponge<OUTPUT_LEN, RATE, WIDTH, ROUNDS, PARTIAL_ROUNDS, ALPHA>;
 
+/// A **Fiat–Shamir transcript** based on Poseidon.
+///
+/// The transcript collects field elements via [`absorb_element`].  When a new
+/// challenge is required, [`get_scalar_challenge`] returns the Poseidon hash of
+/// the current buffer, interpreted as a scalar in the same field `Zq`.
+///
+/// The internal message buffer is **not** cleared after squeezing, allowing the
+/// caller to derive *multiple* independent challenges sequentially by first
+/// appending the previous challenge back into the transcript (standard
+/// practice in many proof systems).
 pub struct Transcript {
     buf: Vec<Zq>,
 }
@@ -436,14 +452,22 @@ impl Default for Transcript {
 }
 
 impl Transcript {
+    /// Creates an **empty** transcript.
     pub fn new() -> Self {
         Self { buf: Vec::new() }
     }
 
+    /// Appends a field element to the transcript.  Elements are stored in the
+    /// order they are seen and fed verbatim to the Poseidon sponge.
     pub fn absorb_element(&mut self, elem: Zq) {
         self.buf.push(elem);
     }
 
+    /// Produces a scalar *challenge* by hashing the current transcript buffer.
+    ///
+    /// Internally this creates a fresh [`PoseidonSponge`] parameterised with the
+    /// **fixed** ARK/MDS so that every party computes an identical result from
+    /// the same message sequence.
     pub fn get_scalar_challenge(&mut self) -> Zq {
         let permutation = Perm::new_with_ark_mds(ARK, MDS);
         let mut sponge = Sponge::new(self.buf.clone(), permutation);
@@ -454,7 +478,6 @@ impl Transcript {
 #[cfg(test)]
 mod tests {
     use crate::zq::Zq;
-
     use super::Transcript;
 
     #[test]
@@ -463,7 +486,41 @@ mod tests {
         transcript.absorb_element(Zq::new(12));
         transcript.absorb_element(Zq::new(12312));
         transcript.absorb_element(Zq::new(111));
-        let result = transcript.get_scalar_challenge();
+        let _result = transcript.get_scalar_challenge();
         // result == 3770429813
+    }
+
+    #[test]
+    fn test_challenge_is_deterministic() {
+        let mut t = Transcript::new();
+        t.absorb_element(Zq::new(42));
+        let c1 = t.get_scalar_challenge();
+        let c2 = t.get_scalar_challenge();
+        assert_eq!(c1, c2);
+    }
+
+    /// Two transcripts with identical message sequences must agree on the
+    /// challenge value.
+    #[test]
+    fn test_two_transcripts_agree() {
+        let mut t1 = Transcript::new();
+        let mut t2 = Transcript::new();
+        for &x in &[1u32, 2, 3, 5, 8] {
+            t1.absorb_element(Zq::new(x));
+            t2.absorb_element(Zq::new(x));
+        }
+        assert_eq!(t1.get_scalar_challenge(), t2.get_scalar_challenge());
+    }
+
+    /// Changing *one* absorbed element should almost certainly alter the
+    /// challenge (collision resistance is probabilistic; here we just assert
+    /// inequality for this specific test vector).
+    #[test]
+    fn test_challenge_changes_with_input() {
+        let mut t1 = Transcript::new();
+        let mut t2 = Transcript::new();
+        t1.absorb_element(Zq::new(99));
+        t2.absorb_element(Zq::new(100));
+        assert_ne!(t1.get_scalar_challenge(), t2.get_scalar_challenge());
     }
 }
