@@ -156,8 +156,8 @@ impl<
 
 #[cfg(test)]
 mod tests {
-    use crate::zq::Zq;
     use super::{PoseidonPermutation, PoseidonSponge};
+    use crate::zq::Zq;
 
     #[test]
     fn test_absorb_fills_rate_then_permute() {

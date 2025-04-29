@@ -463,22 +463,21 @@ impl Transcript {
         self.buf.push(elem);
     }
 
-    /// Produces a scalar *challenge* by hashing the current transcript buffer.
-    ///
-    /// Internally this creates a fresh [`PoseidonSponge`] parameterised with the
-    /// **fixed** ARK/MDS so that every party computes an identical result from
-    /// the same message sequence.
+    /// Generates a *scalar* challenge and **appends it** to the transcript so
+    /// that subsequent challenges are bound to the previous ones.
     pub fn get_scalar_challenge(&mut self) -> Zq {
         let permutation = Perm::new_with_ark_mds(ARK, MDS);
         let mut sponge = Sponge::new(self.buf.clone(), permutation);
-        sponge.compute_hash()[0]
+        let challenge = sponge.compute_hash()[0];
+        self.buf.push(challenge);
+        challenge
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::zq::Zq;
     use super::Transcript;
+    use crate::zq::Zq;
 
     #[test]
     fn test_transcript() {
@@ -491,12 +490,12 @@ mod tests {
     }
 
     #[test]
-    fn test_challenge_is_deterministic() {
+    fn test_challenge_is_appended_to_transcript() {
         let mut t = Transcript::new();
         t.absorb_element(Zq::new(42));
         let c1 = t.get_scalar_challenge();
         let c2 = t.get_scalar_challenge();
-        assert_eq!(c1, c2);
+        assert_ne!(c1, c2);
     }
 
     /// Two transcripts with identical message sequences must agree on the
