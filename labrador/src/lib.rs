@@ -19,4 +19,6 @@
 
 pub mod commitments;
 pub mod core;
+pub mod prover;
 pub mod ring;
+pub mod verifier;
