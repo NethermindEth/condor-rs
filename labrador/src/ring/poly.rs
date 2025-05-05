@@ -568,6 +568,7 @@ mod tests {
     use super::*;
 
     #[test]
+    // DONE
     fn test_conjugate_automorphism() {
         let poly1: PolyRing = PolyRing::new(vec![Zq::ONE, Zq::TWO, Zq::new(3)]);
         let poly2: PolyRing = PolyRing::new(vec![Zq::new(4), Zq::new(5), Zq::new(6)]);

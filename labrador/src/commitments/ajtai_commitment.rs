@@ -63,31 +63,28 @@ impl AjtaiParameters {
 
 /// Cryptographic opening containing witness
 #[derive(Clone, Debug)]
-pub struct Opening<const N: usize, const D: usize> {
-    pub witness: RqVector<N, D>,
+pub struct Opening {
+    pub witness: RqVector,
 }
 
-impl<const N: usize, const D: usize> Opening<N, D> {
+impl Opening {
     /// Creates a new opening from a witness
-    pub const fn new(witness: RqVector<N, D>) -> Self {
+    pub const fn new(witness: RqVector) -> Self {
         Self { witness }
     }
 }
 
 /// Ajtai commitment scheme implementation with matrix-based operations
 #[derive(Debug)]
-pub struct AjtaiCommitment<const M: usize, const N: usize, const D: usize> {
-    matrix_a: RqMatrix<M, N, D>,
+pub struct AjtaiCommitment<const M: usize, const N: usize> {
+    matrix_a: RqMatrix,
     witness_bound: Zq,
 }
 
 // Core implementation with security checks
-impl<const M: usize, const N: usize, const D: usize> AjtaiCommitment<M, N, D> {
+impl<const M: usize, const N: usize> AjtaiCommitment<M, N> {
     /// Creates new commitment scheme with validated parameters
-    pub fn new(
-        params: AjtaiParameters,
-        matrix_a: RqMatrix<M, N, D>,
-    ) -> Result<Self, ParameterError> {
+    pub fn new(params: AjtaiParameters, matrix_a: RqMatrix) -> Result<Self, ParameterError> {
         Self::validate_parameters(&params)?;
 
         Ok(Self {
@@ -97,10 +94,7 @@ impl<const M: usize, const N: usize, const D: usize> AjtaiCommitment<M, N, D> {
     }
 
     /// Generates commitment and opening information with bounds checking
-    pub fn commit(
-        &self,
-        witness: RqVector<N, D>,
-    ) -> Result<(RqVector<M, D>, Opening<N, D>), CommitError> {
+    pub fn commit(&self, witness: RqVector) -> Result<(RqVector, Opening), CommitError> {
         if !Self::check_bounds(&witness, self.witness_bound) {
             return Err(CommitError::InvalidWitnessBounds(self.witness_bound));
         }
@@ -114,8 +108,8 @@ impl<const M: usize, const N: usize, const D: usize> AjtaiCommitment<M, N, D> {
     /// Verifies commitment against opening information
     pub fn verify(
         &self,
-        commitment: &RqVector<M, D>,
-        opening: &Opening<N, D>,
+        commitment: &RqVector,
+        opening: &Opening,
     ) -> Result<(), VerificationError> {
         if !Self::check_bounds(&opening.witness, self.witness_bound) {
             return Err(VerificationError::InvalidWitnessBounds(self.witness_bound));
@@ -131,7 +125,7 @@ impl<const M: usize, const N: usize, const D: usize> AjtaiCommitment<M, N, D> {
 
     /// Validates scheme parameters against cryptographic security requirements
     fn validate_parameters(params: &AjtaiParameters) -> Result<(), ParameterError> {
-        if [M, N, D].contains(&0) {
+        if [M, N].contains(&0) {
             return Err(ParameterError::ZeroParameter);
         }
 
@@ -183,12 +177,12 @@ impl<const M: usize, const N: usize, const D: usize> AjtaiCommitment<M, N, D> {
     }
 
     /// Checks polynomial coefficients against specified bound
-    fn check_bounds<const SIZE: usize>(polynomials: &RqVector<SIZE, D>, bound: Zq) -> bool {
+    fn check_bounds(polynomials: &RqVector, bound: Zq) -> bool {
         polynomials.iter().all(|p| p.check_bounds(bound))
     }
 
     /// Returns a reference to the internal matrix
-    pub fn matrix(&self) -> &RqMatrix<M, N, D> {
+    pub fn matrix(&self) -> &RqMatrix {
         &self.matrix_a
     }
 
@@ -205,25 +199,24 @@ mod tests {
 
     const TEST_M: usize = 8;
     const TEST_N: usize = 8;
-    const TEST_D: usize = 4;
-    type TestAjtai = AjtaiCommitment<TEST_M, TEST_N, TEST_D>;
+    type TestAjtai = AjtaiCommitment<TEST_M, TEST_N>;
 
     // Test helpers
     mod test_utils {
         use super::*;
 
-        pub fn valid_witness(scheme: &TestAjtai) -> RqVector<TEST_N, TEST_D> {
-            vec![Rq::new([scheme.witness_bound(); TEST_D]); TEST_N].into()
+        pub fn valid_witness(scheme: &TestAjtai) -> RqVector {
+            vec![Rq::new([scheme.witness_bound(); Rq::DEGREE]); TEST_N].into()
         }
 
-        pub fn random_valid_witness() -> RqVector<TEST_N, TEST_D> {
+        pub fn random_valid_witness() -> RqVector {
             let mut rng = rand::rng();
-            RqVector::random_ternary(&mut rng)
+            RqVector::random_ternary(&mut rng, TEST_N)
         }
 
         pub fn setup_scheme() -> TestAjtai {
             let mut rng = rand::rng();
-            let matrix_a = RqMatrix::random(&mut rng);
+            let matrix_a = RqMatrix::random(&mut rng, TEST_M, TEST_N);
             TestAjtai::new(AjtaiParameters::new(Zq::ONE, Zq::ONE).unwrap(), matrix_a).unwrap()
         }
     }
@@ -276,7 +269,7 @@ mod tests {
     #[test]
     fn handles_edge_cases() {
         let scheme = test_utils::setup_scheme();
-        let zero_witness = RqVector::zero();
+        let zero_witness = RqVector::zero(TEST_N);
 
         assert!(scheme.commit(zero_witness).is_ok());
         assert!(scheme.commit(test_utils::valid_witness(&scheme)).is_ok());

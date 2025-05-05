@@ -1,5 +1,6 @@
 use core::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 use rand::distr::uniform::{Error, SampleBorrow, SampleUniform, UniformInt, UniformSampler};
+use rand::distr::Uniform;
 use rand::prelude::*;
 use std::fmt;
 /// Represents an element in the ring Z/qZ where q = 2^32.
@@ -161,6 +162,226 @@ impl Neg for Zq {
         }
     }
 }
+
+pub trait ZqVector {
+    fn random<R: Rng + CryptoRng>(rng: &mut R, n: usize) -> Self;
+    fn conjugate_automorphism(&self) -> Self;
+    fn mul(&self, other: &Self) -> Self;
+    fn add(&self, other: &Self) -> Self;
+    fn inner_product(&self, other: &Self) -> Zq;
+}
+
+impl ZqVector for Vec<Zq> {
+    fn random<R: Rng + CryptoRng>(rng: &mut R, n: usize) -> Self {
+        // you can re‑use the UniformZq defined above
+        let uniform = UniformZq::new_inclusive(Zq::ZERO, Zq::MAX).unwrap();
+        (0..n).map(|_| uniform.sample(rng)).collect()
+    }
+
+    /// Add two ZqVector with flexible degree
+    fn add(&self, other: &Self) -> Self {
+        let max_degree = self.len().max(other.len());
+        let mut coeffs = vec![Zq::ZERO; max_degree];
+        for (i, coeff) in coeffs.iter_mut().enumerate().take(max_degree) {
+            if i < self.len() {
+                *coeff += self[i];
+            }
+            if i < other.len() {
+                *coeff += other[i];
+            }
+        }
+        coeffs
+    }
+
+    /// Note: This is a key performance bottleneck. The multiplication here is primarily used in: Prover.check_projection()
+    /// which verifies the condition: p_j? = ct(sum(<σ−1(pi_i^(j)), s_i>))
+    /// Each ZqVector involved has a length of 2*lambda (default: 256).
+    /// Consider optimizing this operation by applying NTT-based multiplication to improve performance.
+    fn mul(&self, other: &Vec<Zq>) -> Vec<Zq> {
+        let mut result_coefficients = vec![Zq::new(0); self.len() + other.len() - 1];
+        for (i, &coeff1) in self.iter().enumerate() {
+            for (j, &coeff2) in other.iter().enumerate() {
+                result_coefficients[i + j] += coeff1 * coeff2;
+            }
+        }
+
+        if result_coefficients.len() > self.len() {
+            let q_minus_1 = Zq::MAX;
+            let (left, right) = result_coefficients.split_at_mut(self.len());
+            for (i, &overflow) in right.iter().enumerate() {
+                left[i] += overflow * q_minus_1;
+            }
+            result_coefficients.truncate(self.len());
+        }
+        result_coefficients
+    }
+
+    /// Dot product between coefficients
+    fn inner_product(&self, other: &Self) -> Zq {
+        self.iter()
+            .zip(other.iter())
+            .map(|(&a, &b)| a * b)
+            .fold(Zq::ZERO, |acc, x| acc + x)
+    }
+
+    /// Compute the conjugate automorphism \sigma_{-1} of vector based on B) Constraints..., Page 21.
+    fn conjugate_automorphism(&self) -> Vec<Zq> {
+        let q_minus_1 = Zq::MAX;
+        let mut new_coeffs = vec![Zq::ZERO; self.len()];
+        for (i, new_coeff) in new_coeffs.iter_mut().enumerate().take(self.len()) {
+            if i < self.len() {
+                if i == 0 {
+                    *new_coeff = self[i];
+                } else {
+                    *new_coeff = self[i] * q_minus_1;
+                }
+            } else {
+                *new_coeff = Zq::ZERO;
+            }
+        }
+        let reversed_coefficients = new_coeffs
+            .iter()
+            .take(1)
+            .cloned()
+            .chain(new_coeffs.iter().skip(1).rev().cloned())
+            .collect::<Vec<Zq>>();
+
+        reversed_coefficients
+    }
+}
+
+// /// A ZqVector is a vector of Zq elements with a flexible size.
+// /// Mainly used for store random Zq elements
+// #[derive(Debug, Clone, PartialEq, Eq)]
+// pub struct ZqVector {
+//     coeffs: Vec<Zq>,
+// }
+// impl ZqVector {
+//     pub fn new(coeffs: Vec<Zq>) -> Self {
+//         Self { coeffs }
+//     }
+
+//     pub fn zero(len: usize) -> Self {
+//         Self::new(vec![Zq::ZERO; len])
+//     }
+
+//     pub fn get_coeffs(&self) -> &Vec<Zq> {
+//         &self.coeffs
+//     }
+
+//     pub fn len(&self) -> usize {
+//         self.coeffs.len()
+//     }
+
+//     pub fn is_empty(&self) -> bool {
+//         self.coeffs.is_empty()
+//     }
+
+//     pub fn random<R: Rng + CryptoRng>(rng: &mut R, n: usize) -> Self {
+//         let uniform = Uniform::new_inclusive(Zq::ZERO, Zq::MAX).unwrap();
+//         let mut coeffs = Vec::with_capacity(n);
+//         coeffs.extend((0..n).map(|_| uniform.sample(rng)));
+//         Self { coeffs }
+//     }
+
+//     pub fn iter(&self) -> impl Iterator<Item = &Zq> {
+//         self.coeffs.iter()
+//     }
+
+//     pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut Zq> {
+//         self.coeffs.iter_mut()
+//     }
+
+//     /// Dot product between coefficients
+//     pub fn inner_product(&self, other: &Self) -> Zq {
+//         self.coeffs
+//             .iter()
+//             .zip(other.coeffs.iter())
+//             .map(|(&a, &b)| a * b)
+//             .fold(Zq::ZERO, |acc, x| acc + x)
+//     }
+
+//     /// Compute the conjugate automorphism \sigma_{-1} of vector based on B) Constraints..., Page 21.
+//     pub fn conjugate_automorphism(&self) -> ZqVector {
+//         let q_minus_1 = Zq::MAX;
+//         let mut new_coeffs = vec![Zq::ZERO; self.get_coeffs().len()];
+//         for (i, new_coeff) in new_coeffs
+//             .iter_mut()
+//             .enumerate()
+//             .take(self.get_coeffs().len())
+//         {
+//             if i < self.get_coeffs().len() {
+//                 if i == 0 {
+//                     *new_coeff = self.get_coeffs()[i];
+//                 } else {
+//                     *new_coeff = self.get_coeffs()[i] * q_minus_1;
+//                 }
+//             } else {
+//                 *new_coeff = Zq::ZERO;
+//             }
+//         }
+//         let reversed_coefficients = new_coeffs
+//             .iter()
+//             .take(1)
+//             .cloned()
+//             .chain(new_coeffs.iter().skip(1).rev().cloned())
+//             .collect::<Vec<Zq>>();
+
+//         ZqVector::new(reversed_coefficients)
+//     }
+// }
+
+// impl FromIterator<Zq> for ZqVector {
+//     fn from_iter<T: IntoIterator<Item = Zq>>(iter: T) -> Self {
+//         let coeffs: Vec<Zq> = iter.into_iter().collect();
+//         ZqVector::new(coeffs)
+//     }
+// }
+
+// impl Add<&ZqVector> for &ZqVector {
+//     type Output = ZqVector;
+//     /// Add two ZqVector with flexible degree
+//     fn add(self, other: &ZqVector) -> ZqVector {
+//         let max_degree = self.get_coeffs().len().max(other.get_coeffs().len());
+//         let mut coeffs = vec![Zq::ZERO; max_degree];
+//         for (i, coeff) in coeffs.iter_mut().enumerate().take(max_degree) {
+//             if i < self.get_coeffs().len() {
+//                 *coeff += self.get_coeffs()[i];
+//             }
+//             if i < other.get_coeffs().len() {
+//                 *coeff += other.get_coeffs()[i];
+//             }
+//         }
+//         ZqVector::new(coeffs)
+//     }
+// }
+
+// /// Note: This is a key performance bottleneck. The multiplication here is primarily used in: Prover.check_projection()
+// /// which verifies the condition: p_j? = ct(sum(<σ−1(pi_i^(j)), s_i>))
+// /// Each ZqVector involved has a length of 2*lambda (default: 256).
+// /// Consider optimizing this operation by applying NTT-based multiplication to improve performance.
+// impl Mul<&ZqVector> for &ZqVector {
+//     type Output = ZqVector;
+//     fn mul(self, other: &ZqVector) -> ZqVector {
+//         let mut result_coefficients =
+//             vec![Zq::new(0); self.get_coeffs().len() + other.get_coeffs().len() - 1];
+//         for (i, &coeff1) in self.get_coeffs().iter().enumerate() {
+//             for (j, &coeff2) in other.get_coeffs().iter().enumerate() {
+//                 result_coefficients[i + j] += coeff1 * coeff2;
+//             }
+//         }
+
+//         if result_coefficients.len() > self.get_coeffs().len() {
+//             let q_minus_1 = Zq::MAX;
+//             let (left, right) = result_coefficients.split_at_mut(self.get_coeffs().len());
+//             for (i, &overflow) in right.iter().enumerate() {
+//                 left[i] += overflow * q_minus_1;
+//             }
+//             result_coefficients.truncate(self.get_coeffs().len());
+//         }
+//         ZqVector::new(result_coefficients)
+//     }
+// }
 
 #[cfg(test)]
 mod tests {
