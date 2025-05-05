@@ -50,7 +50,6 @@ impl RqVector {
             let coeffs = rq.get_coefficients();
             concatenated_coeffs.extend_from_slice(coeffs);
         }
-
         concatenated_coeffs
     }
 

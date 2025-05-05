@@ -13,9 +13,6 @@ use crate::{
 };
 use rand::rng;
 
-/// explicitly set the deg_bound_d to D == deg_bound_d, which is 64
-const D: usize = 64;
-
 #[derive(Debug)]
 pub enum ProverError {
     /// Indicates that the L2 norm (squared) of the witness exceeded the allowed threshold.
@@ -212,14 +209,14 @@ impl<'a> LabradorProver<'a> {
     }
 
     /// check p_j? = ct(sum(<σ−1(pi_i^(j)), s_i>))
-    fn check_projection(&self, p: &Vec<Zq>) -> Result<bool, ProverError> {
+    fn check_projection(&self, p: &[Zq]) -> Result<bool, ProverError> {
         let s_coeffs: Vec<Vec<Zq>> = self
             .witness
             .s
             .iter()
             .map(|s_i| {
                 s_i.iter()
-                    .flat_map(|s_i_p| s_i_p.get_coefficients().clone())
+                    .flat_map(|s_i_p| *s_i_p.get_coefficients())
                     .collect()
             })
             .collect();
@@ -229,7 +226,7 @@ impl<'a> LabradorProver<'a> {
             for (i, s_i) in s_coeffs.iter().enumerate() {
                 let pi_ele = &self.tr.pi[i][j];
                 let pi_ele_ca = pi_ele.conjugate_automorphism();
-                poly = poly.add(&((&pi_ele_ca).mul(s_i)));
+                poly = poly.add(&(pi_ele_ca.multiply(s_i)));
             }
 
             if poly[0] != p_j {

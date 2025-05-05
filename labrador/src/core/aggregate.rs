@@ -235,19 +235,16 @@ fn calculate_aggr_ct_phi(
                     let right_side = (0..ep.lambda2)
                         .map(|j| {
                             let omega_j = random_omega[k][j];
-
-                            let poly_vec = (0..ep.n)
+                            (0..ep.n)
                                 .map(|chunk_index| {
-                                    let start = chunk_index * ep.deg_bound_d;
-                                    let end = start + ep.deg_bound_d;
+                                    let start = chunk_index * Rq::DEGREE;
+                                    let end = start + Rq::DEGREE;
 
                                     let pi_poly = Rq::new(pi[i][j][start..end].try_into().unwrap());
                                     let pi_poly_conjugate = pi_poly.conjugate_automorphism();
                                     &pi_poly_conjugate * &omega_j
                                 })
-                                .collect::<RqVector>();
-
-                            poly_vec
+                                .collect::<RqVector>()
                         })
                         .fold(RqVector::new(vec![Rq::zero(); ep.n]), |acc, val| {
                             acc.iter().zip(val.iter()).map(|(a, b)| a + b).collect()

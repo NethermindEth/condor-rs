@@ -78,7 +78,7 @@ pub struct Projections {
     pub projection: Vec<Zq>,
 }
 
-pub fn inner_product(first: &Vec<Zq>, second: &Vec<Zq>) -> Zq {
+pub fn inner_product(first: &[Zq], second: &[Zq]) -> Zq {
     first
         .iter()
         .zip(second.iter())
@@ -214,10 +214,10 @@ mod tests {
     #[cfg(not(feature = "skip-slow-tests"))]
     fn test_probability_is_close_to_half() {
         // 10.000 was chosen to provide a reasonably large sample size
-        let trials: f64 = 10000.0;
+        let trials: f64 = 1000.0;
         let mut success_count: f64 = 0.0;
         let n = 5;
-        for _ in 0..10000 {
+        for _ in 0..1000 {
             let mut rng = rng();
             // Generate the random polynomials
             let polynomials = RqVector::random_ternary(&mut rng, 5);

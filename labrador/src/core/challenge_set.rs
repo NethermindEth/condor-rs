@@ -8,6 +8,12 @@ pub struct ChallengeSet {
     norm: f64,
 }
 
+impl Default for ChallengeSet {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Challenge Space over R = Z_q\[X\] / (X^d + 1), paper page 6:
 impl ChallengeSet {
     pub fn new() -> Self {
@@ -41,22 +47,22 @@ fn sample_challenge() -> Rq {
     let mut challenge = [Zq::ZERO; Rq::DEGREE];
 
     // Add 31 coefficients, each either +1 or -1.
-    for idx in 23..54 {
+    for item in challenge.iter_mut().take(31) {
         let value = if rng.random_bool(0.5) {
             Zq::ONE
         } else {
             -Zq::ONE
         };
-        challenge[idx] = value;
+        *item = value;
     }
     // Add 10 coefficients, each either +2 or -2.
-    for idx in 54..64 {
+    for item in challenge.iter_mut().skip(31).take(10) {
         let value = if rng.random_bool(0.5) {
             Zq::new(2)
         } else {
             -Zq::new(2)
         };
-        challenge[idx] = value;
+        *item = value;
     }
 
     // Shuffle the vector to randomize the positions.
@@ -69,7 +75,7 @@ fn sample_challenge() -> Rq {
 fn sample_challenge_with_norm(threshold: f64) -> Rq {
     loop {
         let candidate = sample_challenge();
-        let norm = Rq::operator_norm(&candidate);
+        let norm = candidate.operator_norm();
         if norm < threshold {
             return candidate;
         }

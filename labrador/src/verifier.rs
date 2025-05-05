@@ -1,3 +1,5 @@
+#![allow(clippy::result_large_err)]
+
 use crate::core::{
     aggregate, crs::PublicPrams, env_params::EnvironmentParameters, statement::Statement,
 };
@@ -265,7 +267,6 @@ impl<'a> LabradorVerifier<'a> {
         h: &[RqVector],
     ) -> bool {
         let r = a_primes.len();
-        let d = a_primes[0].get_elements()[0].get_coefficients().len();
 
         let sum_a_primes_g: Rq = a_primes
             .iter()

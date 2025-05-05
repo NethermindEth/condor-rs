@@ -361,8 +361,8 @@ impl Add<&Rq> for &Rq {
     /// Add two polynomials with flexible degree
     fn add(self, other: &Rq) -> Rq {
         let mut coeffs = [Zq::ZERO; Rq::DEGREE];
-        for i in 0..Rq::DEGREE {
-            coeffs[i] = self.get_coefficients()[i] + other.get_coefficients()[i];
+        for (idx, item) in coeffs.iter_mut().enumerate().take(Rq::DEGREE) {
+            *item = self.get_coefficients()[idx] + other.get_coefficients()[idx];
         }
         Rq::new(coeffs)
     }
