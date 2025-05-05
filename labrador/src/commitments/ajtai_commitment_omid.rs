@@ -14,14 +14,16 @@ pub enum ParameterError {
     InvalidWitnessBounds(Zq),
     #[error("commitment output length {0} is too large")]
     TooLargeCommitmentLength(usize),
+    #[error("Invalid Witness Size")]
+    InvalidWitnessSize,
+    #[error("Invalid Commit Size")]
+    InvalidCommitSize,
 }
 
 #[derive(Debug, Error)]
 pub enum CommitError {
     #[error("witness coefficients exceed bound {0}")]
     InvalidWitnessBounds(Zq),
-    #[error("invalid witness vector size")]
-    InvalidWitnessSize,
 }
 
 #[derive(Debug, Error)]
@@ -30,39 +32,29 @@ pub enum VerificationError {
     InvalidWitnessBounds(Zq),
     #[error("commitment does not match opening")]
     CommitmentMismatch,
-    #[error("invalid witness vector size")]
-    InvalidWitnessSize,
-    #[error("invalid openning vector size")]
-    InvalidOpenningSize,
 }
 
-/// Ajtai commitment scheme implementation with matrix-based operations
 #[derive(Debug)]
-pub struct AjtaiCommitment {
+pub struct AjtaiCommitment<const COMMIT_SIZE: usize, const WITNESS_SIZE: usize> {
+    random_matrix: RqMatrix,
     beta: Zq,
     witness_bound: Zq,
-    random_matrix: RqMatrix,
 }
 
-impl AjtaiCommitment {
+impl<const COMMIT_SIZE: usize, const WITNESS_SIZE: usize>
+    AjtaiCommitment<COMMIT_SIZE, WITNESS_SIZE>
+{
     pub fn new(
+        random_matrix: RqMatrix,
         beta: Zq,
         witness_bound: Zq,
-        random_matrix: RqMatrix,
     ) -> Result<Self, ParameterError> {
-        if witness_bound.is_zero() {
-            return Err(ParameterError::InvalidWitnessBounds(witness_bound));
-        }
-        Self::validate_parameters(
-            beta,
-            random_matrix.get_elements().len(),
-            random_matrix.get_elements()[0].get_elements().len(),
-        )?;
+        Self::validate_parameters(&random_matrix, beta, witness_bound)?;
 
         Ok(Self {
+            random_matrix,
             beta,
             witness_bound,
-            random_matrix,
         })
     }
 
@@ -70,10 +62,6 @@ impl AjtaiCommitment {
     pub fn commit(&self, witness: &RqVector) -> Result<RqVector, CommitError> {
         if !Self::check_bounds(witness, self.witness_bound) {
             return Err(CommitError::InvalidWitnessBounds(self.witness_bound));
-        }
-        if witness.get_elements().len() != self.random_matrix.get_elements()[0].get_elements().len()
-        {
-            return Err(CommitError::InvalidWitnessSize);
         }
         let commitment = &self.random_matrix * witness;
         Ok(commitment)
@@ -88,13 +76,6 @@ impl AjtaiCommitment {
         if !Self::check_bounds(opening, self.witness_bound) {
             return Err(VerificationError::InvalidWitnessBounds(self.witness_bound));
         }
-        if opening.get_elements().len() != self.random_matrix.get_elements()[0].get_elements().len()
-        {
-            return Err(VerificationError::InvalidWitnessSize);
-        }
-        if commitment.get_elements().len() != self.random_matrix.get_elements().len() {
-            return Err(VerificationError::InvalidOpenningSize);
-        }
 
         let recomputed = &self.random_matrix * opening;
         if commitment != &recomputed {
@@ -104,11 +85,20 @@ impl AjtaiCommitment {
         Ok(())
     }
 
-    fn validate_parameters(beta: Zq, row_len: usize, col_len: usize) -> Result<(), ParameterError> {
-        if [row_len, col_len].contains(&0) {
+    fn validate_parameters(random_matrix: &RqMatrix, beta: Zq, witness_bound: Zq) -> Result<(), ParameterError> {
+        if witness_bound.is_zero() {
+            return Err(ParameterError::InvalidWitnessBounds(witness_bound));
+        }
+        if [COMMIT_SIZE, WITNESS_SIZE].contains(&0) {
             return Err(ParameterError::ZeroParameter);
         }
-        Self::verify_security_relation(beta, row_len)
+        if random_matrix.get_elements().len() != COMMIT_SIZE {
+            return Err(ParameterError::InvalidCommitSize);
+        }
+        if random_matrix.get_elements()[0].get_elements().len() != WITNESS_SIZE {
+            return Err(ParameterError::InvalidWitnessSize);
+        }
+        Self::verify_security_relation(beta)
     }
 
     /// Verifies the security relation β²m³ < q² required for Ajtai's commitment scheme.
@@ -123,7 +113,7 @@ impl AjtaiCommitment {
     /// - β bounds the size of witness coefficients
     /// - m is the commitment output length
     /// - q is the modulus of the underlying ring
-    fn verify_security_relation(beta: Zq, m: usize) -> Result<(), ParameterError> {
+    fn verify_security_relation(beta: Zq) -> Result<(), ParameterError> {
         // Calculate q from Zq properties
         let q_val = Zq::MAX;
         let q: u128 = q_val.to_u128() + 1;
@@ -135,11 +125,11 @@ impl AjtaiCommitment {
             .ok_or(ParameterError::SecurityBoundViolation)?;
 
         // Calculate m³
-        let m_cubed: u128 = m
+        let m_cubed: u128 = COMMIT_SIZE
             .checked_pow(3)
             .ok_or(ParameterError::SecurityBoundViolation)?
             .try_into()
-            .map_err(|_| ParameterError::TooLargeCommitmentLength(m))?;
+            .map_err(|_| ParameterError::TooLargeCommitmentLength(COMMIT_SIZE))?;
 
         // Calculate q²
         let q_squared = q
@@ -169,14 +159,6 @@ impl AjtaiCommitment {
     pub fn witness_bound(&self) -> Zq {
         self.witness_bound
     }
-
-    pub fn get_row_size(&self) -> usize {
-        self.random_matrix.get_elements().len()
-    }
-    
-    pub fn get_col_size(&self) -> usize {
-        self.random_matrix.get_elements()[0].get_elements().len()
-    }
 }
 
 #[cfg(test)]
@@ -191,7 +173,11 @@ mod tests {
     mod test_utils {
         use super::*;
 
-        pub fn valid_witness(scheme: &AjtaiCommitment) -> RqVector {
+        const TEST_M: usize = 8;
+        const TEST_N: usize = 8;
+        type TestAjtai = AjtaiCommitment<TEST_M, TEST_N>;
+
+        pub fn valid_witness(scheme: &TestAjtai) -> RqVector {
             vec![Rq::new([scheme.witness_bound(); Rq::DEGREE]); TEST_N].into()
         }
 
@@ -200,19 +186,19 @@ mod tests {
             RqVector::random_ternary(&mut rng, TEST_N)
         }
 
-        pub fn setup_scheme() -> AjtaiCommitment {
+        pub fn setup_scheme() -> TestAjtai {
             let mut rng = rand::rng();
-            let random_matrix = RqMatrix::random(&mut rng, TEST_M, TEST_N);
-            AjtaiCommitment::new(Zq::ONE, Zq::ONE, random_matrix).unwrap()
+            let rnd_matrix = RqMatrix::random(&mut rng, TEST_M, TEST_N);
+            AjtaiCommitment::new(rnd_matrix, Zq::ONE, Zq::ONE).unwrap()
         }
     }
 
     #[test]
     fn rejects_invalid_parameters() {
-        assert!(AjtaiCommitment::new(
+        assert!(AjtaiCommitment::<TEST_M, TEST_N>::new(
+            RqMatrix::new(vec![RqVector::new(vec![Rq::zero()])]),
             Zq::ONE,
-            Zq::ZERO,
-            RqMatrix::new(vec![RqVector::new(vec![Rq::zero()])])
+            Zq::ZERO
         )
         .is_err());
         let _ = test_utils::setup_scheme(); // Will panic if setup fails

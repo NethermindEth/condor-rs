@@ -1,9 +1,10 @@
 use crate::core::{challenge_set::ChallengeSet, env_params::EnvironmentParameters};
+use crate::ring::rq_matrix::RqMatrix;
 use crate::ring::rq_vector::RqVector;
 
 pub struct PublicPrams {
     // A \in R_q^(k*n)
-    pub matrix_a: Vec<RqVector>,
+    pub matrix_a: RqMatrix,
     // B_{ik} \in R_q^(k_1*k), for i \in [1,r] and k \in [0, t_1-1]
     pub matrix_b: Vec<Vec<Vec<RqVector>>>,
     // C_{ijk} \in R_q^(k_2*1), for i \in [1,r], j \in [i, r], and k \in [0, t_2-1]
@@ -14,7 +15,7 @@ pub struct PublicPrams {
 
 impl PublicPrams {
     pub fn new(ep: &EnvironmentParameters) -> Self {
-        let matrix_a = Self::challenge_matrix(ep.k, ep.n);
+        let matrix_a = Self::challenge_RqMatrix(ep.k, ep.n);
 
         let matrix_b: Vec<Vec<Vec<RqVector>>> = (0..ep.r)
             .map(|_| {
@@ -54,6 +55,16 @@ impl PublicPrams {
             matrix_c,
             matrix_d,
         }
+    }
+
+    fn challenge_RqMatrix(row: usize, col: usize) -> RqMatrix {
+        (0..row)
+            .map(|_| {
+                (0..col)
+                    .map(|_| ChallengeSet::new().get_challenges().clone())
+                    .collect()
+            })
+            .collect()
     }
 
     fn challenge_matrix(row: usize, col: usize) -> Vec<RqVector> {

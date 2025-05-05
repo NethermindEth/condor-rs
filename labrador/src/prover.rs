@@ -1,3 +1,4 @@
+use crate::commitments::ajtai_commitment::AjtaiCommitment;
 use crate::ring::zq::Zq;
 use crate::ring::zq::ZqVector;
 use crate::{
@@ -135,8 +136,19 @@ impl<'a> LabradorProver<'a> {
         // Step 1: Outer commitments u_1 starts: --------------------------------------------
 
         // Ajtai Commitments t_i = A * s_i
-        let matrix_a = &self.pp.matrix_a;
-        let t_i: Vec<RqVector> = self.witness.s.iter().map(|s_i| s_i * matrix_a).collect();
+        // let matrix_a = &self.pp.matrix_a;
+        // let t_i: Vec<RqVector> = self.witness.s.iter().map(|s_i| s_i * matrix_a).collect();
+        let t_i: Vec<RqVector> = self
+            .witness
+            .s
+            .iter()
+            .map(|s_i| {
+                AjtaiCommitment::new(ep.beta, ep.beta, self.pp.matrix_a.clone())
+                    .unwrap()
+                    .commit(&s_i)
+                    .unwrap()
+            })
+            .collect();
 
         // decompose t_i into t_i^(0) + ... + t_i^(t_1-1) * b_1^(t_1-1)
         let t_ij: Vec<Vec<RqVector>> = t_i

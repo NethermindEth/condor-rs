@@ -30,7 +30,7 @@ use super::rq_vector::RqVector;
 
 /// This module provides implementations for various operations
 /// in the polynomial ring R = Z_q\[X\] / (X^d + 1).
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Copy)]
 pub struct Rq {
     coeffs: [Zq; Self::DEGREE],
 }

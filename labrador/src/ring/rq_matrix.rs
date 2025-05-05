@@ -31,6 +31,10 @@ impl RqMatrix {
                 .collect(),
         }
     }
+
+    pub fn get_elements(&self) -> &Vec<RqVector> {
+        &self.elements
+    }
 }
 
 impl FromIterator<RqVector> for RqMatrix {
@@ -69,8 +73,6 @@ impl Mul<&RqVector> for RqMatrix {
 
 #[cfg(test)]
 mod tests {
-    use std::u32;
-
     use super::*;
     use crate::ring::rq::Rq;
     use crate::ring::zq::Zq;

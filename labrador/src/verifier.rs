@@ -122,7 +122,7 @@ impl<'a> LabradorVerifier<'a> {
 
         // 4. line 15: check Az ?= c_1 * t_1 + ... + c_r * t_r
 
-        let az = &proof.z * &self.pp.matrix_a;
+        let az = &self.pp.matrix_a * &proof.z;
         let ct_sum = aggregate::calculate_z(&proof.t_i, &self.tr.random_c);
 
         if az != ct_sum {
