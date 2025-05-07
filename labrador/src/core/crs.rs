@@ -2,52 +2,25 @@ use crate::core::{challenge_set::ChallengeSet, env_params::EnvironmentParameters
 use crate::ring::rq_matrix::RqMatrix;
 use crate::ring::rq_vector::RqVector;
 
+#[derive(Clone)]
 pub struct PublicPrams {
     // A \in R_q^(k*n)
     pub matrix_a: RqMatrix,
     // B_{ik} \in R_q^(k_1*k), for i \in [1,r] and k \in [0, t_1-1]
-    pub matrix_b: Vec<Vec<Vec<RqVector>>>,
+    pub matrix_b: RqMatrix,
     // C_{ijk} \in R_q^(k_2*1), for i \in [1,r], j \in [i, r], and k \in [0, t_2-1]
-    pub matrix_c: Vec<Vec<Vec<Vec<RqVector>>>>,
+    pub matrix_c: RqMatrix,
     // D_{ijk} \in R_q^(k_2*1), for i \in [1,r], j \in [i, r], and k \in [0, t_1-1]
-    pub matrix_d: Vec<Vec<Vec<Vec<RqVector>>>>,
+    pub matrix_d: RqMatrix,
 }
 
 impl PublicPrams {
     pub fn new(ep: &EnvironmentParameters) -> Self {
-        let matrix_a = Self::challenge_RqMatrix(ep.k, ep.n);
-
-        let matrix_b: Vec<Vec<Vec<RqVector>>> = (0..ep.r)
-            .map(|_| {
-                (0..ep.t_1)
-                    .map(|_| Self::challenge_matrix(ep.k_1, ep.k))
-                    .collect()
-            })
-            .collect();
-
-        let matrix_c: Vec<Vec<Vec<Vec<RqVector>>>> = (0..ep.r)
-            .map(|_| {
-                (0..ep.r)
-                    .map(|_| {
-                        (0..ep.t_2)
-                            .map(|_| Self::challenge_matrix(ep.k_2, 1))
-                            .collect()
-                    })
-                    .collect()
-            })
-            .collect();
-
-        let matrix_d: Vec<Vec<Vec<Vec<RqVector>>>> = (0..ep.r)
-            .map(|_| {
-                (0..ep.r)
-                    .map(|_| {
-                        (0..ep.t_1)
-                            .map(|_| Self::challenge_matrix(ep.k_2, 1))
-                            .collect()
-                    })
-                    .collect()
-            })
-            .collect();
+        let matrix_a = Self::challenge_rq_matrix(ep.k, ep.n);
+        let matrix_b = Self::challenge_rq_matrix(ep.k_1, ep.r * ep.t_1 * ep.k);
+        // Todo: Need to confirm the row length is k_1 or k_2
+        let matrix_c = Self::challenge_rq_matrix(ep.k_1, ep.t_2 * (ep.r ^ 2 + ep.r) / 2);
+        let matrix_d = Self::challenge_rq_matrix(ep.k_2, ep.t_1 * (ep.r ^ 2 + ep.r) / 2);
 
         Self {
             matrix_a,
@@ -57,7 +30,7 @@ impl PublicPrams {
         }
     }
 
-    fn challenge_RqMatrix(row: usize, col: usize) -> RqMatrix {
+    fn challenge_rq_matrix(row: usize, col: usize) -> RqMatrix {
         (0..row)
             .map(|_| {
                 (0..col)

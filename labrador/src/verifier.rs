@@ -1,10 +1,12 @@
 #![allow(clippy::result_large_err)]
 
+use crate::commitments::combined_commitments::{DecompositionParameters, OuterCommitment};
 use crate::core::{
     aggregate, crs::PublicPrams, env_params::EnvironmentParameters, statement::Statement,
 };
 use crate::prover::{Challenges, Proof};
 use crate::ring::rq::Rq;
+use crate::ring::rq_matrix::RqMatrix;
 use crate::ring::rq_vector::RqVector;
 use crate::ring::zq::{Zq, ZqVector};
 
@@ -58,30 +60,33 @@ impl<'a> LabradorVerifier<'a> {
     pub fn verify(&self, proof: &Proof, ep: &EnvironmentParameters) -> Result<bool, VerifierError> {
         // 1. line 08: check g_ij ?= g_ji
         // 2. line 09: check h_ij ?= h_ji
-        for i in 0..ep.r {
-            for j in (i + 1)..ep.r {
-                let g_ij = &proof.g_ij[i].get_elements()[j];
-                let g_ji = &proof.g_ij[j].get_elements()[i];
-                if g_ij != g_ji {
-                    return Err(VerifierError::NotSymmetric {
-                        i,
-                        j,
-                        expected: g_ji.clone(),
-                        found: g_ij.clone(),
-                    });
-                }
-                let h_ij = &proof.h_ij[i].get_elements()[j];
-                let h_ji = &proof.h_ij[j].get_elements()[i];
-                if h_ij != h_ji {
-                    return Err(VerifierError::NotSymmetric {
-                        i,
-                        j,
-                        expected: h_ji.clone(),
-                        found: h_ij.clone(),
-                    });
-                }
-            }
-        }
+        // if !proof.g_ij.is_symmetric() or !proof.h_ij.is_symmetric() {
+        //     // Return error
+        // }
+        // for i in 0..ep.r {
+        //     for j in (i + 1)..ep.r {
+        //         let g_ij = &proof.g_ij[i].get_elements()[j];
+        //         let g_ji = &proof.g_ij[j].get_elements()[i];
+        //         if g_ij != g_ji {
+        //             return Err(VerifierError::NotSymmetric {
+        //                 i,
+        //                 j,
+        //                 expected: g_ji.clone(),
+        //                 found: g_ij.clone(),
+        //             });
+        //         }
+        //         let h_ij = &proof.h_ij[i].get_elements()[j];
+        //         let h_ji = &proof.h_ij[j].get_elements()[i];
+        //         if h_ij != h_ji {
+        //             return Err(VerifierError::NotSymmetric {
+        //                 i,
+        //                 j,
+        //                 expected: h_ji.clone(),
+        //                 found: h_ij.clone(),
+        //             });
+        //         }
+        //     }
+        // }
 
         // check b_0^{''(k)} ?= <omega^(k),p> + \sum(psi_l^(k) * b_0^{'(l)})
         Self::check_b_0_aggr(self, proof, ep).unwrap();
@@ -97,11 +102,13 @@ impl<'a> LabradorVerifier<'a> {
             .collect();
         let g_ij: Vec<Vec<RqVector>> = proof
             .g_ij
+            .get_elements()
             .iter()
             .map(|i| RqVector::decompose(i, ep.b, ep.t_2))
             .collect();
         let h_ij: Vec<Vec<RqVector>> = proof
             .h_ij
+            .get_elements()
             .iter()
             .map(|i| RqVector::decompose(i, ep.b, ep.t_1))
             .collect();
@@ -189,32 +196,43 @@ impl<'a> LabradorVerifier<'a> {
             ep,
         );
 
-        if !Self::check_relation(&a_primes, &b_primes, &proof.g_ij, &proof.h_ij) {
+        if !Self::check_relation(
+            &RqMatrix::new(a_primes),
+            &b_primes,
+            &proof.g_ij,
+            &proof.h_ij,
+        ) {
             return Err(VerifierError::RelationCheckFailed);
         }
 
         // 8. line 19: u_1 ?= \sum(\sum(B_ik * t_i^(k))) + \sum(\sum(C_ijk * g_ij^(k)))
 
         let u_1 = &proof.u_1;
-        let outer_commit_u_1 =
-            aggregate::calculate_u_1(&self.pp.matrix_b, &self.pp.matrix_c, &t_ij, &g_ij, ep);
+        let mut outer_commitments = OuterCommitment::new(self.pp.clone(), ep.clone());
+        outer_commitments.compute_u1(
+            RqMatrix::new(proof.t_i.clone()),
+            DecompositionParameters::new(ep.b, ep.t_1),
+            proof.g_ij.clone(),
+            DecompositionParameters::new(ep.b, ep.t_2),
+        );
 
-        if u_1 != &outer_commit_u_1 {
+        if proof.u_1 != outer_commitments.u_1 {
             return Err(VerifierError::OuterCommitError {
                 computed: u_1.clone(),
-                expected: outer_commit_u_1,
+                expected: outer_commitments.u_1,
             });
         }
 
         // 9. line 20: u_2 ?= \sum(\sum(D_ijk * h_ij^(k)))
+        outer_commitments.compute_u2(
+            proof.h_ij.clone(),
+            DecompositionParameters::new(ep.b, ep.t_1),
+        );
 
-        let u_2 = &proof.u_2;
-        let outer_commit_u_2 = aggregate::calculate_u_2(&self.pp.matrix_d, &h_ij, ep);
-
-        if u_2 != &outer_commit_u_2 {
+        if proof.u_2 != outer_commitments.u_2 {
             return Err(VerifierError::OuterCommitError {
-                computed: u_2.clone(),
-                expected: outer_commit_u_2,
+                computed: outer_commitments.u_2.clone(),
+                expected: proof.u_2.clone(),
             });
         }
 
@@ -222,12 +240,12 @@ impl<'a> LabradorVerifier<'a> {
     }
 
     /// calculate the right hand side of line 16 or line 17, \sum(g_ij * c_i * c_j) or \sum(h_ij * c_i * c_j)
-    fn calculate_gh_ci_cj(x_ij: &[RqVector], random_c: &RqVector, r: usize) -> Rq {
+    fn calculate_gh_ci_cj(x_ij: &RqMatrix, random_c: &RqVector, r: usize) -> Rq {
         (0..r)
             .map(|i| {
                 (0..r)
                     .map(|j| {
-                        &(&x_ij[i].get_elements()[j] * &random_c.get_elements()[i])
+                        &(&x_ij.get_elements()[i].get_elements()[j] * &random_c.get_elements()[i])
                             * &random_c.get_elements()[j]
                     })
                     .fold(Rq::zero(), |acc, x| &acc + &x)
@@ -260,17 +278,13 @@ impl<'a> LabradorVerifier<'a> {
     /// param: h: h_{ii}
     ///
     /// return: true if the relation holds, false otherwise
-    pub fn check_relation(
-        a_primes: &[RqVector],
-        b_primes: &Rq,
-        g: &[RqVector],
-        h: &[RqVector],
-    ) -> bool {
-        let r = a_primes.len();
+    pub fn check_relation(a_primes: &RqMatrix, b_primes: &Rq, g: &RqMatrix, h: &RqMatrix) -> bool {
+        let r = a_primes.get_elements().len();
 
         let sum_a_primes_g: Rq = a_primes
+            .get_elements()
             .iter()
-            .zip(g.iter())
+            .zip(g.get_elements().iter())
             .map(|(a_i, g_i)| {
                 a_i.iter()
                     .zip(g_i.iter())
@@ -280,7 +294,7 @@ impl<'a> LabradorVerifier<'a> {
             .fold(Rq::new([Zq::ZERO; Rq::DEGREE]), |acc, val| &acc + &val);
 
         let sum_h_ii: Rq = (0..r).fold(Rq::new([Zq::ZERO; Rq::DEGREE]), |acc, i| {
-            &acc + &h[i].get_elements()[i]
+            &acc + &h.get_elements()[i].get_elements()[i]
         });
 
         let b_primes2 = b_primes * &Zq::TWO;

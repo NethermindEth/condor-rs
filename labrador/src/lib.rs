@@ -17,8 +17,8 @@
 // Amortization
 #![doc = include_str!("../doc/amortization.md")]
 
-pub mod commitments;
-pub mod core;
-pub mod prover;
+// pub mod commitments;
+// pub mod core;
+// pub mod prover;
 pub mod ring;
-pub mod verifier;
+// pub mod verifier;

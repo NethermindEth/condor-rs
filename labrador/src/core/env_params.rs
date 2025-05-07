@@ -1,6 +1,7 @@
 use crate::ring::zq::Zq;
 
 // Example Environment parameters used for LaBRADOR, can be expanded as required by testing.
+#[derive(Clone)]
 pub struct EnvironmentParameters {
     // r is the number of witness elements, multiplicity
     pub r: usize,
@@ -15,6 +16,8 @@ pub struct EnvironmentParameters {
     pub t_1: usize,
     // t_2
     pub t_2: usize,
+    // Norm bound for Ajtai commitment of vector t
+    pub gamma_1: Zq,
     // kappa k, the example size, 128/log_q
     pub k: usize,
     pub k_1: usize,
@@ -37,6 +40,7 @@ impl EnvironmentParameters {
         b: Zq,
         t_1: usize,
         t_2: usize,
+        gamma_1: Zq,
         k: usize,
         k_1: usize,
         k_2: usize,
@@ -52,6 +56,7 @@ impl EnvironmentParameters {
             b,
             t_1,
             t_2,
+            gamma_1,
             k,
             k_1,
             k_2,
@@ -68,10 +73,11 @@ impl Default for EnvironmentParameters {
         Self {
             r: 3,
             n: 5,
-            beta: Zq::new(65535),
+            beta: Zq::new(60),
             b: Zq::new(16),
             t_1: 4,
             t_2: 4,
+            gamma_1: Zq::new(60),
             k: 4,
             k_1: 5,
             k_2: 5,

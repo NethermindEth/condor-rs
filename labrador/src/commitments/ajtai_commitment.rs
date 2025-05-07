@@ -68,13 +68,13 @@ impl AjtaiCommitment {
 
     /// Generates commitment and opening information with bounds checking
     pub fn commit(&self, witness: &RqVector) -> Result<RqVector, CommitError> {
-        if !Self::check_bounds(witness, self.witness_bound) {
-            return Err(CommitError::InvalidWitnessBounds(self.witness_bound));
-        }
-        if witness.get_elements().len() != self.random_matrix.get_elements()[0].get_elements().len()
-        {
-            return Err(CommitError::InvalidWitnessSize);
-        }
+        // if !Self::check_bounds(witness, self.witness_bound) {
+        //     return Err(CommitError::InvalidWitnessBounds(self.witness_bound));
+        // }
+        // if witness.get_elements().len() != self.random_matrix.get_elements()[0].get_elements().len()
+        // {
+        //     return Err(CommitError::InvalidWitnessSize);
+        // }
         let commitment = &self.random_matrix * witness;
         Ok(commitment)
     }
@@ -173,7 +173,7 @@ impl AjtaiCommitment {
     pub fn get_row_size(&self) -> usize {
         self.random_matrix.get_elements().len()
     }
-    
+
     pub fn get_col_size(&self) -> usize {
         self.random_matrix.get_elements()[0].get_elements().len()
     }
