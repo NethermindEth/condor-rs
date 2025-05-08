@@ -140,8 +140,6 @@ impl<'a> LabradorProver<'a> {
         // Step 1: Outer commitments u_1 starts: --------------------------------------------
 
         // Ajtai Commitments t_i = A * s_i
-        // let matrix_a = &self.pp.matrix_a;
-        // let t_i: Vec<RqVector> = self.witness.s.iter().map(|s_i| s_i * matrix_a).collect();
         let t_i: Vec<RqVector> = self
             .witness
             .s
@@ -179,6 +177,7 @@ impl<'a> LabradorProver<'a> {
         //     .collect();
         // let matrix_b = &self.pp.matrix_b;
         // let matrix_c = &self.pp.matrix_c;
+
         // calculate outer commitment u_1 = \sum(B_ik * t_i^(k)) + \sum(C_ijk * g_ij^(k))
 
         // let u_1 = aggregate::calculate_u_1(matrix_b, matrix_c, &t_ij, &g_ij, ep);
@@ -224,6 +223,7 @@ impl<'a> LabradorProver<'a> {
             DecompositionParameters::new(ep.b, ep.t_1),
         );
         // let u_2 = aggregate::calculate_u_2(matrix_d, &h_ij, ep);
+
         // calculate z = c_1*s_1 + ... + c_r*s_r
         let z = aggregate::calculate_z(&self.witness.s, &self.tr.random_c);
 
