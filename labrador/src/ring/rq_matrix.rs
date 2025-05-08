@@ -69,8 +69,6 @@ impl Mul<&RqVector> for RqMatrix {
 
 #[cfg(test)]
 mod tests {
-    use std::u32;
-
     use super::*;
     use crate::ring::rq::Rq;
     use crate::ring::zq::Zq;

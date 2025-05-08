@@ -178,6 +178,7 @@ mod tests {
 
     // Test the distribution of values in the random matrix
     #[test]
+    #[allow(clippy::as_conversions)]
     fn test_random_distribution_matrix() {
         // 1000 was chosen to provide a reasonably large sample size
         let n = 1000;
