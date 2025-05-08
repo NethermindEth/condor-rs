@@ -17,9 +17,9 @@ impl RqVector {
     }
 
     /// Create a zero vector
-    pub fn zero(lenght: usize) -> Self {
+    pub fn zero(length: usize) -> Self {
         Self {
-            elements: vec![Rq::zero(); lenght],
+            elements: vec![Rq::zero(); length],
         }
     }
 

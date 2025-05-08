@@ -30,8 +30,8 @@ pub enum VerificationError {
     InvalidWitnessBounds(Zq),
     #[error("commitment does not match opening")]
     CommitmentMismatch,
-    #[error("invalid openning vector size")]
-    InvalidOpenningSize,
+    #[error("invalid opening vector size")]
+    InvalidOpeningSize,
     #[error("invalid commitment vector size")]
     InvalidCommitmentSize,
 }
@@ -86,7 +86,7 @@ impl AjtaiCommitment {
             return Err(VerificationError::InvalidWitnessBounds(self.witness_bound));
         }
         if opening.get_length() != self.random_matrix.get_col_len() {
-            return Err(VerificationError::InvalidOpenningSize);
+            return Err(VerificationError::InvalidOpeningSize);
         }
         if commitment.get_length() != self.random_matrix.get_row_len() {
             return Err(VerificationError::InvalidCommitmentSize);
