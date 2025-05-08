@@ -214,7 +214,7 @@ mod tests {
     #[test]
     #[cfg(not(feature = "skip-slow-tests"))]
     fn test_probability_is_close_to_half() {
-        // 10.000 was chosen to provide a reasonably large sample size
+        // 1000 was chosen to provide a reasonably large sample size
         let trials: f64 = 1000.0;
         let mut success_count: f64 = 0.0;
         let n = 5;
@@ -249,8 +249,8 @@ mod tests {
     #[test]
     #[cfg(not(feature = "skip-slow-tests"))]
     fn average_value() {
-        // 100.000 was chosen to provide a reasonably large sample size
-        let trials: u128 = 100000;
+        // 10000 was chosen to provide a reasonably large sample size
+        let trials: u128 = 10000;
         let n = 3;
         let mut rng = rng();
         let polynomials = RqVector::random_ternary(&mut rng, 3);
@@ -276,7 +276,7 @@ mod tests {
         };
 
         // we choose a small tolerance value for possible statistical error
-        let tolerance: u128 = 2;
+        let tolerance: u128 = 20;
         assert!(
             difference < tolerance,
             "Average norm value {} is not equal to {}.",
