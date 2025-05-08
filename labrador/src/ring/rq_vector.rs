@@ -23,6 +23,10 @@ impl RqVector {
         }
     }
 
+    pub fn get_length(&self) -> usize {
+        self.elements.len()
+    }
+
     pub fn get_elements(&self) -> &Vec<Rq> {
         &self.elements
     }
@@ -57,7 +61,7 @@ impl RqVector {
         self.iter()
             .zip(other.iter())
             .map(|(a, b)| a.multiplication(b))
-            .fold(Rq::zero(), |acc, val| &acc + &val)
+            .fold(Rq::zero(), |acc, val| acc + val)
     }
 
     /// Get the underlying vector as slice
@@ -149,7 +153,7 @@ impl Mul for &RqVector {
         self.elements
             .iter()
             .zip(rhs.elements.iter())
-            .map(|(a, b)| a.clone() * b.clone())
+            .map(|(a, b)| *a * *b)
             .fold(Rq::zero(), |acc, x| acc + x)
     }
 }

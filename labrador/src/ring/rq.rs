@@ -41,13 +41,17 @@ impl Rq {
     pub const fn new(coeffs: [Zq; Self::DEGREE]) -> Self {
         Rq { coeffs }
     }
+
+    /// Generate zero polynomial
+    pub const fn zero() -> Self {
+        Self {
+            coeffs: [Zq::ZERO; Self::DEGREE],
+        }
+    }
+
     /// Get the coefficients as a vector
     pub fn get_coefficients(&self) -> &[Zq; Self::DEGREE] {
         &self.coeffs
-    }
-
-    pub fn iter_mut(&mut self) -> std::slice::IterMut<'_, Zq> {
-        self.coeffs.iter_mut()
     }
 
     /// Polynomial addition
@@ -170,11 +174,11 @@ impl Rq {
     /// Where each p⁽ⁱ⁾ has small coefficients, using centered representatives
     pub fn decompose(&self, base: Zq, num_parts: usize) -> RqVector {
         let mut parts = Vec::with_capacity(num_parts);
-        let mut current = self.clone();
+        let mut current = *self;
 
         for i in 0..num_parts {
             if i == num_parts - 1 {
-                parts.push(current.clone());
+                parts.push(current);
             } else {
                 // Extract low part (mod base, centered around 0)
                 let mut low_coeffs = [Zq::ZERO; Self::DEGREE];
@@ -184,7 +188,7 @@ impl Rq {
                 }
 
                 let low_part = Self::new(low_coeffs);
-                parts.push(low_part.clone());
+                parts.push(low_part);
 
                 // Update current
                 current -= low_part;
@@ -234,10 +238,6 @@ impl Rq {
     /// Check if polynomial coefficients are within bounds
     pub fn check_bounds(&self, bound: Zq) -> bool {
         self.iter().all(|coeff| coeff <= &bound || coeff >= &-bound)
-    }
-
-    pub const fn zero() -> Self {
-        Self::new([Zq::ZERO; Self::DEGREE])
     }
 
     /// Compute the conjugate automorphism \sigma_{-1} of vector based on B) Constraints..., Page 21.
@@ -358,7 +358,7 @@ impl Mul<&Zq> for &Rq {
 
 impl Add<&Rq> for &Rq {
     type Output = Rq;
-    /// Add two polynomials with flexible degree
+    /// Add two polynomials
     fn add(self, other: &Rq) -> Rq {
         let mut coeffs = [Zq::ZERO; Rq::DEGREE];
         for (idx, item) in coeffs.iter_mut().enumerate().take(Rq::DEGREE) {
@@ -580,8 +580,8 @@ mod tests {
         // Subtraction with zero polynomial
         let poly5: Rq = vec![Zq::ONE, Zq::new(2), Zq::new(3), Zq::new(4)].into();
         let poly6: Rq = vec![Zq::ZERO].into();
-        let result3 = poly6.clone() - poly5.clone();
-        let result4 = poly5.clone() - poly6.clone();
+        let result3 = poly6 - poly5;
+        let result4 = poly5 - poly6;
         assert_eq!(
             result3.coeffs,
             helper::padded(&[
@@ -851,9 +851,8 @@ mod tests {
         assert_eq!(parts.get_elements().len(), 3, "Should have 3 parts");
 
         // Test reconstruction with all 3 parts
-        let reconstructed = parts[0].clone()
-            + parts[1].clone().scalar_mul(Zq::new(4))
-            + parts[2].clone().scalar_mul(Zq::new(16)); // 4²
+        let reconstructed =
+            parts[0] + parts[1].scalar_mul(Zq::new(4)) + parts[2].scalar_mul(Zq::new(16)); // 4²
 
         // Verify reconstruction coefficient by coefficient
         for i in 0..4 {
@@ -918,7 +917,7 @@ mod tests {
         let parts = poly.decompose(Zq::new(3), 2);
 
         // Verify reconstruction
-        let reconstructed = parts[0].clone() + parts[1].clone().scalar_mul(Zq::new(3));
+        let reconstructed = parts[0] + parts[1].scalar_mul(Zq::new(3));
 
         for i in 0..3 {
             assert_eq!(
@@ -978,7 +977,7 @@ mod tests {
             }
 
             // Verify reconstruction
-            let reconstructed = parts[0].clone() + parts[1].clone().scalar_mul(Zq::new(*base));
+            let reconstructed = parts[0] + parts[1].scalar_mul(Zq::new(*base));
             assert_eq!(reconstructed, poly, "Base {}: Reconstruction failed", base);
         }
     }

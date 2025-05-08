@@ -104,17 +104,17 @@ pub fn calculate_b_constraint(
     // calculate \sum(a_{ij}^{k}<s_i, s_j>)
     let left_side = (0..size_s).map(|i| {
         (0..size_s).map(|j| {
-            &a_constraint[i].get_elements()[j]
-                * &s[i].inner_product_poly_vector(&s[j])
+            a_constraint[i].get_elements()[j]
+                * s[i].inner_product_poly_vector(&s[j])
         })
-        .fold(Rq::zero(), |acc, val| &acc + &val )
+        .fold(Rq::zero(), |acc, val| acc + val )
     })
-    .fold(Rq::zero(), |acc, val| &acc + &val );
+    .fold(Rq::zero(), |acc, val| acc + val );
 
     // calculate \sum(<phi_{i}^{k}, s_i>)
     let right_side = (0..size_s).fold(Rq::zero(), |acc, i| {
-        &acc + &phi_constraint[i].inner_product_poly_vector(&s[i])
+        acc + phi_constraint[i].inner_product_poly_vector(&s[i])
     });
 
-    &left_side + &right_side
+    left_side + right_side
 }

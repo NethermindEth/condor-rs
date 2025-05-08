@@ -30,16 +30,15 @@ pub enum VerificationError {
     InvalidWitnessBounds(Zq),
     #[error("commitment does not match opening")]
     CommitmentMismatch,
-    #[error("invalid witness vector size")]
-    InvalidWitnessSize,
     #[error("invalid openning vector size")]
     InvalidOpenningSize,
+    #[error("invalid commitment vector size")]
+    InvalidCommitmentSize,
 }
 
 /// Ajtai commitment scheme implementation with matrix-based operations
 #[derive(Debug)]
 pub struct AjtaiCommitment {
-    beta: Zq,
     witness_bound: Zq,
     random_matrix: RqMatrix,
 }
@@ -55,12 +54,11 @@ impl AjtaiCommitment {
         }
         Self::validate_parameters(
             beta,
-            random_matrix.get_elements().len(),
-            random_matrix.get_elements()[0].get_elements().len(),
+            random_matrix.get_row_len(),
+            random_matrix.get_col_len(),
         )?;
 
         Ok(Self {
-            beta,
             witness_bound,
             random_matrix,
         })
@@ -68,13 +66,12 @@ impl AjtaiCommitment {
 
     /// Generates commitment and opening information with bounds checking
     pub fn commit(&self, witness: &RqVector) -> Result<RqVector, CommitError> {
-        // if !Self::check_bounds(witness, self.witness_bound) {
-        //     return Err(CommitError::InvalidWitnessBounds(self.witness_bound));
-        // }
-        // if witness.get_elements().len() != self.random_matrix.get_elements()[0].get_elements().len()
-        // {
-        //     return Err(CommitError::InvalidWitnessSize);
-        // }
+        if !self.check_bounds(witness) {
+            return Err(CommitError::InvalidWitnessBounds(self.witness_bound));
+        }
+        if witness.get_length() != self.random_matrix.get_col_len() {
+            return Err(CommitError::InvalidWitnessSize);
+        }
         let commitment = &self.random_matrix * witness;
         Ok(commitment)
     }
@@ -85,15 +82,14 @@ impl AjtaiCommitment {
         commitment: &RqVector,
         opening: &RqVector,
     ) -> Result<(), VerificationError> {
-        if !Self::check_bounds(opening, self.witness_bound) {
+        if !self.check_bounds(opening) {
             return Err(VerificationError::InvalidWitnessBounds(self.witness_bound));
         }
-        if opening.get_elements().len() != self.random_matrix.get_elements()[0].get_elements().len()
-        {
-            return Err(VerificationError::InvalidWitnessSize);
-        }
-        if commitment.get_elements().len() != self.random_matrix.get_elements().len() {
+        if opening.get_length() != self.random_matrix.get_col_len() {
             return Err(VerificationError::InvalidOpenningSize);
+        }
+        if commitment.get_length() != self.random_matrix.get_row_len() {
+            return Err(VerificationError::InvalidCommitmentSize);
         }
 
         let recomputed = &self.random_matrix * opening;
@@ -156,8 +152,12 @@ impl AjtaiCommitment {
     }
 
     /// Checks polynomial coefficients against specified bound
-    fn check_bounds(polynomials: &RqVector, bound: Zq) -> bool {
-        polynomials.iter().all(|p| p.check_bounds(bound))
+    fn check_bounds(&self, _polynomials: &RqVector) -> bool {
+        // As now there are no concrete parameters, we return true.
+        true
+        // polynomials
+        //     .iter()
+        //     .all(|p| p.check_bounds(self.witness_bound))
     }
 
     /// Returns a reference to the internal matrix

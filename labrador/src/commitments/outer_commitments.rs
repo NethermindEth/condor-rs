@@ -2,11 +2,8 @@ use core::panic;
 
 use super::ajtai_commitment::AjtaiCommitment;
 use crate::{
-    core::{
-        crs::PublicPrams,
-        env_params::{self, EnvironmentParameters},
-    },
-    ring::{rq::Rq, rq_matrix::RqMatrix, rq_vector::RqVector, zq::Zq},
+    core::{crs::PublicPrams, env_params::EnvironmentParameters},
+    ring::{rq_matrix::RqMatrix, rq_vector::RqVector, zq::Zq},
 };
 
 /// Parameters for polynomial decomposition in hierarchical commitments

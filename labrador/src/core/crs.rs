@@ -1,6 +1,5 @@
 use crate::core::{challenge_set::ChallengeSet, env_params::EnvironmentParameters};
 use crate::ring::rq_matrix::RqMatrix;
-use crate::ring::rq_vector::RqVector;
 
 #[derive(Clone)]
 pub struct PublicPrams {
@@ -16,11 +15,11 @@ pub struct PublicPrams {
 
 impl PublicPrams {
     pub fn new(ep: &EnvironmentParameters) -> Self {
-        let matrix_a = Self::challenge_rq_matrix(ep.k, ep.n);
-        let matrix_b = Self::challenge_rq_matrix(ep.k_1, ep.r * ep.t_1 * ep.k);
-        // Todo: Need to confirm the row length is k_1 or k_2
-        let matrix_c = Self::challenge_rq_matrix(ep.k_1, ep.t_2 * (ep.r ^ 2 + ep.r) / 2);
-        let matrix_d = Self::challenge_rq_matrix(ep.k_2, ep.t_1 * (ep.r ^ 2 + ep.r) / 2);
+        let matrix_a = Self::challenge_rq_matrix(ep.kappa, ep.n);
+        let matrix_b = Self::challenge_rq_matrix(ep.kappa_1, ep.r * ep.t_1 * ep.kappa);
+        // Todo: Need to confirm the row length is k_1 or k_2. For now, it is set to be k_1.
+        let matrix_c = Self::challenge_rq_matrix(ep.kappa_1, ep.t_2 * ((ep.r.pow(2)) + ep.r) / 2);
+        let matrix_d = Self::challenge_rq_matrix(ep.kappa_2, ep.t_1 * ((ep.r.pow(2)) + ep.r) / 2);
 
         Self {
             matrix_a,
@@ -34,17 +33,7 @@ impl PublicPrams {
         (0..row)
             .map(|_| {
                 (0..col)
-                    .map(|_| ChallengeSet::new().get_challenges().clone())
-                    .collect()
-            })
-            .collect()
-    }
-
-    fn challenge_matrix(row: usize, col: usize) -> Vec<RqVector> {
-        (0..row)
-            .map(|_| {
-                (0..col)
-                    .map(|_| ChallengeSet::new().get_challenges().clone())
+                    .map(|_| *ChallengeSet::new().get_challenges())
                     .collect()
             })
             .collect()

@@ -1,6 +1,6 @@
 #![allow(clippy::result_large_err)]
 
-use crate::commitments::combined_commitments::{DecompositionParameters, OuterCommitment};
+use crate::commitments::outer_commitments::{DecompositionParameters, OuterCommitment};
 use crate::core::{
     aggregate, crs::PublicPrams, env_params::EnvironmentParameters, statement::Statement,
 };
@@ -58,6 +58,7 @@ impl<'a> LabradorVerifier<'a> {
 
     /// All check conditions are from page 18
     pub fn verify(&self, proof: &Proof, ep: &EnvironmentParameters) -> Result<bool, VerifierError> {
+        // We probably do not need the following. We only store half of the matrix
         // 1. line 08: check g_ij ?= g_ji
         // 2. line 09: check h_ij ?= h_ji
         // if !proof.g_ij.is_symmetric() or !proof.h_ij.is_symmetric() {
@@ -245,12 +246,12 @@ impl<'a> LabradorVerifier<'a> {
             .map(|i| {
                 (0..r)
                     .map(|j| {
-                        &(&x_ij.get_elements()[i].get_elements()[j] * &random_c.get_elements()[i])
-                            * &random_c.get_elements()[j]
+                        (x_ij.get_cell_symmetric(i, j) * random_c.get_elements()[i])
+                            * random_c.get_elements()[j]
                     })
-                    .fold(Rq::zero(), |acc, x| &acc + &x)
+                    .fold(Rq::zero(), |acc, x| acc + x)
             })
-            .fold(Rq::zero(), |acc, x| &acc + &x)
+            .fold(Rq::zero(), |acc, x| acc + x)
     }
 
     /// calculate the left hand side of line 17, \sum(<\phi_z, z> * c_i)
@@ -258,7 +259,7 @@ impl<'a> LabradorVerifier<'a> {
         phi.iter()
             .zip(c.iter())
             .map(|(phi_i, c_i)| &(phi_i.inner_product_poly_vector(z)) * c_i)
-            .fold(Rq::zero(), |acc, x| &acc + &x)
+            .fold(Rq::zero(), |acc, x| acc + x)
     }
 
     fn norm_squared(polys: &[Vec<RqVector>]) -> Zq {
@@ -281,26 +282,21 @@ impl<'a> LabradorVerifier<'a> {
     pub fn check_relation(a_primes: &RqMatrix, b_primes: &Rq, g: &RqMatrix, h: &RqMatrix) -> bool {
         let r = a_primes.get_elements().len();
 
-        let sum_a_primes_g: Rq = a_primes
-            .get_elements()
-            .iter()
-            .zip(g.get_elements().iter())
-            .map(|(a_i, g_i)| {
-                a_i.iter()
-                    .zip(g_i.iter())
-                    .map(|(a_ij, g_ij)| a_ij * g_ij)
-                    .fold(Rq::new([Zq::ZERO; Rq::DEGREE]), |acc, val| &acc + &val)
-            })
-            .fold(Rq::new([Zq::ZERO; Rq::DEGREE]), |acc, val| &acc + &val);
+        let mut sum_a_primes_g = Rq::zero();
+        // walk only over the stored half: i ≤ j
+        for i in 0..r {
+            for j in 0..r {
+                sum_a_primes_g +=
+                    a_primes.get_elements()[i].get_elements()[j] * g.get_cell_symmetric(i, j);
+            }
+        }
 
-        let sum_h_ii: Rq = (0..r).fold(Rq::new([Zq::ZERO; Rq::DEGREE]), |acc, i| {
-            &acc + &h.get_elements()[i].get_elements()[i]
-        });
+        let sum_h_ii = (0..r).fold(Rq::zero(), |acc, i| acc + h.get_cell_symmetric(i, i));
 
         let b_primes2 = b_primes * &Zq::TWO;
         let sum_a_primes_g2 = &sum_a_primes_g * &Zq::TWO;
 
-        &sum_a_primes_g2 + &sum_h_ii == b_primes2
+        sum_a_primes_g2 + sum_h_ii == b_primes2
     }
 
     fn check_b_0_aggr(
@@ -308,7 +304,7 @@ impl<'a> LabradorVerifier<'a> {
         proof: &Proof,
         ep: &EnvironmentParameters,
     ) -> Result<bool, VerifierError> {
-        for k in 0..ep.k {
+        for k in 0..ep.kappa {
             let b_0_poly = proof.b_ct_aggr.get_elements()[k].get_coefficients()[0];
             let mut b_0: Zq = (0..ep.constraint_l)
                 .map(|l| self.tr.psi[k][l] * self.st.b_0_ct[l])

@@ -1,7 +1,7 @@
 use crate::commitments::ajtai_commitment::AjtaiCommitment;
-use crate::commitments::combined_commitments::DecompositionParameters;
-use crate::commitments::combined_commitments::OuterCommitment;
-use crate::commitments::garbage_polynomials::GarbagePolynomials;
+use crate::commitments::outer_commitments::DecompositionParameters;
+use crate::commitments::outer_commitments::OuterCommitment;
+use crate::core::garbage_polynomials::GarbagePolynomials;
 use crate::ring::rq_matrix::RqMatrix;
 use crate::ring::zq::Zq;
 use crate::ring::zq::ZqVector;
@@ -55,13 +55,13 @@ pub struct Challenges {
 impl Challenges {
     pub fn new(ep: &EnvironmentParameters) -> Self {
         // generate random psi with size: k * constraint_l, each element is Zq
-        let psi: Vec<Vec<Zq>> = (0..ep.k)
+        let psi: Vec<Vec<Zq>> = (0..ep.kappa)
             .map(|_| Vec::<Zq>::random(&mut rng(), ep.constraint_l))
             .collect();
 
         // generate randm omega is with size: k * lambda2, each element is Zq
-        let omega: Vec<Vec<Zq>> = (0..ep.k)
-            .map(|_| Vec::<Zq>::random(&mut rng(), ep.lambda2))
+        let omega: Vec<Vec<Zq>> = (0..ep.kappa)
+            .map(|_| Vec::<Zq>::random(&mut rng(), 2 * ep.lambda))
             .collect();
 
         // \pi is from JL projection, pi contains r matrices and each matrix: security_level2 * (n*d), (security_level2 is 256 in the paper).
@@ -70,16 +70,16 @@ impl Challenges {
         // generate random alpha and beta from challenge set
         let cs_alpha: ChallengeSet = ChallengeSet::new();
         let random_alpha: RqVector = (0..ep.constraint_k)
-            .map(|_| cs_alpha.get_challenges().clone())
+            .map(|_| *cs_alpha.get_challenges())
             .collect();
 
         let cs_beta: ChallengeSet = ChallengeSet::new();
         let random_beta: RqVector = (0..ep.constraint_k)
-            .map(|_| cs_beta.get_challenges().clone())
+            .map(|_| *cs_beta.get_challenges())
             .collect();
 
         let cs_c: ChallengeSet = ChallengeSet::new();
-        let random_c: RqVector = (0..ep.r).map(|_| cs_c.get_challenges().clone()).collect();
+        let random_c: RqVector = (0..ep.r).map(|_| *cs_c.get_challenges()).collect();
 
         Self {
             pi,
@@ -149,12 +149,12 @@ impl<'a> LabradorProver<'a> {
             .map(|s_i| {
                 AjtaiCommitment::new(ep.beta, ep.beta, self.pp.matrix_a.clone())
                     .unwrap()
-                    .commit(&s_i)
+                    .commit(s_i)
                     .unwrap()
             })
             .collect();
 
-        /// Omid Code
+        // This replaces the following code
         let mut garbage_polynomials = GarbagePolynomials::new(self.witness.s.clone());
         garbage_polynomials.compute_g();
         let mut outer_commitments = OuterCommitment::new(self.pp.clone(), ep.clone());
@@ -164,7 +164,7 @@ impl<'a> LabradorProver<'a> {
             garbage_polynomials.g.clone(),
             DecompositionParameters::new(ep.b, ep.t_2),
         );
-        ///
+        // Probably do not need the following code
         // decompose t_i into t_i^(0) + ... + t_i^(t_1-1) * b_1^(t_1-1)
         // let t_ij: Vec<Vec<RqVector>> = t_i
         //     .iter()

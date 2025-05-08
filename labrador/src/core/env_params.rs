@@ -3,67 +3,80 @@ use crate::ring::zq::Zq;
 // Example Environment parameters used for LaBRADOR, can be expanded as required by testing.
 #[derive(Clone)]
 pub struct EnvironmentParameters {
-    // r is the number of witness elements, multiplicity
-    pub r: usize,
-    // n is the witness sizes, rank
-    pub n: usize,
-    // witness norm bound beta
-    pub beta: Zq,
-    // decompose base b
-    pub b: Zq,
-    // the parts of decomposition.
-    // t_1
-    pub t_1: usize,
-    // t_2
-    pub t_2: usize,
-    // Norm bound for Ajtai commitment of vector t
-    pub gamma_1: Zq,
-    // kappa k, the example size, 128/log_q
-    pub k: usize,
-    pub k_1: usize,
-    pub k_2: usize,
-    // security level, \lambda = 128, lambda2 = 2 * lambda
-    pub lambda2: usize,
-    // the log of modulus q, q = 2^(32)
-    pub log_q: usize,
-    // L: F' functions family size, K: F functions family size
-    pub constraint_l: usize,
-    pub constraint_k: usize,
+    /// Relation R Parameters
+    pub n: usize, // rank (size of each witness s_i)
+    pub r: usize, // multiplicity (number of witness elements)
+
+    /// Decomposition Parameters
+    pub b: Zq, // z decomposition base
+    pub b_1: Zq,    // t_i decomposition base
+    pub t_1: usize, // t_i number of parts
+    pub b_2: Zq,    // g_ij decomposition base
+    pub t_2: usize, // g_ij number of parts
+
+    /// Norm Bounds
+    pub beta: Zq, // Bound for witness s_i
+    pub gamma: Zq,   // Bound for z
+    pub gamma_1: Zq, // Bound for t
+    pub gamma_2: Zq, // Bound for g and h
+
+    /// Commitment Matrices Sizes
+    pub kappa: usize, // Number of rows in A
+    pub kappa_1: usize, // Number of rows in B
+    pub kappa_2: usize, // Number of rows in C
+
+    /// Security Parameter
+    pub lambda: usize, // security parameter
+
+    /// Function Families Sizes
+    pub constraint_k: usize, // Number of constraints of the form f
+    pub constraint_l: usize, // Number of constraints of the form f'
+
+    /// Other Parameters
+    pub log_q: usize, // Size of log(q) in bits, where q is the modulo
 }
 
 #[allow(clippy::too_many_arguments)]
 impl EnvironmentParameters {
     pub fn new(
-        r: usize,
         n: usize,
-        beta: Zq,
+        r: usize,
         b: Zq,
+        b_1: Zq,
         t_1: usize,
+        b_2: Zq,
         t_2: usize,
+        beta: Zq,
+        gamma: Zq,
         gamma_1: Zq,
-        k: usize,
-        k_1: usize,
-        k_2: usize,
-        lambda2: usize,
-        log_q: usize,
-        constraint_l: usize,
+        gamma_2: Zq,
+        kappa: usize,
+        kappa_1: usize,
+        kappa_2: usize,
+        lambda: usize,
         constraint_k: usize,
+        constraint_l: usize,
+        log_q: usize,
     ) -> Self {
         Self {
-            r,
             n,
-            beta,
+            r,
             b,
+            b_1,
             t_1,
+            b_2,
             t_2,
+            beta,
+            gamma,
             gamma_1,
-            k,
-            k_1,
-            k_2,
-            lambda2,
-            log_q,
-            constraint_l,
+            gamma_2,
+            kappa,
+            kappa_1,
+            kappa_2,
+            lambda,
             constraint_k,
+            constraint_l,
+            log_q,
         }
     }
 }
@@ -71,20 +84,24 @@ impl EnvironmentParameters {
 impl Default for EnvironmentParameters {
     fn default() -> Self {
         Self {
-            r: 3,
             n: 5,
-            beta: Zq::new(60),
-            b: Zq::new(16),
+            r: 3,
+            b: Zq::new(2),
+            b_1: Zq::new(16),
             t_1: 4,
+            b_2: Zq::new(16),
             t_2: 4,
-            gamma_1: Zq::new(60),
-            k: 4,
-            k_1: 5,
-            k_2: 5,
-            lambda2: 256,
-            log_q: 32,
-            constraint_l: 5,
+            beta: Zq::new(65535),
+            gamma: Zq::new(16),
+            gamma_1: Zq::new(16),
+            gamma_2: Zq::new(16),
+            kappa: 4,
+            kappa_1: 5,
+            kappa_2: 5,
+            lambda: 128,
             constraint_k: 5,
+            constraint_l: 5,
+            log_q: 32,
         }
     }
 }

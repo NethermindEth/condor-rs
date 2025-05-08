@@ -17,10 +17,11 @@ impl GarbagePolynomials {
 
     pub fn compute_g(&mut self) {
         let mut g_i = Vec::new();
-        for witness_i in &self.witness_vector {
+        for i in 0..self.witness_vector.len() {
             let mut g_ij = Vec::new();
-            for witness_j in &self.witness_vector {
-                g_ij.push(witness_i * witness_j);
+            for j in 0..=i {
+                // Only calculate for j ≤ i (upper triangular)
+                g_ij.push(&self.witness_vector[i] * &self.witness_vector[j]);
             }
             g_i.push(RqVector::new(g_ij));
         }
@@ -37,7 +38,7 @@ impl GarbagePolynomials {
                 // Only calculate for j ≤ i (upper triangular)
                 let inner_phi_i_s_j = phi[i].inner_product_poly_vector(&self.witness_vector[j]);
                 let inner_phi_j_s_i = phi[j].inner_product_poly_vector(&self.witness_vector[i]);
-                h_ij.push(&inner_phi_i_s_j + &inner_phi_j_s_i);
+                h_ij.push(inner_phi_i_s_j + inner_phi_j_s_i);
             }
             h_i.push(RqVector::new(h_ij));
         }

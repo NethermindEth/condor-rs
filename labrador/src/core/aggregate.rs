@@ -175,7 +175,7 @@ fn calculate_aggr_ct_a(
     a_ct: &[Vec<RqVector>],
     ep: &EnvironmentParameters,
 ) -> Vec<Vec<RqVector>> {
-    let aprimes: Vec<Vec<RqVector>> = (0..ep.k).map(|k| {
+    let aprimes: Vec<Vec<RqVector>> = (0..ep.kappa).map(|k| {
         let psi_k = &random_psi[k];
         (0..ep.r).map(|i| {
             (0..ep.r).map(|j| {
@@ -187,7 +187,7 @@ fn calculate_aggr_ct_a(
                 .fold(
                     // sum over all l
                     Rq::zero(),
-                    |acc, val| &acc + &val,
+                    |acc, val| acc + val,
                 )
             }).collect::<RqVector>()
         }).collect::<Vec<RqVector>>()
@@ -214,7 +214,7 @@ fn calculate_aggr_ct_phi(
     random_omega: &[Vec<Zq>],
     ep: &EnvironmentParameters,
 ) -> Vec<Vec<RqVector>> {
-    let phi_ct_aggr: Vec<Vec<RqVector>> = (0..ep.k)
+    let phi_ct_aggr: Vec<Vec<RqVector>> = (0..ep.kappa)
         .map(|k| {
             (0..ep.r)
                 .map(|i| {
@@ -232,7 +232,7 @@ fn calculate_aggr_ct_phi(
 
                     // Calculate the right side: \sum(\omega_j^{k} * \sigma_{-1} * pi_i^{j})
                     // Because the length of pi is n*d, so we need to split it into n parts, each part has d elements to do the conjugate automorphism.
-                    let right_side = (0..ep.lambda2)
+                    let right_side = (0..(2 * ep.lambda))
                         .map(|j| {
                             let omega_j = random_omega[k][j];
                             (0..ep.n)
@@ -274,23 +274,23 @@ fn calculate_aggr_ct_b(
     witness: &[RqVector],
     ep: &EnvironmentParameters,
 ) -> RqVector {
-    (0..ep.k).map(|k| {
+    (0..ep.kappa).map(|k| {
         (0..ep.r).map(|i| {
-            &(0..ep.r).map(|j| {
+            (0..ep.r).map(|j| {
                 // calculate a_{ij}^{''(k)} * <s_i, s_j>
-                &a_ct_aggr[k][i].get_elements()[j]
-                    * &witness[i].inner_product_poly_vector(&witness[j])
+                a_ct_aggr[k][i].get_elements()[j]
+                    * witness[i].inner_product_poly_vector(&witness[j])
             })
             .fold(
                 // sum over all i,j
                 Rq::zero(),
-                |acc, val| &acc + &val,
+                |acc, val| acc + val,
             )
             // add \phi_{i}^{''(k)} * s[i]
-            + &phi_ct_aggr[k][i].inner_product_poly_vector(&witness[i])
+            + phi_ct_aggr[k][i].inner_product_poly_vector(&witness[i])
         }) // sum over all i,j
         .fold(Rq::zero(), |acc, val| {
-            &acc + &val
+            acc + val
         })
     }).collect()
 }
@@ -319,18 +319,16 @@ fn calculate_aggr_a(
                     // calculate \sum(alpha_k * a_{ij}), k is constraint_k
                     let left_side = (0..ep.constraint_k)
                         .map(|k| {
-                            &a_constraint[k][i].get_elements()[j] * &random_alpha.get_elements()[k]
+                            a_constraint[k][i].get_elements()[j] * random_alpha.get_elements()[k]
                         })
-                        .fold(Rq::zero(), |acc, val| &acc + &val);
+                        .fold(Rq::zero(), |acc, val| acc + val);
 
                     // calculate \sum(beta_k * a_{ij}^{''(k)}), k is size k
-                    let right_side = (0..ep.k)
-                        .map(|k| {
-                            &a_ct_aggr[k][i].get_elements()[j] * &random_beta.get_elements()[k]
-                        })
-                        .fold(Rq::zero(), |acc, val| &acc + &val);
+                    let right_side = (0..ep.kappa)
+                        .map(|k| a_ct_aggr[k][i].get_elements()[j] * random_beta.get_elements()[k])
+                        .fold(Rq::zero(), |acc, val| acc + val);
 
-                    &left_side + &right_side
+                    left_side + right_side
                 })
                 .collect::<RqVector>()
         })
@@ -371,7 +369,7 @@ fn calculate_aggr_phi(
                 });
 
             // calculate \sum(beta_k * \phi_{i}^{''(k)})
-            let right_side: RqVector = (0..ep.k)
+            let right_side: RqVector = (0..ep.kappa)
                 .map(|k| {
                     phi_ct_aggr[k][i]
                         .iter()
@@ -407,14 +405,14 @@ fn calculate_aggr_b(
     ep: &EnvironmentParameters,
 ) -> Rq {
     let left_side = (0..ep.constraint_k)
-        .map(|k| &b_constraint.get_elements()[k] * &random_alpha.get_elements()[k])
-        .fold(Rq::zero(), |acc, val| &acc + &val);
+        .map(|k| b_constraint.get_elements()[k] * random_alpha.get_elements()[k])
+        .fold(Rq::zero(), |acc, val| acc + val);
 
-    let right_side = (0..ep.k)
-        .map(|k| &b_ct_aggr.get_elements()[k] * &random_beta.get_elements()[k])
-        .fold(Rq::zero(), |acc, val| &acc + &val);
+    let right_side = (0..ep.kappa)
+        .map(|k| b_ct_aggr.get_elements()[k] * random_beta.get_elements()[k])
+        .fold(Rq::zero(), |acc, val| acc + val);
 
-    &left_side + &right_side
+    left_side + right_side
 }
 
 /// calculate h_{ij} = 1/2 * (<\phi_i, s_j> + <\phi_j, s_i>), then use base b to decompose the polynomial
@@ -484,7 +482,7 @@ pub fn calculate_u_1(
     g_ij: &[Vec<RqVector>],
     ep: &EnvironmentParameters,
 ) -> RqVector {
-    let mut u_1 = vec![Rq::zero(); ep.k_1];
+    let mut u_1 = vec![Rq::zero(); ep.kappa_1];
     // calculate left side
     for i in 0..ep.r {
         for k in 0..ep.t_1 {

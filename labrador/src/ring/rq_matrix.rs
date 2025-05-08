@@ -16,12 +16,32 @@ impl RqMatrix {
         RqMatrix { elements }
     }
 
+    pub fn zero(row_len: usize, col_len: usize) -> Self {
+        RqMatrix::new(vec![RqVector::zero(col_len); row_len])
+    }
+
+    pub fn get_row_len(&self) -> usize {
+        self.elements.len()
+    }
+
+    pub fn get_col_len(&self) -> usize {
+        self.elements[0].get_length()
+    }
+
     /// Create a random matrix of polynomials
     pub fn random<R: Rng + CryptoRng>(rng: &mut R, row_len: usize, col_len: usize) -> Self {
         Self {
             elements: (0..row_len)
                 .map(|_| RqVector::random(rng, col_len))
                 .collect(),
+        }
+    }
+
+    pub fn get_cell_symmetric(&self, row: usize, col: usize) -> Rq {
+        if row >= col {
+            self.elements[row].get_elements()[col]
+        } else {
+            self.elements[col].get_elements()[row]
         }
     }
 
@@ -94,6 +114,18 @@ mod tests {
     fn rqmatrix_fits_stack() {
         let mut rng = rand::rng();
         let _: RqMatrix = RqMatrix::random(&mut rng, 256, 1 << 10);
+    }
+
+    #[test]
+    fn test_zero_matrix() {
+        let matrix = RqMatrix::zero(10, 20);
+        assert_eq!(matrix.get_row_len(), 10);
+        assert_eq!(matrix.get_col_len(), 20);
+        for row in matrix.get_elements() {
+            for cell in row.get_elements() {
+                assert!(cell.is_zero());
+            }
+        }
     }
 
     #[test]
