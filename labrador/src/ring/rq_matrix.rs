@@ -4,37 +4,51 @@ use std::ops::Mul;
 
 /// Matrix of polynomials in Rq
 #[derive(Debug, Clone)]
-pub struct RqMatrix<const M: usize, const N: usize, const D: usize> {
-    elements: Vec<RqVector<N, D>>,
+pub struct RqMatrix {
+    elements: Vec<RqVector>,
 }
 
-impl<const M: usize, const N: usize, const D: usize> RqMatrix<M, N, D> {
+impl RqMatrix {
     /// Constructor for the Matrix of polynomials in Rq
-    pub const fn new(elements: Vec<RqVector<N, D>>) -> Self {
+    pub const fn new(elements: Vec<RqVector>) -> Self {
         RqMatrix { elements }
     }
 
     /// Create a random matrix of polynomials
-    pub fn random<R: Rng + CryptoRng>(rng: &mut R) -> Self {
+    pub fn random<R: Rng + CryptoRng>(rng: &mut R, row_len: usize, col_len: usize) -> Self {
         Self {
-            elements: (0..M).map(|_| RqVector::random(rng)).collect(),
+            elements: (0..row_len)
+                .map(|_| RqVector::random(rng, col_len))
+                .collect(),
         }
     }
 
     /// Create a random matrix of polynomials with ternary coefficients
-    pub fn random_ternary<R: Rng + CryptoRng>(rng: &mut R) -> Self {
+    pub fn random_ternary<R: Rng + CryptoRng>(rng: &mut R, row_len: usize, col_len: usize) -> Self {
         Self {
-            elements: (0..M).map(|_| RqVector::random_ternary(rng)).collect(),
+            elements: (0..row_len)
+                .map(|_| RqVector::random_ternary(rng, col_len))
+                .collect(),
         }
     }
 }
 
-// Implement matrix-vector multiplication for reference to matrix
-impl<const M: usize, const N: usize, const D: usize> Mul<&RqVector<N, D>> for &RqMatrix<M, N, D> {
-    type Output = RqVector<M, D>;
+impl FromIterator<RqVector> for RqMatrix {
+    fn from_iter<T: IntoIterator<Item = RqVector>>(iter: T) -> Self {
+        let mut elements = Vec::new();
+        for item in iter {
+            elements.push(item);
+        }
+        RqMatrix::new(elements)
+    }
+}
 
-    fn mul(self, rhs: &RqVector<N, D>) -> Self::Output {
-        let mut result = RqVector::zero();
+// Implement matrix-vector multiplication for reference to matrix
+impl Mul<&RqVector> for &RqMatrix {
+    type Output = RqVector;
+
+    fn mul(self, rhs: &RqVector) -> Self::Output {
+        let mut result = RqVector::zero(self.elements.len());
 
         for (i, row) in self.elements.iter().enumerate() {
             result[i] = row * rhs;
@@ -45,10 +59,10 @@ impl<const M: usize, const N: usize, const D: usize> Mul<&RqVector<N, D>> for &R
 }
 
 // Implement matrix-vector multiplication for owned matrix by delegating to reference implementation
-impl<const M: usize, const N: usize, const D: usize> Mul<&RqVector<N, D>> for RqMatrix<M, N, D> {
-    type Output = RqVector<M, D>;
+impl Mul<&RqVector> for RqMatrix {
+    type Output = RqVector;
 
-    fn mul(self, rhs: &RqVector<N, D>) -> Self::Output {
+    fn mul(self, rhs: &RqVector) -> Self::Output {
         &self * rhs
     }
 }
@@ -63,38 +77,40 @@ mod tests {
     #[cfg(not(feature = "skip-slow-tests"))]
     fn rqmatrix_fits_stack() {
         let mut rng = rand::rng();
-        let _: RqMatrix<256, { 1 << 10 }, 64> = RqMatrix::random(&mut rng);
+        let _: RqMatrix = RqMatrix::random(&mut rng, 256, 1 << 10);
     }
 
     #[test]
     fn test_rqmartrix_mul() {
-        let poly1: Rq<2> = vec![Zq::new(8), Zq::new(6)].into();
-        let poly2: Rq<2> = vec![Zq::new(u32::MAX - 4), Zq::new(u32::MAX - 4)].into();
-        let poly3: Rq<2> = vec![Zq::ONE, Zq::ZERO].into();
-        let poly4: Rq<2> = vec![Zq::ZERO, Zq::new(4)].into();
-        let matrix_1: RqMatrix<1, 2, 2> = RqMatrix::new(vec![RqVector::from(vec![poly1, poly2])]);
-        let vec_1: RqVector<2, 2> = RqVector::from(vec![poly3, poly4]);
+        let poly1: Rq = vec![Zq::new(8), Zq::new(6)].into();
+        let poly2: Rq = vec![Zq::new(u32::MAX - 4), Zq::new(u32::MAX - 4)].into();
+        let poly3: Rq = vec![Zq::ONE, Zq::ZERO].into();
+        let poly4: Rq = vec![Zq::ZERO, Zq::new(4)].into();
+        let matrix_1: RqMatrix = RqMatrix::new(vec![RqVector::from(vec![poly1, poly2])]);
+        let vec_1: RqVector = RqVector::from(vec![poly3, poly4]);
 
         let result_1 = matrix_1.mul(&vec_1);
-        let expected_poly_1 = vec![Zq::new(28), Zq::new(u32::MAX - 13)].into();
+        let expected_poly_1 =
+            vec![Zq::new(8), Zq::new(u32::MAX - 13), Zq::new(u32::MAX - 19)].into();
         let expected_1 = RqVector::from(vec![expected_poly_1]);
         assert_eq!(result_1, expected_1);
 
-        let poly5: Rq<2> = vec![Zq::new(u32::MAX - 6), Zq::new(7)].into();
-        let poly6: Rq<2> = vec![Zq::new(u32::MAX - 2), Zq::ZERO].into();
-        let poly7: Rq<2> = vec![Zq::new(8), Zq::new(u32::MAX - 1)].into();
-        let poly8: Rq<2> = vec![Zq::new(u32::MAX - 3), Zq::new(4)].into();
-        let poly9: Rq<2> = vec![Zq::MAX, Zq::new(u32::MAX - 1)].into();
-        let poly10: Rq<2> = vec![Zq::new(u32::MAX - 2), Zq::new(u32::MAX - 2)].into();
-        let matrix_2: RqMatrix<2, 2, 2> = RqMatrix::new(vec![
+        let poly5: Rq = vec![Zq::new(u32::MAX - 6), Zq::new(7)].into();
+        let poly6: Rq = vec![Zq::new(u32::MAX - 2), Zq::ZERO].into();
+        let poly7: Rq = vec![Zq::new(8), Zq::new(u32::MAX - 1)].into();
+        let poly8: Rq = vec![Zq::new(u32::MAX - 3), Zq::new(4)].into();
+        let poly9: Rq = vec![Zq::MAX, Zq::new(u32::MAX - 1)].into();
+        let poly10: Rq = vec![Zq::new(u32::MAX - 2), Zq::new(u32::MAX - 2)].into();
+        let matrix_2: RqMatrix = RqMatrix::new(vec![
             RqVector::from(vec![poly5, poly6]),
             RqVector::from(vec![poly7, poly8]),
         ]);
-        let vec_2: RqVector<2, 2> = RqVector::from(vec![poly9, poly10]);
+        let vec_2: RqVector = RqVector::from(vec![poly9, poly10]);
 
         let result_2 = matrix_2.mul(&vec_2);
-        let expected_poly_2_1 = vec![Zq::new(30), Zq::new(16)].into();
-        let expected_poly_2_2 = vec![Zq::new(12), Zq::new(u32::MAX - 13)].into();
+        let expected_poly_2_1 = vec![Zq::new(16), Zq::new(16), Zq::new(u32::MAX - 13)].into();
+        let expected_poly_2_2 =
+            vec![Zq::new(4), Zq::new(u32::MAX - 13), Zq::new(u32::MAX - 7)].into();
         let expected_2 = RqVector::from(vec![expected_poly_2_1, expected_poly_2_2]);
         assert_eq!(result_2, expected_2);
     }

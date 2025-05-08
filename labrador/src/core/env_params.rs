@@ -23,9 +23,6 @@ pub struct EnvironmentParameters {
     pub lambda2: usize,
     // the log of modulus q, q = 2^(32)
     pub log_q: usize,
-    // random Eqlynomial degree bound
-    pub deg_bound_d: usize,
-
     // L: F' functions family size, K: F functions family size
     pub constraint_l: usize,
     pub constraint_k: usize,
@@ -45,7 +42,6 @@ impl EnvironmentParameters {
         k_2: usize,
         lambda2: usize,
         log_q: usize,
-        deg_bound_d: usize,
         constraint_l: usize,
         constraint_k: usize,
     ) -> Self {
@@ -61,7 +57,6 @@ impl EnvironmentParameters {
             k_2,
             lambda2,
             log_q,
-            deg_bound_d,
             constraint_l,
             constraint_k,
         }
@@ -82,7 +77,6 @@ impl Default for EnvironmentParameters {
             k_2: 5,
             lambda2: 256,
             log_q: 32,
-            deg_bound_d: 64,
             constraint_l: 5,
             constraint_k: 5,
         }

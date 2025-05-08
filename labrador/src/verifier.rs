@@ -1,17 +1,20 @@
+#![allow(clippy::result_large_err)]
+
 use crate::core::{
     aggregate, crs::PublicPrams, env_params::EnvironmentParameters, statement::Statement,
 };
 use crate::prover::{Challenges, Proof};
-use crate::ring::poly::{PolyRing, PolyVector};
-use crate::ring::zq::Zq;
+use crate::ring::rq::Rq;
+use crate::ring::rq_vector::RqVector;
+use crate::ring::zq::{Zq, ZqVector};
 
 #[derive(Debug)]
 pub enum VerifierError {
     NotSymmetric {
         i: usize,
         j: usize,
-        expected: PolyRing,
-        found: PolyRing,
+        expected: Rq,
+        found: Rq,
     },
     B0Mismatch {
         index: usize,
@@ -23,21 +26,21 @@ pub enum VerifierError {
         allowed: Zq,
     },
     AzError {
-        computed: PolyVector,
-        expected: PolyVector,
+        computed: RqVector,
+        expected: RqVector,
     },
     ZInnerError {
-        computed: PolyRing,
-        expected: PolyRing,
+        computed: Rq,
+        expected: Rq,
     },
     PhiError {
-        computed: PolyRing,
-        expected: PolyRing,
+        computed: Rq,
+        expected: Rq,
     },
     RelationCheckFailed,
     OuterCommitError {
-        computed: PolyVector,
-        expected: PolyVector,
+        computed: RqVector,
+        expected: RqVector,
     },
 }
 pub struct LabradorVerifier<'a> {
@@ -86,21 +89,21 @@ impl<'a> LabradorVerifier<'a> {
         // 3. line 14: check norm_sum(z, t, g, h) <= (beta')^2
 
         // decompose z into z = z^(0) + z^(1) * b, only two parts.
-        let z_ij = PolyVector::decompose(&proof.z, ep.b, 2);
-        let t_ij: Vec<Vec<PolyVector>> = proof
+        let z_ij = RqVector::decompose(&proof.z, ep.b, 2);
+        let t_ij: Vec<Vec<RqVector>> = proof
             .t_i
             .iter()
-            .map(|i| PolyVector::decompose(i, ep.b, ep.t_1))
+            .map(|i| RqVector::decompose(i, ep.b, ep.t_1))
             .collect();
-        let g_ij: Vec<Vec<PolyVector>> = proof
+        let g_ij: Vec<Vec<RqVector>> = proof
             .g_ij
             .iter()
-            .map(|i| PolyVector::decompose(i, ep.b, ep.t_2))
+            .map(|i| RqVector::decompose(i, ep.b, ep.t_2))
             .collect();
-        let h_ij: Vec<Vec<PolyVector>> = proof
+        let h_ij: Vec<Vec<RqVector>> = proof
             .h_ij
             .iter()
-            .map(|i| PolyVector::decompose(i, ep.b, ep.t_1))
+            .map(|i| RqVector::decompose(i, ep.b, ep.t_1))
             .collect();
         let norm_z_ij = z_ij
             .iter()
@@ -120,7 +123,7 @@ impl<'a> LabradorVerifier<'a> {
         // 4. line 15: check Az ?= c_1 * t_1 + ... + c_r * t_r
 
         let az = &proof.z * &self.pp.matrix_a;
-        let ct_sum: PolyVector = aggregate::calculate_z(&proof.t_i, &self.tr.random_c);
+        let ct_sum = aggregate::calculate_z(&proof.t_i, &self.tr.random_c);
 
         if az != ct_sum {
             return Err(VerifierError::AzError {
@@ -219,7 +222,7 @@ impl<'a> LabradorVerifier<'a> {
     }
 
     /// calculate the right hand side of line 16 or line 17, \sum(g_ij * c_i * c_j) or \sum(h_ij * c_i * c_j)
-    fn calculate_gh_ci_cj(x_ij: &[PolyVector], random_c: &PolyVector, r: usize) -> PolyRing {
+    fn calculate_gh_ci_cj(x_ij: &[RqVector], random_c: &RqVector, r: usize) -> Rq {
         (0..r)
             .map(|i| {
                 (0..r)
@@ -227,20 +230,20 @@ impl<'a> LabradorVerifier<'a> {
                         &(&x_ij[i].get_elements()[j] * &random_c.get_elements()[i])
                             * &random_c.get_elements()[j]
                     })
-                    .fold(PolyRing::zero_poly(), |acc, x| &acc + &x)
+                    .fold(Rq::zero(), |acc, x| &acc + &x)
             })
-            .fold(PolyRing::zero_poly(), |acc, x| &acc + &x)
+            .fold(Rq::zero(), |acc, x| &acc + &x)
     }
 
     /// calculate the left hand side of line 17, \sum(<\phi_z, z> * c_i)
-    fn calculate_phi_z_c(phi: &[PolyVector], c: &PolyVector, z: &PolyVector) -> PolyRing {
+    fn calculate_phi_z_c(phi: &[RqVector], c: &RqVector, z: &RqVector) -> Rq {
         phi.iter()
             .zip(c.iter())
             .map(|(phi_i, c_i)| &(phi_i.inner_product_poly_vector(z)) * c_i)
-            .fold(PolyRing::zero_poly(), |acc, x| &acc + &x)
+            .fold(Rq::zero(), |acc, x| &acc + &x)
     }
 
-    fn norm_squared(polys: &[Vec<PolyVector>]) -> Zq {
+    fn norm_squared(polys: &[Vec<RqVector>]) -> Zq {
         polys.iter().fold(Zq::ZERO, |acc, poly| {
             acc + poly
                 .iter()
@@ -258,26 +261,25 @@ impl<'a> LabradorVerifier<'a> {
     ///
     /// return: true if the relation holds, false otherwise
     pub fn check_relation(
-        a_primes: &[PolyVector],
-        b_primes: &PolyRing,
-        g: &[PolyVector],
-        h: &[PolyVector],
+        a_primes: &[RqVector],
+        b_primes: &Rq,
+        g: &[RqVector],
+        h: &[RqVector],
     ) -> bool {
         let r = a_primes.len();
-        let d = a_primes[0].get_elements()[0].get_coeffs().len();
 
-        let sum_a_primes_g: PolyRing = a_primes
+        let sum_a_primes_g: Rq = a_primes
             .iter()
             .zip(g.iter())
             .map(|(a_i, g_i)| {
                 a_i.iter()
                     .zip(g_i.iter())
                     .map(|(a_ij, g_ij)| a_ij * g_ij)
-                    .fold(PolyRing::new(vec![Zq::ZERO; d]), |acc, val| &acc + &val)
+                    .fold(Rq::new([Zq::ZERO; Rq::DEGREE]), |acc, val| &acc + &val)
             })
-            .fold(PolyRing::new(vec![Zq::ZERO; d]), |acc, val| &acc + &val);
+            .fold(Rq::new([Zq::ZERO; Rq::DEGREE]), |acc, val| &acc + &val);
 
-        let sum_h_ii: PolyRing = (0..r).fold(PolyRing::new(vec![Zq::ZERO; d]), |acc, i| {
+        let sum_h_ii: Rq = (0..r).fold(Rq::new([Zq::ZERO; Rq::DEGREE]), |acc, i| {
             &acc + &h[i].get_elements()[i]
         });
 
@@ -293,9 +295,9 @@ impl<'a> LabradorVerifier<'a> {
         ep: &EnvironmentParameters,
     ) -> Result<bool, VerifierError> {
         for k in 0..ep.k {
-            let b_0_poly = proof.b_ct_aggr.get_elements()[k].get_coeffs()[0];
+            let b_0_poly = proof.b_ct_aggr.get_elements()[k].get_coefficients()[0];
             let mut b_0: Zq = (0..ep.constraint_l)
-                .map(|l| self.tr.psi[k].get_coeffs()[l] * self.st.b_0_ct.get_coeffs()[l])
+                .map(|l| self.tr.psi[k][l] * self.st.b_0_ct[l])
                 .sum();
             let inner_omega_p = self.tr.omega[k].inner_product(proof.p.get_projection());
             b_0 += inner_omega_p;

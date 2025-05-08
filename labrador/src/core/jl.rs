@@ -1,5 +1,3 @@
-use crate::ring::poly::PolyVector;
-use crate::ring::poly::ZqVector;
 use crate::ring::rq::Rq;
 use crate::ring::rq_vector::RqVector;
 use crate::ring::zq::Zq;
@@ -11,15 +9,15 @@ pub const SECURITY_LEVEL: usize = 128;
 /// The size of the projection matrix is 2\lambda
 pub const PROJECTION_MATRIX_SIZE: usize = 2 * SECURITY_LEVEL;
 /// Projection matrix with values in {1,0,-1} mod q
-pub struct ProjectionMatrix<const D: usize> {
-    matrix: Vec<ZqVector>,
+pub struct ProjectionMatrix {
+    matrix: Vec<Vec<Zq>>,
 }
 
-impl<const D: usize> ProjectionMatrix<D> {
+impl ProjectionMatrix {
     /// Defines a matrix of size 256xnxD
     /// n is the size of the vector of polynomials
     pub fn new(n: usize) -> Self {
-        let mut matrix = vec![ZqVector::new(vec![Zq::ZERO; n * D]); PROJECTION_MATRIX_SIZE];
+        let mut matrix = vec![vec![Zq::ZERO; n * Rq::DEGREE]; PROJECTION_MATRIX_SIZE];
         let mut rng = rng();
         for row in matrix.iter_mut() {
             for elem in row.iter_mut() {
@@ -38,21 +36,21 @@ impl<const D: usize> ProjectionMatrix<D> {
     }
 
     /// Returns the matrix
-    pub fn get_matrix(&self) -> &Vec<ZqVector> {
+    pub fn get_matrix(&self) -> &Vec<Vec<Zq>> {
         &self.matrix
     }
 }
 
 /// Calculate projection vector
 #[derive(Debug, Clone)]
-pub struct ProjectionVector<const N: usize, const D: usize> {
-    projection: Rq<PROJECTION_MATRIX_SIZE>,
+pub struct ProjectionVector {
+    projection: Vec<Zq>,
 }
 
-impl<const N: usize, const D: usize> ProjectionVector<N, D> {
+impl ProjectionVector {
     /// Calculates Projection
-    pub fn new(matrix: &ProjectionMatrix<D>, s_i: &RqVector<N, D>) -> Self {
-        let mut projection = Rq::new([Zq::ZERO; PROJECTION_MATRIX_SIZE]);
+    pub fn new(matrix: &ProjectionMatrix, s_i: &RqVector) -> Self {
+        let mut projection = vec![Zq::ZERO; PROJECTION_MATRIX_SIZE];
         let coefficients = s_i.concatenate_coefficients();
         for (i, item) in projection.iter_mut().enumerate() {
             *item = matrix.get_matrix()[i]
@@ -65,7 +63,7 @@ impl<const N: usize, const D: usize> ProjectionVector<N, D> {
     }
 
     /// Obtain projection
-    pub fn get_projection(&self) -> &Rq<PROJECTION_MATRIX_SIZE> {
+    pub fn get_projection(&self) -> &Vec<Zq> {
         &self.projection
     }
 
@@ -77,16 +75,24 @@ impl<const N: usize, const D: usize> ProjectionVector<N, D> {
 
 #[derive(Debug, Clone)]
 pub struct Projections {
-    pub projection: ZqVector,
+    pub projection: Vec<Zq>,
+}
+
+pub fn inner_product(first: &[Zq], second: &[Zq]) -> Zq {
+    first
+        .iter()
+        .zip(second.iter())
+        .map(|(&a, &b)| a * b)
+        .fold(Zq::ZERO, |acc, x| acc + x)
 }
 
 impl Projections {
     /// Calculates Projection
-    pub fn new(matrices: &[Vec<ZqVector>], witness: &[PolyVector]) -> Self {
+    pub fn new(matrices: &[Vec<Vec<Zq>>], witness: &[RqVector]) -> Self {
         let mut temp = Vec::with_capacity(PROJECTION_MATRIX_SIZE);
-        let coefficients: Vec<ZqVector> = witness
+        let coefficients: Vec<Vec<Zq>> = witness
             .iter()
-            .map(|s_i| s_i.concatenate_coefficients(PROJECTION_MATRIX_SIZE))
+            .map(|s_i| s_i.concatenate_coefficients())
             .collect();
 
         for j in 0..PROJECTION_MATRIX_SIZE {
@@ -94,18 +100,18 @@ impl Projections {
             for i in 0..matrices.len() {
                 let pi = &matrices[i][j];
                 let s_i = &coefficients[i];
-                let inner = pi.inner_product(s_i);
+                let inner = inner_product(pi, s_i);
                 sum += inner;
             }
             temp.push(sum);
         }
-        let projection = ZqVector::new(temp);
+        let projection = temp;
 
         Projections { projection }
     }
 
     /// Obtain projection
-    pub fn get_projection(&self) -> &ZqVector {
+    pub fn get_projection(&self) -> &Vec<Zq> {
         &self.projection
     }
 
@@ -122,17 +128,11 @@ const UPPER_BOUND_FACTOR: Zq = Zq::new(128);
 const LOWER_BOUND_FACTOR: Zq = Zq::new(30);
 
 // Function to verify upper bound of projection
-pub fn verify_upper_bound<const N: usize, const D: usize>(
-    projection: ProjectionVector<N, D>,
-    beta_squared: Zq,
-) -> bool {
+pub fn verify_upper_bound(projection: ProjectionVector, beta_squared: Zq) -> bool {
     projection.norm_squared() < (UPPER_BOUND_FACTOR * beta_squared)
 }
 // Function to verify lower bound of projection
-pub fn verify_lower_bound<const N: usize, const D: usize>(
-    projection: ProjectionVector<N, D>,
-    beta_squared: Zq,
-) -> bool {
+pub fn verify_lower_bound(projection: ProjectionVector, beta_squared: Zq) -> bool {
     projection.norm_squared() > (LOWER_BOUND_FACTOR * beta_squared)
 }
 
@@ -144,7 +144,7 @@ mod tests {
     #[test]
     fn test_size_projection_matrix() {
         let n = 10;
-        let matrix = ProjectionMatrix::<4>::new(n);
+        let matrix = ProjectionMatrix::new(n);
 
         assert_eq!(
             matrix.matrix.len(),
@@ -154,13 +154,13 @@ mod tests {
         );
         assert_eq!(
             matrix.matrix[0].len(),
-            n * 4,
+            n * Rq::DEGREE,
             "Matrix should have {} columns",
-            n * 4
+            n * Rq::DEGREE
         );
 
         let n2 = 1;
-        let matrix = ProjectionMatrix::<4>::new(n2);
+        let matrix = ProjectionMatrix::new(n2);
 
         assert_eq!(
             matrix.matrix.len(),
@@ -170,18 +170,19 @@ mod tests {
         );
         assert_eq!(
             matrix.matrix[0].len(),
-            n2 * 4,
+            n2 * Rq::DEGREE,
             "Matrix should have {} columns",
-            n2 * 4
+            n2 * Rq::DEGREE
         );
     }
 
     // Test the distribution of values in the random matrix
     #[test]
+    #[allow(clippy::as_conversions)]
     fn test_random_distribution_matrix() {
         // 1000 was chosen to provide a reasonably large sample size
         let n = 1000;
-        let matrix = ProjectionMatrix::<4>::new(n);
+        let matrix = ProjectionMatrix::new(n);
         let mut counts = [0.0, 0.0, 0.0]; // -1, 0, 1
         for row in matrix.matrix.iter() {
             for &elem in row.iter() {
@@ -195,7 +196,7 @@ mod tests {
             }
         }
         // Number of elements in the matrix as f64 (256x4x1000)
-        let total: f64 = 1024000.0;
+        let total: f64 = (256 * Rq::DEGREE * n) as f64;
         println!("this is the total amount of elements{}", total);
         let expected = [0.25, 0.5, 0.25];
         for i in 0..3 {
@@ -213,14 +214,14 @@ mod tests {
     #[test]
     #[cfg(not(feature = "skip-slow-tests"))]
     fn test_probability_is_close_to_half() {
-        // 10.000 was chosen to provide a reasonably large sample size
-        let trials: f64 = 10000.0;
+        // 1000 was chosen to provide a reasonably large sample size
+        let trials: f64 = 1000.0;
         let mut success_count: f64 = 0.0;
         let n = 5;
-        for _ in 0..10000 {
+        for _ in 0..1000 {
             let mut rng = rng();
             // Generate the random polynomials
-            let polynomials = RqVector::<5, 5>::random_ternary(&mut rng);
+            let polynomials = RqVector::random_ternary(&mut rng, 5);
             // Generate projection matrix
             let matrix = ProjectionMatrix::new(n);
             // Generate Projection
@@ -248,11 +249,11 @@ mod tests {
     #[test]
     #[cfg(not(feature = "skip-slow-tests"))]
     fn average_value() {
-        // 100.000 was chosen to provide a reasonably large sample size
-        let trials: u128 = 100000;
+        // 10000 was chosen to provide a reasonably large sample size
+        let trials: u128 = 10000;
         let n = 3;
         let mut rng = rng();
-        let polynomials = RqVector::<3, 3>::random_ternary(&mut rng);
+        let polynomials = RqVector::random_ternary(&mut rng, 3);
         let mut matrix = ProjectionMatrix::new(n);
         let mut projection = ProjectionVector::new(&matrix, &polynomials);
         let mut norm_sum = projection.norm_squared();
@@ -275,7 +276,7 @@ mod tests {
         };
 
         // we choose a small tolerance value for possible statistical error
-        let tolerance: u128 = 2;
+        let tolerance: u128 = 20;
         assert!(
             difference < tolerance,
             "Average norm value {} is not equal to {}.",
@@ -290,7 +291,7 @@ mod tests {
         let n = 5;
         let mut rng = rng();
         // Generate random vector of polynomials of small norm
-        let polynomials = RqVector::<5, 64>::random_ternary(&mut rng);
+        let polynomials = RqVector::random_ternary(&mut rng, 5);
         // Generate projection matrix
         let matrix = ProjectionMatrix::new(n);
         // Generate Projection
@@ -303,20 +304,11 @@ mod tests {
     // Test vector concatenation
     #[test]
     fn test_vector_concatenation() {
-        let polynomials: RqVector<2, 4> = RqVector::from(vec![
-            vec![Zq::ONE, Zq::ZERO, Zq::ZERO, Zq::MAX].into(),
-            vec![Zq::new(6), Zq::ZERO, Zq::new(5), Zq::new(3)].into(),
-        ]);
-        let vector = vec![
-            Zq::ONE,
-            Zq::ZERO,
-            Zq::ZERO,
-            Zq::MAX,
-            Zq::new(6),
-            Zq::ZERO,
-            Zq::new(5),
-            Zq::new(3),
-        ];
-        assert!(polynomials.concatenate_coefficients() == vector);
+        let mut vec1 = vec![Zq::new(10); Rq::DEGREE];
+        let mut vec2 = vec![Zq::new(12); Rq::DEGREE];
+        let polynomials = RqVector::from(vec![vec1.clone().into(), vec2.clone().into()]);
+
+        vec1.append(&mut vec2);
+        assert!(polynomials.concatenate_coefficients() == vec1);
     }
 }

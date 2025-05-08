@@ -1,17 +1,17 @@
-use crate::core::{
-    aggregate,
-    challenge_set::ChallengeSet,
-    crs::PublicPrams,
-    env_params::EnvironmentParameters,
-    jl::{ProjectionMatrix, Projections},
-    statement::Statement,
-};
-use crate::ring::poly::{PolyVector, ZqVector};
 use crate::ring::zq::Zq;
+use crate::ring::zq::ZqVector;
+use crate::{
+    core::{
+        aggregate,
+        challenge_set::ChallengeSet,
+        crs::PublicPrams,
+        env_params::EnvironmentParameters,
+        jl::{ProjectionMatrix, Projections},
+        statement::Statement,
+    },
+    ring::rq_vector::RqVector,
+};
 use rand::rng;
-
-/// explicitly set the deg_bound_d to D == deg_bound_d, which is 64
-const D: usize = 64;
 
 #[derive(Debug)]
 pub enum ProverError {
@@ -27,54 +27,54 @@ pub enum ProverError {
 // Proof contains the parameters will be sent to verifier
 // All parameters are from tr, line 2 on page 18
 pub struct Proof {
-    pub u_1: PolyVector,
+    pub u_1: RqVector,
     pub p: Projections,
-    pub b_ct_aggr: PolyVector,
-    pub u_2: PolyVector,
-    pub z: PolyVector,
-    pub t_i: Vec<PolyVector>,
-    pub g_ij: Vec<PolyVector>,
-    pub h_ij: Vec<PolyVector>,
+    pub b_ct_aggr: RqVector,
+    pub u_2: RqVector,
+    pub z: RqVector,
+    pub t_i: Vec<RqVector>,
+    pub g_ij: Vec<RqVector>,
+    pub h_ij: Vec<RqVector>,
 }
 
 // pub struct Challenges just for testing, should be replaced by the Transcript
 pub struct Challenges {
-    pub pi: Vec<Vec<ZqVector>>,
-    pub psi: Vec<ZqVector>,
-    pub omega: Vec<ZqVector>,
-    pub random_alpha: PolyVector,
-    pub random_beta: PolyVector,
-    pub random_c: PolyVector,
+    pub pi: Vec<Vec<Vec<Zq>>>,
+    pub psi: Vec<Vec<Zq>>,
+    pub omega: Vec<Vec<Zq>>,
+    pub random_alpha: RqVector,
+    pub random_beta: RqVector,
+    pub random_c: RqVector,
 }
 
 impl Challenges {
     pub fn new(ep: &EnvironmentParameters) -> Self {
         // generate random psi with size: k * constraint_l, each element is Zq
-        let psi: Vec<ZqVector> = (0..ep.k)
-            .map(|_| ZqVector::random(&mut rng(), ep.constraint_l))
+        let psi: Vec<Vec<Zq>> = (0..ep.k)
+            .map(|_| Vec::<Zq>::random(&mut rng(), ep.constraint_l))
             .collect();
 
         // generate randm omega is with size: k * lambda2, each element is Zq
-        let omega: Vec<ZqVector> = (0..ep.k)
-            .map(|_| ZqVector::random(&mut rng(), ep.lambda2))
+        let omega: Vec<Vec<Zq>> = (0..ep.k)
+            .map(|_| Vec::<Zq>::random(&mut rng(), ep.lambda2))
             .collect();
 
         // \pi is from JL projection, pi contains r matrices and each matrix: security_level2 * (n*d), (security_level2 is 256 in the paper).
-        let pi: Vec<Vec<ZqVector>> = Self::get_pi(ep.r, ep.n);
+        let pi: Vec<Vec<Vec<Zq>>> = Self::get_pi(ep.r, ep.n);
 
         // generate random alpha and beta from challenge set
-        let cs_alpha: ChallengeSet = ChallengeSet::new(ep.deg_bound_d);
-        let random_alpha: PolyVector = (0..ep.constraint_k)
+        let cs_alpha: ChallengeSet = ChallengeSet::new();
+        let random_alpha: RqVector = (0..ep.constraint_k)
             .map(|_| cs_alpha.get_challenges().clone())
             .collect();
 
-        let cs_beta: ChallengeSet = ChallengeSet::new(ep.deg_bound_d);
-        let random_beta: PolyVector = (0..ep.constraint_k)
+        let cs_beta: ChallengeSet = ChallengeSet::new();
+        let random_beta: RqVector = (0..ep.constraint_k)
             .map(|_| cs_beta.get_challenges().clone())
             .collect();
 
-        let cs_c: ChallengeSet = ChallengeSet::new(ep.deg_bound_d);
-        let random_c: PolyVector = (0..ep.r).map(|_| cs_c.get_challenges().clone()).collect();
+        let cs_c: ChallengeSet = ChallengeSet::new();
+        let random_c: RqVector = (0..ep.r).map(|_| cs_c.get_challenges().clone()).collect();
 
         Self {
             pi,
@@ -86,20 +86,20 @@ impl Challenges {
         }
     }
 
-    pub fn get_pi(r: usize, n: usize) -> Vec<Vec<ZqVector>> {
+    pub fn get_pi(r: usize, n: usize) -> Vec<Vec<Vec<Zq>>> {
         (0..r)
-            .map(|_| ProjectionMatrix::<D>::new(n).get_matrix().clone())
+            .map(|_| ProjectionMatrix::new(n).get_matrix().clone())
             .collect()
     }
 }
 pub struct Witness {
-    pub s: Vec<PolyVector>,
+    pub s: Vec<RqVector>,
 }
 
 impl Witness {
     pub fn new(ep: &EnvironmentParameters) -> Self {
         let s = (0..ep.r)
-            .map(|_| PolyVector::random_ternary(ep.n, ep.deg_bound_d))
+            .map(|_| RqVector::random_ternary(&mut rng(), ep.n))
             .collect();
         Self { s }
     }
@@ -136,19 +136,19 @@ impl<'a> LabradorProver<'a> {
 
         // Ajtai Commitments t_i = A * s_i
         let matrix_a = &self.pp.matrix_a;
-        let t_i: Vec<PolyVector> = self.witness.s.iter().map(|s_i| s_i * matrix_a).collect();
+        let t_i: Vec<RqVector> = self.witness.s.iter().map(|s_i| s_i * matrix_a).collect();
 
         // decompose t_i into t_i^(0) + ... + t_i^(t_1-1) * b_1^(t_1-1)
-        let t_ij: Vec<Vec<PolyVector>> = t_i
+        let t_ij: Vec<Vec<RqVector>> = t_i
             .iter()
-            .map(|i| PolyVector::decompose(i, ep.b, ep.t_1))
+            .map(|i| RqVector::decompose(i, ep.b, ep.t_1))
             .collect();
         // calculate garbage polynomial g = <s_i, s_j>
-        let g_gp: Vec<PolyVector> = aggregate::calculate_gij(&self.witness.s, ep.r);
+        let g_gp: Vec<RqVector> = aggregate::calculate_gij(&self.witness.s, ep.r);
         // decompose g_gp into g_ij = g_ij^(0) + ... + g_ij^(t_2-1) * b_2^(t_2=1)
-        let g_ij: Vec<Vec<PolyVector>> = g_gp
+        let g_ij: Vec<Vec<RqVector>> = g_gp
             .iter()
-            .map(|i| PolyVector::decompose(i, ep.b, ep.t_2))
+            .map(|i| RqVector::decompose(i, ep.b, ep.t_2))
             .collect();
         let matrix_b = &self.pp.matrix_b;
         let matrix_c = &self.pp.matrix_c;
@@ -183,9 +183,9 @@ impl<'a> LabradorProver<'a> {
         let phi_i = aggr_2.phi_i;
         let h_gp = aggregate::calculate_hij(&phi_i, &self.witness.s, ep);
         // decompose h_gp into h_ij = h_ij^(0) + ... + h_ij^(t_1-1) * b_1^(t_1-1)
-        let h_ij: Vec<Vec<PolyVector>> = h_gp
+        let h_ij: Vec<Vec<RqVector>> = h_gp
             .iter()
-            .map(|i| PolyVector::decompose(i, ep.b, ep.t_1))
+            .map(|i| RqVector::decompose(i, ep.b, ep.t_1))
             .collect();
         // Outer commitments: u_2
         let matrix_d = &self.pp.matrix_d;
@@ -209,31 +209,31 @@ impl<'a> LabradorProver<'a> {
     }
 
     /// check p_j? = ct(sum(<σ−1(pi_i^(j)), s_i>))
-    fn check_projection(&self, p: &ZqVector) -> Result<bool, ProverError> {
-        let s_coeffs: Vec<ZqVector> = self
+    fn check_projection(&self, p: &[Zq]) -> Result<bool, ProverError> {
+        let s_coeffs: Vec<Vec<Zq>> = self
             .witness
             .s
             .iter()
             .map(|s_i| {
                 s_i.iter()
-                    .flat_map(|s_i_p| s_i_p.get_coeffs().clone())
+                    .flat_map(|s_i_p| *s_i_p.get_coefficients())
                     .collect()
             })
             .collect();
 
         for (j, &p_j) in p.iter().enumerate() {
-            let mut poly = ZqVector::zero(p.len());
+            let mut poly = vec![Zq::ZERO; p.len()];
             for (i, s_i) in s_coeffs.iter().enumerate() {
                 let pi_ele = &self.tr.pi[i][j];
-                let pi_ele_ca = &pi_ele.conjugate_automorphism();
-                poly = &poly + &(pi_ele_ca * s_i);
+                let pi_ele_ca = pi_ele.conjugate_automorphism();
+                poly = poly.add(&(pi_ele_ca.multiply(s_i)));
             }
 
-            if poly.get_coeffs()[0] != p_j {
+            if poly[0] != p_j {
                 return Err(ProverError::ProjectionError {
                     index: j,
                     expected: p_j,
-                    computed: poly.get_coeffs()[0],
+                    computed: poly[0],
                 });
             }
         }
@@ -245,7 +245,7 @@ impl<'a> LabradorProver<'a> {
     fn check_witness_l2norm(&self, ep: &EnvironmentParameters) -> Result<bool, ProverError> {
         let beta2 = ep.beta * ep.beta;
         for polys in &self.witness.s {
-            let witness_l2norm_squared = PolyVector::compute_norm_squared(polys);
+            let witness_l2norm_squared = RqVector::compute_norm_squared(polys);
             if witness_l2norm_squared > beta2 {
                 return Err(ProverError::WitnessL2NormViolated {
                     norm_squared: witness_l2norm_squared,
