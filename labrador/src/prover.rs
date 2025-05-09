@@ -155,7 +155,6 @@ impl<'a> LabradorProver<'a> {
         // This replaces the following code
         let mut garbage_polynomials = GarbagePolynomials::new(self.witness.s.clone());
         garbage_polynomials.compute_g();
-        
         // calculate outer commitment u_1 = \sum(B_ik * t_i^(k)) + \sum(C_ijk * g_ij^(k))
         let mut outer_commitments = OuterCommitment::new(self.pp.clone(), ep.clone());
         outer_commitments.compute_u1(

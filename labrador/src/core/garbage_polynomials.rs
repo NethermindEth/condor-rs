@@ -204,7 +204,7 @@ mod tests {
         garbage_polynomial.compute_g();
 
         assert_eq!(garbage_polynomial.g.get_row_len(), 3);
-        // Assert tha g stores half of the matrix
+        // Assert that g stores half of the matrix
         for row in 0..multiplicity {
             assert_eq!(
                 garbage_polynomial.g.get_elements()[row].get_length(),
@@ -240,7 +240,7 @@ mod tests {
         garbage_polynomial.compute_h(&phi);
 
         assert_eq!(garbage_polynomial.h.get_row_len(), 3);
-        // Assert tha g stores half of the matrix
+        // Assert that g stores half of the matrix
         for row in 0..multiplicity {
             assert_eq!(
                 garbage_polynomial.h.get_elements()[row].get_length(),
