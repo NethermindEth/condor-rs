@@ -8,6 +8,8 @@
 #![doc = include_str!("../doc/arithmetic_circuit_translation.md")]
 // Ajtai Commitment
 #![doc = include_str!("../doc/ajtai_commitment.md")]
+// Hierarchical Commitment
+#![doc = include_str!("../doc/hierarchical_commitment.md")]
 // Projections
 #![doc = include_str!("../doc/projections.md")]
 // Aggregation
@@ -15,18 +17,8 @@
 // Amortization
 #![doc = include_str!("../doc/amortization.md")]
 
-pub mod rq;
-
-pub mod zq;
-
-pub mod ajtai_commitment;
-
-pub mod rq_matrix;
-
-pub mod rq_vector;
-
-pub mod jl;
-
-pub mod poseidon;
-
-// pub mod transcript;
+pub mod commitments;
+pub mod core;
+pub mod prover;
+pub mod ring;
+pub mod verifier;

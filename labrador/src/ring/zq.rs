@@ -17,6 +17,8 @@ impl Zq {
     pub const ZERO: Self = Self::new(0);
     /// Multiplicative identity
     pub const ONE: Self = Self::new(1);
+    /// Two
+    pub const TWO: Self = Self::new(2);
     /// Maximum element
     pub const MAX: Self = Self::new(u32::MAX);
 
@@ -34,57 +36,44 @@ impl Zq {
         self.value == 0
     }
 
-    // Computes x^exp % q using exponentiation by squaring
-    pub fn pow(&self, exp: u64) -> Self {
-        let mut result = Zq::ONE;
-        let mut base = *self;
-        let mut exponent = exp;
-
-        // Exponentiation by squaring
-        while exponent > 0 {
-            if exponent % 2 == 1 {
-                result *= base;
-            }
-            base = base * base;
-            exponent /= 2;
-        }
-
-        result
+    #[allow(clippy::as_conversions)]
+    pub fn get_value(&self) -> usize {
+        self.value as usize
     }
 
-    /// Calculates the modular inverse of an element using the Extended Euclidean Algorithm.
-    /// Returns `None` if no inverse exists.
-    pub fn inv(self) -> Option<Self> {
-        let mut a: u128 = self.to_u128();
-        let mut x0: u128 = 0;
-        let mut x1: u128 = 1;
-        let mut q: u128 = 4294967291; // modulus 2^32 - 5
-        let original_q = q;
+    /// Returns the centered representative modulo the given bound
+    /// Result is guaranteed to be in (-bound/2, bound/2]
+    ///
+    /// # Panics
+    ///
+    /// Panics if `bound` is zero.
+    pub(crate) fn centered_mod(&self, bound: Self) -> Self {
+        assert!(
+            bound != Zq::ZERO,
+            "cannot get centered representative modulo for zero bound"
+        );
+        let bounded_coeff = Self::new(self.value % bound.value);
+        let half_bound = bound.scale_by(Self::TWO);
 
-        while a != 0 {
-            let quotient = q.wrapping_div(a);
-            let remainder = q.wrapping_rem(a);
-
-            let new_x0 = x1.wrapping_sub(quotient.wrapping_mul(x0));
-            let new_x1 = x0;
-
-            x0 = new_x0;
-            x1 = new_x1;
-            q = a;
-            a = remainder;
+        if bounded_coeff > half_bound {
+            bounded_coeff - bound
+        } else {
+            bounded_coeff
         }
+    }
 
-        // If gcd(a, q) != 1, no inverse exists
-        if q != 1 {
-            return None;
-        }
-
-        let result =
-            (x1.wrapping_rem(original_q).wrapping_add(original_q)).wrapping_rem(original_q);
-
-        Some(Zq::new(
-            result.try_into().expect("Failed to convert result to u32"),
-        ))
+    /// Scales by other Zq.
+    ///
+    /// Effectively it is a floor division of internal values.
+    /// But for the ring of integers there is no defined division
+    /// operation.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `bound` is zero.
+    pub(crate) fn scale_by(&self, rhs: Self) -> Self {
+        assert!(rhs != Zq::ZERO, "cannot scale by zero");
+        Self::new(self.value / rhs.value)
     }
 }
 
@@ -102,6 +91,14 @@ macro_rules! impl_arithmetic {
         impl $assign_trait for Zq {
             fn $assign_method(&mut self, rhs: Self) {
                 self.value = self.value.$op(rhs.value);
+            }
+        }
+
+        impl $trait<Zq> for &Zq {
+            type Output = Zq;
+
+            fn $method(self, rhs: Zq) -> Self::Output {
+                Zq::new(self.value.$op(rhs.value))
             }
         }
     };
@@ -170,6 +167,93 @@ impl Neg for Zq {
     }
 }
 
+pub trait ZqVector {
+    fn random<R: Rng + CryptoRng>(rng: &mut R, n: usize) -> Self;
+    fn conjugate_automorphism(&self) -> Self;
+    fn multiply(&self, other: &Self) -> Self;
+    fn add(&self, other: &Self) -> Self;
+    fn inner_product(&self, other: &Self) -> Zq;
+}
+
+impl ZqVector for Vec<Zq> {
+    fn random<R: Rng + CryptoRng>(rng: &mut R, n: usize) -> Self {
+        // you can re‑use the UniformZq defined above
+        let uniform = UniformZq::new_inclusive(Zq::ZERO, Zq::MAX).unwrap();
+        (0..n).map(|_| uniform.sample(rng)).collect()
+    }
+
+    /// Add two ZqVector with flexible degree
+    fn add(&self, other: &Self) -> Self {
+        let max_degree = self.len().max(other.len());
+        let mut coeffs = vec![Zq::ZERO; max_degree];
+        for (i, coeff) in coeffs.iter_mut().enumerate().take(max_degree) {
+            if i < self.len() {
+                *coeff += self[i];
+            }
+            if i < other.len() {
+                *coeff += other[i];
+            }
+        }
+        coeffs
+    }
+
+    /// Note: This is a key performance bottleneck. The multiplication here is primarily used in: Prover.check_projection()
+    /// which verifies the condition: p_j? = ct(sum(<σ−1(pi_i^(j)), s_i>))
+    /// Each ZqVector involved has a length of 2*lambda (default: 256).
+    /// Consider optimizing this operation by applying NTT-based multiplication to improve performance.
+    fn multiply(&self, other: &Vec<Zq>) -> Vec<Zq> {
+        let mut result_coefficients = vec![Zq::new(0); self.len() + other.len() - 1];
+        for (i, &coeff1) in self.iter().enumerate() {
+            for (j, &coeff2) in other.iter().enumerate() {
+                result_coefficients[i + j] += coeff1 * coeff2;
+            }
+        }
+
+        if result_coefficients.len() > self.len() {
+            let q_minus_1 = Zq::MAX;
+            let (left, right) = result_coefficients.split_at_mut(self.len());
+            for (i, &overflow) in right.iter().enumerate() {
+                left[i] += overflow * q_minus_1;
+            }
+            result_coefficients.truncate(self.len());
+        }
+        result_coefficients
+    }
+
+    /// Dot product between coefficients
+    fn inner_product(&self, other: &Self) -> Zq {
+        self.iter()
+            .zip(other.iter())
+            .map(|(&a, &b)| a * b)
+            .fold(Zq::ZERO, |acc, x| acc + x)
+    }
+
+    /// Compute the conjugate automorphism \sigma_{-1} of vector based on B) Constraints..., Page 21.
+    fn conjugate_automorphism(&self) -> Vec<Zq> {
+        let q_minus_1 = Zq::MAX;
+        let mut new_coeffs = vec![Zq::ZERO; self.len()];
+        for (i, new_coeff) in new_coeffs.iter_mut().enumerate().take(self.len()) {
+            if i < self.len() {
+                if i == 0 {
+                    *new_coeff = self[i];
+                } else {
+                    *new_coeff = self[i] * q_minus_1;
+                }
+            } else {
+                *new_coeff = Zq::ZERO;
+            }
+        }
+        let reversed_coefficients = new_coeffs
+            .iter()
+            .take(1)
+            .cloned()
+            .chain(new_coeffs.iter().skip(1).rev().cloned())
+            .collect::<Vec<Zq>>();
+
+        reversed_coefficients
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -200,7 +284,7 @@ mod tests {
     fn test_subtraction_edge_cases() {
         let max = Zq::MAX;
         let one = Zq::ONE;
-        let two = Zq::new(2);
+        let two = Zq::TWO;
 
         assert_eq!((one - max).value, 2);
         assert_eq!((two - max).value, 3);
@@ -210,7 +294,7 @@ mod tests {
     #[test]
     fn test_multiplication_wrapping() {
         let a = Zq::new(1 << 31);
-        let two = Zq::new(2);
+        let two = Zq::TWO;
 
         // Multiplication wraps when exceeding u32 range
         assert_eq!((a * two).value, 0, "2^31 * 2 should wrap to 0");
@@ -253,7 +337,7 @@ mod tests {
 
         // Test negative equivalent value in multiplication
         let a = Zq::MAX; // Represents -1 in mod 2^32 arithmetic
-        let b = Zq::new(2);
+        let b = Zq::TWO;
         assert_eq!(
             (a * b).value,
             u32::MAX - 1,
@@ -302,41 +386,5 @@ mod tests {
 
         assert_eq!(neg_a + a, Zq::ZERO);
         assert_eq!(neg_b, Zq::ZERO);
-    }
-    // Exponenciation tests
-    #[test]
-    fn test_pow_zero_exponent() {
-        let base = Zq::new(5);
-        let result = base.pow(0);
-        assert_eq!(result, Zq::ONE);
-    }
-
-    #[test]
-    fn test_pow_one_exponent() {
-        let base = Zq::new(7);
-        let result = base.pow(1);
-        assert_eq!(result, Zq::new(7));
-    }
-
-    #[test]
-    fn test_pow_small_exponent() {
-        let base = Zq::new(3);
-        let result = base.pow(4);
-        assert_eq!(result, Zq::new(81));
-    }
-
-    #[test]
-    fn test_pow_large_exponent() {
-        let base = Zq::new(2);
-        let result = base.pow(10);
-        assert_eq!(result, Zq::new(1024));
-    }
-
-    #[test]
-    fn test_pow_wrapping() {
-        let base = Zq::new(3);
-        let result = base.pow(30);
-        let expected = Zq::new(3284826297);
-        assert_eq!(result, expected);
     }
 }

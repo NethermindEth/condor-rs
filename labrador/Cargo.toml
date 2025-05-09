@@ -8,6 +8,7 @@ license.workspace = true
 [dependencies]
 zerocopy = "0.8"
 rand = {version = "0.9", default-features = false, features = ["thread_rng", "unbiased"] }
+rustfft = "6.2.0"
 thiserror = {version = "1.0", default-features = false }
 blake2 = "0.11.0-pre.5"
 [features]

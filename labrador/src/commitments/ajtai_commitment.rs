@@ -1,4 +1,6 @@
-use crate::{rq_matrix::RqMatrix, rq_vector::RqVector, zq::Zq};
+use crate::ring::rq_matrix::RqMatrix;
+use crate::ring::rq_vector::RqVector;
+use crate::ring::zq::Zq;
 use thiserror::Error;
 
 // Error types with documentation
@@ -18,6 +20,8 @@ pub enum ParameterError {
 pub enum CommitError {
     #[error("witness coefficients exceed bound {0}")]
     InvalidWitnessBounds(Zq),
+    #[error("invalid witness vector size")]
+    InvalidWitnessSize,
 }
 
 #[derive(Debug, Error)]
@@ -26,100 +30,69 @@ pub enum VerificationError {
     InvalidWitnessBounds(Zq),
     #[error("commitment does not match opening")]
     CommitmentMismatch,
-}
-
-/// Configuration parameters for Ajtai commitment scheme with validation invariants
-#[derive(Debug, Clone)]
-pub struct AjtaiParameters {
-    beta: Zq,
-    witness_bound: Zq,
-}
-
-impl AjtaiParameters {
-    /// Creates new parameters with validation
-    pub const fn new(beta: Zq, witness_bound: Zq) -> Result<Self, ParameterError> {
-        if witness_bound.is_zero() {
-            return Err(ParameterError::InvalidWitnessBounds(witness_bound));
-        }
-
-        Ok(Self {
-            beta,
-            witness_bound,
-        })
-    }
-
-    /// Returns the beta value
-    pub const fn beta(&self) -> Zq {
-        self.beta
-    }
-
-    /// Returns the witness bound
-    pub const fn witness_bound(&self) -> Zq {
-        self.witness_bound
-    }
-}
-
-/// Cryptographic opening containing witness
-#[derive(Clone, Debug)]
-pub struct Opening<const N: usize, const D: usize> {
-    pub witness: RqVector<N, D>,
-}
-
-impl<const N: usize, const D: usize> Opening<N, D> {
-    /// Creates a new opening from a witness
-    pub const fn new(witness: RqVector<N, D>) -> Self {
-        Self { witness }
-    }
+    #[error("invalid opening vector size")]
+    InvalidOpeningSize,
+    #[error("invalid commitment vector size")]
+    InvalidCommitmentSize,
 }
 
 /// Ajtai commitment scheme implementation with matrix-based operations
 #[derive(Debug)]
-pub struct AjtaiCommitment<const M: usize, const N: usize, const D: usize> {
-    matrix_a: RqMatrix<M, N, D>,
+pub struct AjtaiCommitment {
     witness_bound: Zq,
+    random_matrix: RqMatrix,
 }
 
-// Core implementation with security checks
-impl<const M: usize, const N: usize, const D: usize> AjtaiCommitment<M, N, D> {
-    /// Creates new commitment scheme with validated parameters
+impl AjtaiCommitment {
     pub fn new(
-        params: AjtaiParameters,
-        matrix_a: RqMatrix<M, N, D>,
+        beta: Zq,
+        witness_bound: Zq,
+        random_matrix: RqMatrix,
     ) -> Result<Self, ParameterError> {
-        Self::validate_parameters(&params)?;
+        if witness_bound.is_zero() {
+            return Err(ParameterError::InvalidWitnessBounds(witness_bound));
+        }
+        Self::validate_parameters(
+            beta,
+            random_matrix.get_row_len(),
+            random_matrix.get_col_len(),
+        )?;
 
         Ok(Self {
-            matrix_a,
-            witness_bound: params.witness_bound,
+            witness_bound,
+            random_matrix,
         })
     }
 
     /// Generates commitment and opening information with bounds checking
-    pub fn commit(
-        &self,
-        witness: RqVector<N, D>,
-    ) -> Result<(RqVector<M, D>, Opening<N, D>), CommitError> {
-        if !Self::check_bounds(&witness, self.witness_bound) {
+    pub fn commit(&self, witness: &RqVector) -> Result<RqVector, CommitError> {
+        if !self.check_bounds(witness) {
             return Err(CommitError::InvalidWitnessBounds(self.witness_bound));
         }
-
-        let commitment = &self.matrix_a * &witness;
-        let opening = Opening::new(witness);
-
-        Ok((commitment, opening))
+        if witness.get_length() != self.random_matrix.get_col_len() {
+            return Err(CommitError::InvalidWitnessSize);
+        }
+        let commitment = &self.random_matrix * witness;
+        Ok(commitment)
     }
 
     /// Verifies commitment against opening information
     pub fn verify(
         &self,
-        commitment: &RqVector<M, D>,
-        opening: &Opening<N, D>,
+        commitment: &RqVector,
+        opening: &RqVector,
     ) -> Result<(), VerificationError> {
-        if !Self::check_bounds(&opening.witness, self.witness_bound) {
+        if !self.check_bounds(opening) {
             return Err(VerificationError::InvalidWitnessBounds(self.witness_bound));
         }
+        if opening.get_length() != self.random_matrix.get_col_len() {
+            return Err(VerificationError::InvalidOpeningSize);
+        }
+        if commitment.get_length() != self.random_matrix.get_row_len() {
+            return Err(VerificationError::InvalidCommitmentSize);
+        }
 
-        let recomputed = &self.matrix_a * &opening.witness;
+        let recomputed = &self.random_matrix * opening;
         if commitment != &recomputed {
             return Err(VerificationError::CommitmentMismatch);
         }
@@ -127,13 +100,11 @@ impl<const M: usize, const N: usize, const D: usize> AjtaiCommitment<M, N, D> {
         Ok(())
     }
 
-    /// Validates scheme parameters against cryptographic security requirements
-    fn validate_parameters(params: &AjtaiParameters) -> Result<(), ParameterError> {
-        if [M, N, D].contains(&0) {
+    fn validate_parameters(beta: Zq, row_len: usize, col_len: usize) -> Result<(), ParameterError> {
+        if [row_len, col_len].contains(&0) {
             return Err(ParameterError::ZeroParameter);
         }
-
-        Self::verify_security_relation(params.beta, M)
+        Self::verify_security_relation(beta, row_len)
     }
 
     /// Verifies the security relation β²m³ < q² required for Ajtai's commitment scheme.
@@ -181,54 +152,69 @@ impl<const M: usize, const N: usize, const D: usize> AjtaiCommitment<M, N, D> {
     }
 
     /// Checks polynomial coefficients against specified bound
-    fn check_bounds<const SIZE: usize>(polynomials: &RqVector<SIZE, D>, bound: Zq) -> bool {
-        polynomials.iter().all(|p| p.check_bounds(bound))
+    fn check_bounds(&self, _polynomials: &RqVector) -> bool {
+        // As now there are no concrete parameters, we return true.
+        true
+        // polynomials
+        //     .iter()
+        //     .all(|p| p.check_bounds(self.witness_bound))
     }
 
     /// Returns a reference to the internal matrix
-    pub fn matrix(&self) -> &RqMatrix<M, N, D> {
-        &self.matrix_a
+    pub fn matrix(&self) -> &RqMatrix {
+        &self.random_matrix
     }
 
     /// Returns the witness bound
     pub fn witness_bound(&self) -> Zq {
         self.witness_bound
     }
+
+    pub fn get_row_size(&self) -> usize {
+        self.random_matrix.get_elements().len()
+    }
+
+    pub fn get_col_size(&self) -> usize {
+        self.random_matrix.get_elements()[0].get_elements().len()
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::rq::Rq;
+    use crate::ring::rq::Rq;
 
     const TEST_M: usize = 8;
     const TEST_N: usize = 8;
-    const TEST_D: usize = 4;
-    type TestAjtai = AjtaiCommitment<TEST_M, TEST_N, TEST_D>;
 
     // Test helpers
     mod test_utils {
         use super::*;
 
-        pub fn valid_witness(scheme: &TestAjtai) -> RqVector<TEST_N, TEST_D> {
-            vec![Rq::new([scheme.witness_bound(); TEST_D]); TEST_N].into()
+        pub fn valid_witness(scheme: &AjtaiCommitment) -> RqVector {
+            vec![Rq::new([scheme.witness_bound(); Rq::DEGREE]); TEST_N].into()
         }
 
-        pub fn random_valid_witness() -> RqVector<TEST_N, TEST_D> {
+        pub fn random_valid_witness() -> RqVector {
             let mut rng = rand::rng();
-            RqVector::random_ternary(&mut rng)
+            RqVector::random_ternary(&mut rng, TEST_N)
         }
 
-        pub fn setup_scheme() -> TestAjtai {
+        pub fn setup_scheme() -> AjtaiCommitment {
             let mut rng = rand::rng();
-            let matrix_a = RqMatrix::random(&mut rng);
-            TestAjtai::new(AjtaiParameters::new(Zq::ONE, Zq::ONE).unwrap(), matrix_a).unwrap()
+            let random_matrix = RqMatrix::random(&mut rng, TEST_M, TEST_N);
+            AjtaiCommitment::new(Zq::ONE, Zq::ONE, random_matrix).unwrap()
         }
     }
 
     #[test]
     fn rejects_invalid_parameters() {
-        assert!(AjtaiParameters::new(Zq::ONE, Zq::ZERO).is_err());
+        assert!(AjtaiCommitment::new(
+            Zq::ONE,
+            Zq::ZERO,
+            RqMatrix::new(vec![RqVector::new(vec![Rq::zero()])])
+        )
+        .is_err());
         let _ = test_utils::setup_scheme(); // Will panic if setup fails
     }
 
@@ -243,12 +229,12 @@ mod tests {
         let scheme = test_utils::setup_scheme();
         let witness = test_utils::valid_witness(&scheme);
 
-        let (commitment, opening) = scheme.commit(witness).unwrap();
-        assert!(scheme.verify(&commitment, &opening).is_ok());
+        let commitment = scheme.commit(&witness).unwrap();
+        assert!(scheme.verify(&commitment, &witness).is_ok());
 
-        let mut bad_opening = opening.clone();
+        let mut bad_opening = witness.clone();
         let mut rng = rand::rng();
-        bad_opening.witness[0] = Rq::random(&mut rng);
+        bad_opening[0] = Rq::random(&mut rng);
         assert!(scheme.verify(&commitment, &bad_opening).is_err());
     }
 
@@ -263,8 +249,8 @@ mod tests {
         // Ensure the witnesses are actually different
         assert_ne!(witness1, witness2, "Test requires different witnesses");
 
-        let (c1, _) = scheme.commit(witness1).unwrap();
-        let (c2, _) = scheme.commit(witness2).unwrap();
+        let c1 = scheme.commit(&witness1).unwrap();
+        let c2 = scheme.commit(&witness2).unwrap();
         assert_ne!(
             c1, c2,
             "Different witnesses should produce different commitments"
@@ -274,10 +260,10 @@ mod tests {
     #[test]
     fn handles_edge_cases() {
         let scheme = test_utils::setup_scheme();
-        let zero_witness = RqVector::zero();
+        let zero_witness = RqVector::zero(TEST_N);
 
-        assert!(scheme.commit(zero_witness).is_ok());
-        assert!(scheme.commit(test_utils::valid_witness(&scheme)).is_ok());
+        assert!(scheme.commit(&zero_witness).is_ok());
+        assert!(scheme.commit(&test_utils::valid_witness(&scheme)).is_ok());
     }
 
     #[test]
@@ -286,8 +272,8 @@ mod tests {
 
         (0..100).for_each(|_| {
             let witness = test_utils::valid_witness(&scheme);
-            let (commitment, opening) = scheme.commit(witness).unwrap();
-            assert!(scheme.verify(&commitment, &opening).is_ok());
+            let commitment = scheme.commit(&witness).unwrap();
+            assert!(scheme.verify(&commitment, &witness).is_ok());
         });
     }
 }

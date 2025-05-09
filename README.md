@@ -43,3 +43,56 @@ RUSTDOCFLAGS="--html-in-header katex-header.html" cargo doc --no-deps -p labrado
 ## License
 
 Apache 2.0
+
+## Contributors ✨
+
+Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/docs/en/emoji-key)):
+
+<!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
+<!-- prettier-ignore-start -->
+<!-- markdownlint-disable -->
+<table>
+  <tbody>
+    <tr>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/JamesEBall"><img src="https://avatars.githubusercontent.com/u/73405337?v=4?s=100" width="100px;" alt="James Ball"/><br /><sub><b>James Ball</b></sub></a><br /><a href="#projectManagement-JamesEBall" title="Project Management">📆</a> <a href="#ideas-JamesEBall" title="Ideas, Planning, & Feedback">🤔</a> <a href="#research-JamesEBall" title="Research">🔬</a> <a href="#fundingFinding-JamesEBall" title="Funding Finding">🔍</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/mattsuffern"><img src="https://avatars.githubusercontent.com/u/135047609?v=4?s=100" width="100px;" alt="Mateo Suffern"/><br /><sub><b>Mateo Suffern</b></sub></a><br /><a href="https://github.com/NethermindEth/condor-rs/commits?author=mattsuffern" title="Documentation">📖</a> <a href="https://github.com/NethermindEth/condor-rs/commits?author=mattsuffern" title="Code">💻</a> <a href="https://github.com/NethermindEth/condor-rs/pulls?q=is%3Apr+reviewed-by%3Amattsuffern" title="Reviewed Pull Requests">👀</a> <a href="https://github.com/NethermindEth/condor-rs/commits?author=mattsuffern" title="Tests">⚠️</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/pycckuu"><img src="https://avatars.githubusercontent.com/u/1489583?v=4?s=100" width="100px;" alt="Igor Markelov"/><br /><sub><b>Igor Markelov</b></sub></a><br /><a href="https://github.com/NethermindEth/condor-rs/commits?author=pycckuu" title="Code">💻</a> <a href="https://github.com/NethermindEth/condor-rs/commits?author=pycckuu" title="Documentation">📖</a> <a href="https://github.com/NethermindEth/condor-rs/pulls?q=is%3Apr+reviewed-by%3Apycckuu" title="Reviewed Pull Requests">👀</a> <a href="https://github.com/NethermindEth/condor-rs/commits?author=pycckuu" title="Tests">⚠️</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/Yue-Zhou1"><img src="https://avatars.githubusercontent.com/u/78064891?v=4?s=100" width="100px;" alt="Yue Zhou"/><br /><sub><b>Yue Zhou</b></sub></a><br /><a href="https://github.com/NethermindEth/condor-rs/commits?author=Yue-Zhou1" title="Code">💻</a> <a href="https://github.com/NethermindEth/condor-rs/commits?author=Yue-Zhou1" title="Documentation">📖</a> <a href="https://github.com/NethermindEth/condor-rs/pulls?q=is%3Apr+reviewed-by%3AYue-Zhou1" title="Reviewed Pull Requests">👀</a> <a href="https://github.com/NethermindEth/condor-rs/commits?author=Yue-Zhou1" title="Tests">⚠️</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/omibo"><img src="https://avatars.githubusercontent.com/u/42227752?v=4?s=100" width="100px;" alt="Omid Bodaghi"/><br /><sub><b>Omid Bodaghi</b></sub></a><br /><a href="https://github.com/NethermindEth/condor-rs/pulls?q=is%3Apr+reviewed-by%3Aomibo" title="Reviewed Pull Requests">👀</a> <a href="https://github.com/NethermindEth/condor-rs/commits?author=omibo" title="Documentation">📖</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/NiDimi"><img src="https://avatars.githubusercontent.com/u/81875532?v=4?s=100" width="100px;" alt="Nick Dimitriou"/><br /><sub><b>Nick Dimitriou</b></sub></a><br /><a href="https://github.com/NethermindEth/condor-rs/pulls?q=is%3Apr+reviewed-by%3ANiDimi" title="Reviewed Pull Requests">👀</a> <a href="#design-NiDimi" title="Design">🎨</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/v0-e"><img src="https://avatars.githubusercontent.com/u/134806759?v=4?s=100" width="100px;" alt="v0-e"/><br /><sub><b>v0-e</b></sub></a><br /><a href="#projectManagement-v0-e" title="Project Management">📆</a> <a href="https://github.com/NethermindEth/condor-rs/pulls?q=is%3Apr+reviewed-by%3Av0-e" title="Reviewed Pull Requests">👀</a></td>
+    </tr>
+    <tr>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/frozenspider"><img src="https://avatars.githubusercontent.com/u/2077017?v=4?s=100" width="100px;" alt="Alex Abdugafarov"/><br /><sub><b>Alex Abdugafarov</b></sub></a><br /><a href="https://github.com/NethermindEth/condor-rs/commits?author=frozenspider" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://maksimryndin.github.io/"><img src="https://avatars.githubusercontent.com/u/16288656?v=4?s=100" width="100px;" alt="maksimryndin"/><br /><sub><b>maksimryndin</b></sub></a><br /><a href="https://github.com/NethermindEth/condor-rs/pulls?q=is%3Apr+reviewed-by%3Amaksimryndin" title="Reviewed Pull Requests">👀</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/earthling1984"><img src="https://avatars.githubusercontent.com/u/19665196?v=4?s=100" width="100px;" alt="Mithun Vaidhyanathan"/><br /><sub><b>Mithun Vaidhyanathan</b></sub></a><br /><a href="#research-earthling1984" title="Research">🔬</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/smartprogrammer93"><img src="https://avatars.githubusercontent.com/u/33181301?v=4?s=100" width="100px;" alt="Ahmad Bitar"/><br /><sub><b>Ahmad Bitar</b></sub></a><br /><a href="#ideas-smartprogrammer93" title="Ideas, Planning, & Feedback">🤔</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/HendrikWaldner"><img src="https://avatars.githubusercontent.com/u/33893964?v=4?s=100" width="100px;" alt="HendrikWaldner"/><br /><sub><b>HendrikWaldner</b></sub></a><br /><a href="#research-HendrikWaldner" title="Research">🔬</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://www.linkedin.com/in/aragirtas"><img src="https://avatars.githubusercontent.com/u/95563727?v=4?s=100" width="100px;" alt="Ahmet Ramazan Agirtas"/><br /><sub><b>Ahmet Ramazan Agirtas</b></sub></a><br /><a href="#research-ahmetramazan" title="Research">🔬</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/mpzajac"><img src="https://avatars.githubusercontent.com/u/25900405?v=4?s=100" width="100px;" alt="mpzajac"/><br /><sub><b>mpzajac</b></sub></a><br /><a href="#research-mpzajac" title="Research">🔬</a> <a href="#projectManagement-mpzajac" title="Project Management">📆</a> <a href="#fundingFinding-mpzajac" title="Funding Finding">🔍</a></td>
+    </tr>
+    <tr>
+      <td align="center" valign="top" width="14.28%"><a href="https://matthewklein.co.uk/"><img src="https://avatars.githubusercontent.com/u/96837318?v=4?s=100" width="100px;" alt="Matthew Klein"/><br /><sub><b>Matthew Klein</b></sub></a><br /><a href="#research-matthew-a-klein" title="Research">🔬</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/GustaveCharles"><img src="https://avatars.githubusercontent.com/u/91184289?v=4?s=100" width="100px;" alt="GustaveCharles"/><br /><sub><b>GustaveCharles</b></sub></a><br /><a href="#research-GustaveCharles" title="Research">🔬</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://sites.google.com/view/luca-dallava/"><img src="https://avatars.githubusercontent.com/u/94935046?v=4?s=100" width="100px;" alt="Luca Dall'Ava"/><br /><sub><b>Luca Dall'Ava</b></sub></a><br /><a href="#research-Luca-DallAva" title="Research">🔬</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/mounikapratapa"><img src="https://avatars.githubusercontent.com/u/43151963?v=4?s=100" width="100px;" alt="Mounika Pratapa"/><br /><sub><b>Mounika Pratapa</b></sub></a><br /><a href="#research-mounikapratapa" title="Research">🔬</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://sites.google.com/view/agarreta"><img src="https://avatars.githubusercontent.com/u/97292142?v=4?s=100" width="100px;" alt="albert_g"/><br /><sub><b>albert_g</b></sub></a><br /><a href="#research-albert-garreta" title="Research">🔬</a></td>
+    </tr>
+  </tbody>
+  <tfoot>
+    <tr>
+      <td align="center" size="13px" colspan="7">
+        <img src="https://raw.githubusercontent.com/all-contributors/all-contributors-cli/1b8533af435da9854653492b1327a23a4dbd0a10/assets/logo-small.svg">
+          <a href="https://all-contributors.js.org/docs/en/bot/usage">Add your contributions</a>
+        </img>
+      </td>
+    </tr>
+  </tfoot>
+</table>
+
+<!-- markdownlint-restore -->
+<!-- prettier-ignore-end -->
+
+<!-- ALL-CONTRIBUTORS-LIST:END -->
+
+This project follows the [all-contributors](https://github.com/all-contributors/all-contributors) specification. Contributions of any kind welcome!
