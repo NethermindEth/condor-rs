@@ -250,8 +250,8 @@ mod tests {
     #[test]
     #[cfg(not(feature = "skip-slow-tests"))]
     fn average_value() {
-        // 10000 was chosen to provide a reasonably large sample size
-        let trials: u128 = 10000;
+        // 20000 was chosen to provide a reasonably large sample size
+        let trials: u128 = 20000;
         let n = 3;
         let mut rng = rng();
         let polynomials = RqVector::random_ternary(&mut rng, 3);

@@ -155,33 +155,15 @@ impl<'a> LabradorProver<'a> {
         // This replaces the following code
         let mut garbage_polynomials = GarbagePolynomials::new(self.witness.s.clone());
         garbage_polynomials.compute_g();
+        
+        // calculate outer commitment u_1 = \sum(B_ik * t_i^(k)) + \sum(C_ijk * g_ij^(k))
         let mut outer_commitments = OuterCommitment::new(self.pp.clone(), ep.clone());
         outer_commitments.compute_u1(
             RqMatrix::new(t_i.clone()),
-            DecompositionParameters::new(ep.b, ep.t_1),
+            DecompositionParameters::new(ep.b, ep.t_1).unwrap(),
             garbage_polynomials.g.clone(),
-            DecompositionParameters::new(ep.b, ep.t_2),
+            DecompositionParameters::new(ep.b, ep.t_2).unwrap(),
         );
-        // Probably do not need the following code
-        // decompose t_i into t_i^(0) + ... + t_i^(t_1-1) * b_1^(t_1-1)
-        // let t_ij: Vec<Vec<RqVector>> = t_i
-        //     .iter()
-        //     .map(|i| RqVector::decompose(i, ep.b, ep.t_1))
-        //     .collect();
-        // // calculate garbage polynomial g = <s_i, s_j>
-        // let g_gp: Vec<RqVector> = aggregate::calculate_gij(&self.witness.s, ep.r);
-        // // decompose g_gp into g_ij = g_ij^(0) + ... + g_ij^(t_2-1) * b_2^(t_2=1)
-        // let g_ij: Vec<Vec<RqVector>> = g_gp
-        //     .iter()
-        //     .map(|i| RqVector::decompose(i, ep.b, ep.t_2))
-        //     .collect();
-        // let matrix_b = &self.pp.matrix_b;
-        // let matrix_c = &self.pp.matrix_c;
-
-        // calculate outer commitment u_1 = \sum(B_ik * t_i^(k)) + \sum(C_ijk * g_ij^(k))
-
-        // let u_1 = aggregate::calculate_u_1(matrix_b, matrix_c, &t_ij, &g_ij, ep);
-
         // Step 1: Outer commitments u_1 ends: ----------------------------------------------
 
         // Step 2: JL projection starts: ----------------------------------------------------
@@ -209,20 +191,10 @@ impl<'a> LabradorProver<'a> {
 
         let phi_i = aggr_2.phi_i;
         garbage_polynomials.compute_h(&phi_i);
-        // let h_gp = aggregate::calculate_hij(&phi_i, &self.witness.s, ep);
-        // // decompose h_gp into h_ij = h_ij^(0) + ... + h_ij^(t_1-1) * b_1^(t_1-1)
-        // let h_ij: Vec<Vec<RqVector>> = h_gp
-        //     .iter()
-        //     .map(|i| RqVector::decompose(i, ep.b, ep.t_1))
-        //     .collect();
-        // // Outer commitments: u_2
-        // let matrix_d = &self.pp.matrix_d;
-        // // calculate outer commitment u_2 = \sum(D_ijk * h_ij^(k))
         outer_commitments.compute_u2(
             garbage_polynomials.h.clone(),
-            DecompositionParameters::new(ep.b, ep.t_1),
+            DecompositionParameters::new(ep.b, ep.t_1).unwrap(),
         );
-        // let u_2 = aggregate::calculate_u_2(matrix_d, &h_ij, ep);
 
         // calculate z = c_1*s_1 + ... + c_r*s_r
         let z = aggregate::calculate_z(&self.witness.s, &self.tr.random_c);

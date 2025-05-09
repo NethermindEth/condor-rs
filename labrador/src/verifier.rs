@@ -58,37 +58,6 @@ impl<'a> LabradorVerifier<'a> {
 
     /// All check conditions are from page 18
     pub fn verify(&self, proof: &Proof, ep: &EnvironmentParameters) -> Result<bool, VerifierError> {
-        // We probably do not need the following. We only store half of the matrix
-        // 1. line 08: check g_ij ?= g_ji
-        // 2. line 09: check h_ij ?= h_ji
-        // if !proof.g_ij.is_symmetric() or !proof.h_ij.is_symmetric() {
-        //     // Return error
-        // }
-        // for i in 0..ep.r {
-        //     for j in (i + 1)..ep.r {
-        //         let g_ij = &proof.g_ij[i].get_elements()[j];
-        //         let g_ji = &proof.g_ij[j].get_elements()[i];
-        //         if g_ij != g_ji {
-        //             return Err(VerifierError::NotSymmetric {
-        //                 i,
-        //                 j,
-        //                 expected: g_ji.clone(),
-        //                 found: g_ij.clone(),
-        //             });
-        //         }
-        //         let h_ij = &proof.h_ij[i].get_elements()[j];
-        //         let h_ji = &proof.h_ij[j].get_elements()[i];
-        //         if h_ij != h_ji {
-        //             return Err(VerifierError::NotSymmetric {
-        //                 i,
-        //                 j,
-        //                 expected: h_ji.clone(),
-        //                 found: h_ij.clone(),
-        //             });
-        //         }
-        //     }
-        // }
-
         // check b_0^{''(k)} ?= <omega^(k),p> + \sum(psi_l^(k) * b_0^{'(l)})
         Self::check_b_0_aggr(self, proof, ep).unwrap();
 
@@ -212,9 +181,9 @@ impl<'a> LabradorVerifier<'a> {
         let mut outer_commitments = OuterCommitment::new(self.pp.clone(), ep.clone());
         outer_commitments.compute_u1(
             RqMatrix::new(proof.t_i.clone()),
-            DecompositionParameters::new(ep.b, ep.t_1),
+            DecompositionParameters::new(ep.b, ep.t_1).unwrap(),
             proof.g_ij.clone(),
-            DecompositionParameters::new(ep.b, ep.t_2),
+            DecompositionParameters::new(ep.b, ep.t_2).unwrap(),
         );
 
         if proof.u_1 != outer_commitments.u_1 {
@@ -227,7 +196,7 @@ impl<'a> LabradorVerifier<'a> {
         // 9. line 20: u_2 ?= \sum(\sum(D_ijk * h_ij^(k)))
         outer_commitments.compute_u2(
             proof.h_ij.clone(),
-            DecompositionParameters::new(ep.b, ep.t_1),
+            DecompositionParameters::new(ep.b, ep.t_1).unwrap(),
         );
 
         if proof.u_2 != outer_commitments.u_2 {
