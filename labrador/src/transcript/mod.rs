@@ -5,5 +5,5 @@
 
 // pub mod permutation;
 // pub mod sponge;
-pub mod transcript;
+pub mod lib;
 pub mod shake_sponge;

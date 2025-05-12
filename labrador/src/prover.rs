@@ -2,17 +2,16 @@ use crate::commitments::ajtai_commitment::AjtaiCommitment;
 use crate::commitments::outer_commitments::DecompositionParameters;
 use crate::commitments::outer_commitments::OuterCommitment;
 use crate::core::garbage_polynomials::GarbagePolynomials;
+use crate::core::jl::Projection;
 use crate::ring::rq_matrix::RqMatrix;
 use crate::ring::zq::Zq;
 use crate::ring::zq::ZqVector;
+use crate::transcript::lib::LabradorTranscript;
+use crate::transcript::shake_sponge::ShakeSponge;
 use crate::{
     core::{
-        aggregate,
-        challenge_set::ChallengeSet,
-        crs::PublicPrams,
-        env_params::EnvironmentParameters,
-        jl::{ProjectionMatrix, Projections},
-        statement::Statement,
+        aggregate, challenge_set::ChallengeSet, crs::PublicPrams,
+        env_params::EnvironmentParameters, statement::Statement,
     },
     ring::rq_vector::RqVector,
 };
@@ -33,7 +32,7 @@ pub enum ProverError {
 // All parameters are from tr, line 2 on page 18
 pub struct Proof {
     pub u_1: RqVector,
-    pub p: Projections,
+    pub p: Vec<Zq>,
     pub b_ct_aggr: RqVector,
     pub u_2: RqVector,
     pub z: RqVector,
@@ -65,7 +64,8 @@ impl Challenges {
             .collect();
 
         // \pi is from JL projection, pi contains r matrices and each matrix: security_level2 * (n*d), (security_level2 is 256 in the paper).
-        let pi: Vec<Vec<Vec<Zq>>> = Self::get_pi(ep.r, ep.n);
+        // let pi: Vec<Vec<Vec<Zq>>> = Self::get_pi(ep.r, ep.n);
+        let pi = Vec::new();
 
         // generate random alpha and beta from challenge set
         let cs_alpha: ChallengeSet = ChallengeSet::new();
@@ -91,11 +91,11 @@ impl Challenges {
         }
     }
 
-    pub fn get_pi(r: usize, n: usize) -> Vec<Vec<Vec<Zq>>> {
-        (0..r)
-            .map(|_| ProjectionMatrix::new(n).get_matrix().clone())
-            .collect()
-    }
+    // pub fn get_pi(r: usize, n: usize) -> Vec<Vec<Vec<Zq>>> {
+    //     (0..r)
+    //         .map(|_| ProjectionMatrix::new(n).get_matrix().clone())
+    //         .collect()
+    // }
 }
 pub struct Witness {
     pub s: Vec<RqVector>,
@@ -115,6 +115,7 @@ pub struct LabradorProver<'a> {
     pub witness: &'a Witness,
     pub st: &'a Statement,
     pub tr: &'a Challenges,
+    pub transcript: LabradorTranscript<ShakeSponge>,
 }
 
 impl<'a> LabradorProver<'a> {
@@ -129,11 +130,12 @@ impl<'a> LabradorProver<'a> {
             witness,
             st,
             tr,
+            transcript: LabradorTranscript::new(ShakeSponge::default()),
         }
     }
 
     /// all prove steps are from page 17
-    pub fn prove(&self, ep: &EnvironmentParameters) -> Result<Proof, ProverError> {
+    pub fn prove(&mut self, ep: &EnvironmentParameters) -> Result<Proof, ProverError> {
         // check the L2 norm of the witness
         // not sure whether this should be handled during the proving or managed by the witness generator.
         Self::check_witness_l2norm(self, ep).unwrap();
@@ -163,24 +165,28 @@ impl<'a> LabradorProver<'a> {
             garbage_polynomials.g.clone(),
             DecompositionParameters::new(ep.b, ep.t_2).unwrap(),
         );
+
+        self.transcript.absorb_u1(outer_commitments.u_1.clone());
         // Step 1: Outer commitments u_1 ends: ----------------------------------------------
 
         // Step 2: JL projection starts: ----------------------------------------------------
 
         // JL projection p_j + check p_j = ct(sum(<\sigma_{-1}(pi_i^(j)), s_i>))
-        let matrices = &self.tr.pi;
-        let p = Projections::new(matrices, &self.witness.s);
+        let pi = self.transcript.generate_pi(ep.lambda, ep.n, ep.r);
+        let p =
+            Projection::new(pi.clone(), ep.lambda, ep.r).compute_batch_projection(&self.witness.s);
+        // Projections::new(pi, &self.witness.s);
 
         // Notice that this check is resource-intensive due to the multiplication of two ZqVector<256> instances,
         // followed by the removal of high-degree terms. It might not be a necessary check.
-        Self::check_projection(self, p.get_projection()).unwrap();
+        Self::check_projection(self, &p, pi.clone()).unwrap();
 
         // Step 2: JL projection ends: ------------------------------------------------------
 
         // Step 3: Aggregation starts: --------------------------------------------------------------
 
         // first aggregation
-        let aggr_1 = aggregate::AggregationOne::new(self.witness, self.st, ep, self.tr);
+        let aggr_1 = aggregate::AggregationOne::new(self.witness, self.st, ep, self.tr, &pi);
         // second aggregation
         let aggr_2 = aggregate::AggregationTwo::new(&aggr_1, self.st, ep, self.tr);
 
@@ -213,7 +219,7 @@ impl<'a> LabradorProver<'a> {
     }
 
     /// check p_j? = ct(sum(<σ−1(pi_i^(j)), s_i>))
-    fn check_projection(&self, p: &[Zq]) -> Result<bool, ProverError> {
+    fn check_projection(&self, p: &[Zq], pi: Vec<Vec<Vec<Zq>>>) -> Result<bool, ProverError> {
         let s_coeffs: Vec<Vec<Zq>> = self
             .witness
             .s
@@ -228,7 +234,7 @@ impl<'a> LabradorProver<'a> {
         for (j, &p_j) in p.iter().enumerate() {
             let mut poly = vec![Zq::ZERO; p.len()];
             for (i, s_i) in s_coeffs.iter().enumerate() {
-                let pi_ele = &self.tr.pi[i][j];
+                let pi_ele = &pi[i][j];
                 let pi_ele_ca = pi_ele.conjugate_automorphism();
                 poly = poly.add(&(pi_ele_ca.multiply(s_i)));
             }
@@ -279,7 +285,7 @@ mod tests {
         let tr = Challenges::new(&ep_1);
 
         // create a new prover
-        let prover = LabradorProver::new(&pp, &witness_1, &st, &tr);
+        let mut prover = LabradorProver::new(&pp, &witness_1, &st, &tr);
         let _proof = prover.prove(&ep_1).unwrap();
     }
 }

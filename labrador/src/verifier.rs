@@ -312,7 +312,7 @@ mod tests {
         let tr = Challenges::new(&ep_1);
 
         // create a new prover
-        let prover = LabradorProver::new(&pp, &witness_1, &st, &tr);
+        let mut prover = LabradorProver::new(&pp, &witness_1, &st, &tr);
         let proof = prover.prove(&ep_1).unwrap();
 
         // create a new verifier
