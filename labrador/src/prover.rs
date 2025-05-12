@@ -43,8 +43,6 @@ pub struct Proof {
 
 // pub struct Challenges just for testing, should be replaced by the Transcript
 pub struct Challenges {
-    pub psi: Vec<Vec<Zq>>,
-    pub omega: Vec<Vec<Zq>>,
     pub random_alpha: RqVector,
     pub random_beta: RqVector,
     pub random_c: RqVector,
@@ -52,16 +50,6 @@ pub struct Challenges {
 
 impl Challenges {
     pub fn new(ep: &EnvironmentParameters) -> Self {
-        // generate random psi with size: k * constraint_l, each element is Zq
-        let psi: Vec<Vec<Zq>> = (0..ep.kappa)
-            .map(|_| Vec::<Zq>::random(&mut rng(), ep.constraint_l))
-            .collect();
-
-        // generate randm omega is with size: k * lambda2, each element is Zq
-        let omega: Vec<Vec<Zq>> = (0..ep.kappa)
-            .map(|_| Vec::<Zq>::random(&mut rng(), 2 * ep.lambda))
-            .collect();
-
         // generate random alpha and beta from challenge set
         let cs_alpha: ChallengeSet = ChallengeSet::new();
         let random_alpha: RqVector = (0..ep.constraint_k)
@@ -77,8 +65,6 @@ impl Challenges {
         let random_c: RqVector = (0..ep.r).map(|_| *cs_c.get_challenges()).collect();
 
         Self {
-            psi,
-            omega,
             random_alpha,
             random_beta,
             random_c,
@@ -180,16 +166,24 @@ impl<'a> LabradorProver<'a> {
 
         // Step 3: Aggregation starts: --------------------------------------------------------------
 
+        let size_of_psi = usize::div_ceil(ep.lambda, ep.log_q);
+        let size_of_omega = size_of_psi;
+        let vector_psi = self
+            .transcript
+            .generate_vector_psi(size_of_psi, ep.constraint_l);
+        let vector_omega = self.transcript.generate_vector_omega(size_of_omega);
         // first aggregation
         let aggr_1 = aggregate::AggregationOne::new(
             self.witness,
             self.st,
             ep,
-            self.tr,
             &vector_of_projection_matrices,
+            &vector_psi,
+            &vector_omega,
         );
         // second aggregation
         let aggr_2 = aggregate::AggregationTwo::new(&aggr_1, self.st, ep, self.tr);
+        self.transcript.absorb_vector_b_ct_aggr(aggr_1.b_ct_aggr);
 
         // Aggregation ends: ----------------------------------------------------------------
 
@@ -210,7 +204,7 @@ impl<'a> LabradorProver<'a> {
         Ok(Proof {
             u_1: outer_commitments.u_1,
             p: self.transcript.vector_p.clone(),
-            b_ct_aggr: aggr_1.b_ct_aggr,
+            b_ct_aggr: self.transcript.b_ct_aggr.clone(),
             u_2: outer_commitments.u_2,
             z,
             t_i,

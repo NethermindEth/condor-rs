@@ -19,25 +19,26 @@ impl AggregationOne {
         witness: &Witness,
         st: &Statement,
         ep: &EnvironmentParameters,
-        tr: &Challenges,
         pi: &[Vec<Vec<Zq>>],
+        psi: &[Vec<Zq>],
+        omega: &[Vec<Zq>],
     ) -> Self {
-        Self::aggregate(witness, st, ep, tr, pi)
+        Self::aggregate(witness, st, ep, pi, psi, omega)
     }
 
     fn aggregate(
         witness: &Witness,
         st: &Statement,
         ep: &EnvironmentParameters,
-        tr: &Challenges,
         pi: &[Vec<Vec<Zq>>],
+        psi: &[Vec<Zq>],
+        omega: &[Vec<Zq>],
     ) -> Self {
         // calculate a_{ij}^{''(k)}
-        let a_ct_aggr: Vec<Vec<RqVector>> = Self::get_a_ct_aggr(&tr.psi, &st.a_ct, ep);
+        let a_ct_aggr: Vec<Vec<RqVector>> = Self::get_a_ct_aggr(psi, &st.a_ct, ep);
 
         // calculate \phi_{i}^{''(k)}
-        let phi_ct_aggr: Vec<Vec<RqVector>> =
-            Self::get_phi_ct_aggr(&st.phi_ct, pi, &tr.psi, &tr.omega, ep);
+        let phi_ct_aggr: Vec<Vec<RqVector>> = Self::get_phi_ct_aggr(&st.phi_ct, pi, psi, omega, ep);
 
         // calculate b^{''(k)}
         let b_ct_aggr: RqVector = Self::get_b_ct_aggr(&a_ct_aggr, &phi_ct_aggr, witness, ep);

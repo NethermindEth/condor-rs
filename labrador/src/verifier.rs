@@ -76,8 +76,16 @@ impl<'a> LabradorVerifier<'a> {
         ep: &EnvironmentParameters,
     ) -> Result<bool, VerifierError> {
         self.transcript.absorb_u1(proof.u_1.clone());
+        let pi = self.transcript.generate_vector_of_projection_matrices();
+        self.transcript.absorb_vector_p(proof.p.clone());
+        let size_of_psi = usize::div_ceil(ep.lambda, ep.log_q);
+        let size_of_omega = size_of_psi;
+        let psi = self
+            .transcript
+            .generate_vector_psi(size_of_psi, ep.constraint_l);
+        let omega = self.transcript.generate_vector_omega(size_of_omega);
         // check b_0^{''(k)} ?= <omega^(k),p> + \sum(psi_l^(k) * b_0^{'(l)})
-        Self::check_b_0_aggr(self, proof, ep).unwrap();
+        Self::check_b_0_aggr(self, proof, ep, &psi, &omega).unwrap();
 
         // 3. line 14: check norm_sum(z, t, g, h) <= (beta')^2
 
@@ -140,14 +148,8 @@ impl<'a> LabradorVerifier<'a> {
         }
 
         // 6. line 17: check \sum(<\phi_i, z>c_i) ?= \sum(h_ij * c_i * c_j)
-
-        let phi_ct_aggr = aggregate::AggregationOne::get_phi_ct_aggr(
-            &self.st.phi_ct,
-            &self.transcript.generate_vector_of_projection_matrices(),
-            &self.tr.psi,
-            &self.tr.omega,
-            ep,
-        );
+        let phi_ct_aggr =
+            aggregate::AggregationOne::get_phi_ct_aggr(&self.st.phi_ct, &pi, &psi, &omega, ep);
         let phi_i = aggregate::AggregationTwo::get_phi_i(
             &self.st.phi_constraint,
             &phi_ct_aggr,
@@ -168,7 +170,7 @@ impl<'a> LabradorVerifier<'a> {
 
         // 7. line 18: check \sum(a_ij * g_ij) + \sum(h_ii) - b ?= 0
 
-        let a_ct_aggr = aggregate::AggregationOne::get_a_ct_aggr(&self.tr.psi, &self.st.a_ct, ep);
+        let a_ct_aggr = aggregate::AggregationOne::get_a_ct_aggr(&psi, &self.st.a_ct, ep);
         let a_primes = aggregate::AggregationTwo::get_a_i(
             &self.st.a_constraint,
             &a_ct_aggr,
@@ -290,14 +292,16 @@ impl<'a> LabradorVerifier<'a> {
         &self,
         proof: &Proof,
         ep: &EnvironmentParameters,
+        psi: &[Vec<Zq>],
+        omega: &[Vec<Zq>],
     ) -> Result<bool, VerifierError> {
         for k in 0..ep.kappa {
             let b_0_poly = proof.b_ct_aggr.get_elements()[k].get_coefficients()[0];
             let mut b_0: Zq = (0..ep.constraint_l)
-                .map(|l| self.tr.psi[k][l] * self.st.b_0_ct[l])
+                .map(|l| psi[k][l] * self.st.b_0_ct[l])
                 .sum();
 
-            let inner_omega_p = self.tr.omega[k].inner_product(&proof.p);
+            let inner_omega_p = omega[k].inner_product(&proof.p);
             b_0 += inner_omega_p;
             if b_0 != b_0_poly {
                 return Err(VerifierError::B0Mismatch {
