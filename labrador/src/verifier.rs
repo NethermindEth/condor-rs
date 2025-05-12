@@ -9,6 +9,8 @@ use crate::ring::rq::Rq;
 use crate::ring::rq_matrix::RqMatrix;
 use crate::ring::rq_vector::RqVector;
 use crate::ring::zq::{Zq, ZqVector};
+use crate::transcript::lib::LabradorTranscript;
+use crate::transcript::shake_sponge::ShakeSponge;
 
 #[derive(Debug)]
 pub enum VerifierError {
@@ -49,15 +51,31 @@ pub struct LabradorVerifier<'a> {
     pub pp: &'a PublicPrams,
     pub st: &'a Statement,
     pub tr: &'a Challenges,
+    pub transcript: LabradorTranscript<ShakeSponge>,
 }
 
 impl<'a> LabradorVerifier<'a> {
-    pub fn new(pp: &'a PublicPrams, st: &'a Statement, tr: &'a Challenges) -> Self {
-        Self { pp, st, tr }
+    pub fn new(
+        pp: &'a PublicPrams,
+        st: &'a Statement,
+        tr: &'a Challenges,
+        transcript: LabradorTranscript<ShakeSponge>,
+    ) -> Self {
+        Self {
+            pp,
+            st,
+            tr,
+            transcript,
+        }
     }
 
     /// All check conditions are from page 18
-    pub fn verify(&self, proof: &Proof, ep: &EnvironmentParameters) -> Result<bool, VerifierError> {
+    pub fn verify(
+        &mut self,
+        proof: &Proof,
+        ep: &EnvironmentParameters,
+    ) -> Result<bool, VerifierError> {
+        self.transcript.absorb_u1(proof.u_1.clone());
         // check b_0^{''(k)} ?= <omega^(k),p> + \sum(psi_l^(k) * b_0^{'(l)})
         Self::check_b_0_aggr(self, proof, ep).unwrap();
 
@@ -125,7 +143,7 @@ impl<'a> LabradorVerifier<'a> {
 
         let phi_ct_aggr = aggregate::AggregationOne::get_phi_ct_aggr(
             &self.st.phi_ct,
-            &self.tr.pi,
+            &self.transcript.generate_vector_of_projection_matrices(),
             &self.tr.psi,
             &self.tr.omega,
             ep,
@@ -278,7 +296,8 @@ impl<'a> LabradorVerifier<'a> {
             let mut b_0: Zq = (0..ep.constraint_l)
                 .map(|l| self.tr.psi[k][l] * self.st.b_0_ct[l])
                 .sum();
-            let inner_omega_p = self.tr.omega[k].inner_product(proof.p.get_projection());
+
+            let inner_omega_p = self.tr.omega[k].inner_product(&proof.p);
             b_0 += inner_omega_p;
             if b_0 != b_0_poly {
                 return Err(VerifierError::B0Mismatch {
@@ -312,11 +331,16 @@ mod tests {
         let tr = Challenges::new(&ep_1);
 
         // create a new prover
-        let mut prover = LabradorProver::new(&pp, &witness_1, &st, &tr);
+        let transcript =
+            LabradorTranscript::new(ShakeSponge::default(), ep_1.lambda, ep_1.n, ep_1.r);
+
+        let mut prover = LabradorProver::new(&pp, &witness_1, &st, &tr, transcript);
         let proof = prover.prove(&ep_1).unwrap();
 
         // create a new verifier
-        let verifier = LabradorVerifier::new(&pp, &st, &tr);
+        let transcript =
+            LabradorTranscript::new(ShakeSponge::default(), ep_1.lambda, ep_1.n, ep_1.r);
+        let mut verifier = LabradorVerifier::new(&pp, &st, &tr, transcript);
         let result = verifier.verify(&proof, &ep_1);
         assert!(result.unwrap());
     }

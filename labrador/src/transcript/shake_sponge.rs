@@ -12,16 +12,9 @@ pub trait Sponge {
     fn squeeze_rq(&mut self, output_lenght: usize) -> Vec<Rq>;
 }
 
+#[derive(Default)]
 pub struct ShakeSponge {
     hasher: Shake256,
-}
-
-impl Default for ShakeSponge {
-    fn default() -> Self {
-        Self {
-            hasher: Shake256::default(),
-        }
-    }
 }
 
 impl Sponge for ShakeSponge {
@@ -55,7 +48,7 @@ impl Sponge for ShakeSponge {
             .map(|chunk| {
                 u32::from_le_bytes(chunk.try_into().expect("Could not convert 4 u8 to one u32"))
             })
-            .map(|u32_value| Zq::new(u32_value))
+            .map(Zq::new)
             .collect();
 
         self.absorb_zq(&zq_values);
@@ -72,7 +65,7 @@ impl Sponge for ShakeSponge {
             .map(|chunk| {
                 u32::from_le_bytes(chunk.try_into().expect("Could not convert 4 u8 to one u32"))
             })
-            .map(|u32_value| Zq::new(u32_value))
+            .map(Zq::new)
             .collect();
 
         let result: Vec<Rq> = zq_values
@@ -92,7 +85,7 @@ impl Sponge for ShakeSponge {
 #[cfg(test)]
 mod test_sponge_correctness {
     use super::*;
-    use crate::ring::{rq_vector::RqVector, zq::ZqVector};
+    use crate::ring::zq::ZqVector;
     use rand::rng;
 
     #[test]

@@ -22,4 +22,4 @@ pub mod core;
 pub mod prover;
 pub mod ring;
 pub mod transcript;
-// pub mod verifier;
+pub mod verifier;

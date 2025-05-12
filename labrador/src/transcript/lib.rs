@@ -3,39 +3,45 @@ use crate::ring::{rq::Rq, rq_vector::RqVector, zq::Zq};
 
 pub struct LabradorTranscript<S: Sponge> {
     sponge: S,
-    u1: RqVector,
-    p: Vec<Zq>,
+    security_parameter: usize,
+    rank: usize,
+    multiplicity: usize,
+    pub u1: RqVector,
+    pub vector_p: Vec<Zq>,
     b_double_prime: RqVector,
     u2: RqVector,
 }
 
 impl<S: Sponge> LabradorTranscript<S> {
-    pub fn new(sponge: S) -> Self {
+    pub fn new(sponge: S, security_parameter: usize, rank: usize, multiplicity: usize) -> Self {
         Self {
             sponge,
+            security_parameter,
+            rank,
+            multiplicity,
             u1: RqVector::new(Vec::new()),
-            p: Vec::new(),
+            vector_p: Vec::new(),
             b_double_prime: RqVector::new(Vec::new()),
             u2: RqVector::new(Vec::new()),
         }
     }
 
     pub fn absorb_u1(&mut self, u1: RqVector) {
-        self.sponge.absorb_rq(&u1.get_elements());
+        self.sponge.absorb_rq(u1.get_elements());
         self.u1 = u1;
     }
 
-    pub fn generate_pi(
-        &mut self,
-        security_parameter: usize,
-        rank: usize,
-        multiplicity: usize,
-    ) -> Vec<Vec<Vec<Zq>>> {
-        // r vectors, each of length 256 * nD
-        let row_size = 2 * security_parameter;
-        let col_size = rank * Rq::DEGREE;
+    pub fn absorb_vector_p(&mut self, p: Vec<Zq>) {
+        self.sponge.absorb_zq(&p);
+        self.vector_p = p;
+    }
 
-        (0..multiplicity)
+    pub fn generate_vector_of_projection_matrices(&mut self) -> Vec<Vec<Vec<Zq>>> {
+        // r vectors, each of length 256 * nD
+        let row_size = 2 * self.security_parameter;
+        let col_size = self.rank * Rq::DEGREE;
+
+        (0..self.multiplicity)
             .map(|_| {
                 let linear_projection_randomness = self.sponge.squeeze_zq(row_size * col_size);
                 linear_projection_randomness
@@ -72,10 +78,15 @@ mod tests_generate_pi {
     use crate::transcript::shake_sponge::ShakeSponge;
 
     #[test]
-    fn test_generate_pi_output_size() {
+    fn test_projection_matrix_has_correct_size() {
         let (security_parameter, rank, multiplicity) = (128, 20, 9);
-        let mut transcript = LabradorTranscript::new(ShakeSponge::default());
-        let result = transcript.generate_pi(security_parameter, rank, multiplicity);
+        let mut transcript = LabradorTranscript::new(
+            ShakeSponge::default(),
+            security_parameter,
+            rank,
+            multiplicity,
+        );
+        let result = transcript.generate_vector_of_projection_matrices();
         assert_eq!(result.len(), multiplicity); // number_of_project_matrices
         assert_eq!(result[0].len(), 2 * security_parameter);
         assert_eq!(result[0][0].len(), rank * Rq::DEGREE);
@@ -84,11 +95,15 @@ mod tests_generate_pi {
     // Test the distribution of values in the random matrix
     #[test]
     #[allow(clippy::as_conversions)]
-    fn test_random_distribution_matrix() {
+    fn test_projection_matrix_is_random() {
         let (security_parameter, rank, multiplicity) = (128, 1000, 1);
-        let mut transcript = LabradorTranscript::new(ShakeSponge::default());
-        let projection_matrix_vector =
-            transcript.generate_pi(security_parameter, rank, multiplicity);
+        let mut transcript = LabradorTranscript::new(
+            ShakeSponge::default(),
+            security_parameter,
+            rank,
+            multiplicity,
+        );
+        let projection_matrix_vector = transcript.generate_vector_of_projection_matrices();
 
         for projection_matrix in projection_matrix_vector {
             let mut counts = [0.0, 0.0, 0.0]; // -1, 0, 1

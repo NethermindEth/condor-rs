@@ -2,7 +2,7 @@ use crate::commitments::ajtai_commitment::AjtaiCommitment;
 use crate::commitments::outer_commitments::DecompositionParameters;
 use crate::commitments::outer_commitments::OuterCommitment;
 use crate::core::garbage_polynomials::GarbagePolynomials;
-use crate::core::jl::Projection;
+use crate::core::jl;
 use crate::ring::rq_matrix::RqMatrix;
 use crate::ring::zq::Zq;
 use crate::ring::zq::ZqVector;
@@ -43,7 +43,6 @@ pub struct Proof {
 
 // pub struct Challenges just for testing, should be replaced by the Transcript
 pub struct Challenges {
-    pub pi: Vec<Vec<Vec<Zq>>>,
     pub psi: Vec<Vec<Zq>>,
     pub omega: Vec<Vec<Zq>>,
     pub random_alpha: RqVector,
@@ -63,10 +62,6 @@ impl Challenges {
             .map(|_| Vec::<Zq>::random(&mut rng(), 2 * ep.lambda))
             .collect();
 
-        // \pi is from JL projection, pi contains r matrices and each matrix: security_level2 * (n*d), (security_level2 is 256 in the paper).
-        // let pi: Vec<Vec<Vec<Zq>>> = Self::get_pi(ep.r, ep.n);
-        let pi = Vec::new();
-
         // generate random alpha and beta from challenge set
         let cs_alpha: ChallengeSet = ChallengeSet::new();
         let random_alpha: RqVector = (0..ep.constraint_k)
@@ -82,7 +77,6 @@ impl Challenges {
         let random_c: RqVector = (0..ep.r).map(|_| *cs_c.get_challenges()).collect();
 
         Self {
-            pi,
             psi,
             omega,
             random_alpha,
@@ -90,12 +84,6 @@ impl Challenges {
             random_c,
         }
     }
-
-    // pub fn get_pi(r: usize, n: usize) -> Vec<Vec<Vec<Zq>>> {
-    //     (0..r)
-    //         .map(|_| ProjectionMatrix::new(n).get_matrix().clone())
-    //         .collect()
-    // }
 }
 pub struct Witness {
     pub s: Vec<RqVector>,
@@ -124,13 +112,14 @@ impl<'a> LabradorProver<'a> {
         witness: &'a Witness,
         st: &'a Statement,
         tr: &'a Challenges,
+        transcript: LabradorTranscript<ShakeSponge>,
     ) -> Self {
         Self {
             pp,
             witness,
             st,
             tr,
-            transcript: LabradorTranscript::new(ShakeSponge::default()),
+            transcript,
         }
     }
 
@@ -165,28 +154,40 @@ impl<'a> LabradorProver<'a> {
             garbage_polynomials.g.clone(),
             DecompositionParameters::new(ep.b, ep.t_2).unwrap(),
         );
-
         self.transcript.absorb_u1(outer_commitments.u_1.clone());
         // Step 1: Outer commitments u_1 ends: ----------------------------------------------
 
         // Step 2: JL projection starts: ----------------------------------------------------
 
         // JL projection p_j + check p_j = ct(sum(<\sigma_{-1}(pi_i^(j)), s_i>))
-        let pi = self.transcript.generate_pi(ep.lambda, ep.n, ep.r);
-        let p =
-            Projection::new(pi.clone(), ep.lambda, ep.r).compute_batch_projection(&self.witness.s);
+        let vector_of_projection_matrices =
+            self.transcript.generate_vector_of_projection_matrices();
+        let vector_p = jl::Projection::new(vector_of_projection_matrices.clone(), ep.lambda)
+            .compute_batch_projection(&self.witness.s);
+        self.transcript.absorb_vector_p(vector_p);
         // Projections::new(pi, &self.witness.s);
 
         // Notice that this check is resource-intensive due to the multiplication of two ZqVector<256> instances,
         // followed by the removal of high-degree terms. It might not be a necessary check.
-        Self::check_projection(self, &p, pi.clone()).unwrap();
-
+        // Omid's Note: This can be removed later. However, we need to ensure a correct projection matrix with correct upper-bound.
+        Self::check_projection(
+            self,
+            &self.transcript.vector_p,
+            vector_of_projection_matrices.clone(),
+        )
+        .unwrap();
         // Step 2: JL projection ends: ------------------------------------------------------
 
         // Step 3: Aggregation starts: --------------------------------------------------------------
 
         // first aggregation
-        let aggr_1 = aggregate::AggregationOne::new(self.witness, self.st, ep, self.tr, &pi);
+        let aggr_1 = aggregate::AggregationOne::new(
+            self.witness,
+            self.st,
+            ep,
+            self.tr,
+            &vector_of_projection_matrices,
+        );
         // second aggregation
         let aggr_2 = aggregate::AggregationTwo::new(&aggr_1, self.st, ep, self.tr);
 
@@ -208,7 +209,7 @@ impl<'a> LabradorProver<'a> {
 
         Ok(Proof {
             u_1: outer_commitments.u_1,
-            p,
+            p: self.transcript.vector_p.clone(),
             b_ct_aggr: aggr_1.b_ct_aggr,
             u_2: outer_commitments.u_2,
             z,
@@ -283,9 +284,11 @@ mod tests {
         let pp = PublicPrams::new(&ep_1);
         // generate random challenges used between prover and verifier.
         let tr = Challenges::new(&ep_1);
+        let transcript =
+            LabradorTranscript::new(ShakeSponge::default(), ep_1.lambda, ep_1.n, ep_1.r);
 
         // create a new prover
-        let mut prover = LabradorProver::new(&pp, &witness_1, &st, &tr);
+        let mut prover = LabradorProver::new(&pp, &witness_1, &st, &tr, transcript);
         let _proof = prover.prove(&ep_1).unwrap();
     }
 }
