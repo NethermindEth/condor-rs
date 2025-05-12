@@ -84,6 +84,12 @@ impl<'a> LabradorVerifier<'a> {
             .transcript
             .generate_vector_psi(size_of_psi, ep.constraint_l);
         let omega = self.transcript.generate_vector_omega(size_of_omega);
+        self.transcript
+            .absorb_vector_b_ct_aggr(proof.b_ct_aggr.clone());
+        let vector_alpha = self.transcript.generate_rq_vector(ep.constraint_k);
+        let size_of_beta = size_of_psi;
+        let vector_beta = self.transcript.generate_rq_vector(size_of_beta);
+
         // check b_0^{''(k)} ?= <omega^(k),p> + \sum(psi_l^(k) * b_0^{'(l)})
         Self::check_b_0_aggr(self, proof, ep, &psi, &omega).unwrap();
 
@@ -153,8 +159,8 @@ impl<'a> LabradorVerifier<'a> {
         let phi_i = aggregate::AggregationTwo::get_phi_i(
             &self.st.phi_constraint,
             &phi_ct_aggr,
-            &self.tr.random_alpha,
-            &self.tr.random_beta,
+            &vector_alpha,
+            &vector_beta,
             ep,
         );
         let sum_phi_z_c = Self::calculate_phi_z_c(&phi_i, &self.tr.random_c, &proof.z);
@@ -174,15 +180,15 @@ impl<'a> LabradorVerifier<'a> {
         let a_primes = aggregate::AggregationTwo::get_a_i(
             &self.st.a_constraint,
             &a_ct_aggr,
-            &self.tr.random_alpha,
-            &self.tr.random_beta,
+            &vector_alpha,
+            &vector_beta,
             ep,
         );
         let b_primes = aggregate::AggregationTwo::get_b_i(
             &self.st.b_constraint,
             &proof.b_ct_aggr,
-            &self.tr.random_alpha,
-            &self.tr.random_beta,
+            &vector_alpha,
+            &vector_beta,
             ep,
         );
 

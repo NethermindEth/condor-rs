@@ -43,32 +43,15 @@ pub struct Proof {
 
 // pub struct Challenges just for testing, should be replaced by the Transcript
 pub struct Challenges {
-    pub random_alpha: RqVector,
-    pub random_beta: RqVector,
     pub random_c: RqVector,
 }
 
 impl Challenges {
     pub fn new(ep: &EnvironmentParameters) -> Self {
-        // generate random alpha and beta from challenge set
-        let cs_alpha: ChallengeSet = ChallengeSet::new();
-        let random_alpha: RqVector = (0..ep.constraint_k)
-            .map(|_| *cs_alpha.get_challenges())
-            .collect();
-
-        let cs_beta: ChallengeSet = ChallengeSet::new();
-        let random_beta: RqVector = (0..ep.constraint_k)
-            .map(|_| *cs_beta.get_challenges())
-            .collect();
-
         let cs_c: ChallengeSet = ChallengeSet::new();
         let random_c: RqVector = (0..ep.r).map(|_| *cs_c.get_challenges()).collect();
 
-        Self {
-            random_alpha,
-            random_beta,
-            random_c,
-        }
+        Self { random_c }
     }
 }
 pub struct Witness {
@@ -181,10 +164,15 @@ impl<'a> LabradorProver<'a> {
             &vector_psi,
             &vector_omega,
         );
-        // second aggregation
-        let aggr_2 = aggregate::AggregationTwo::new(&aggr_1, self.st, ep, self.tr);
-        self.transcript.absorb_vector_b_ct_aggr(aggr_1.b_ct_aggr);
+        self.transcript
+            .absorb_vector_b_ct_aggr(aggr_1.b_ct_aggr.clone());
 
+        // second aggregation
+        let size_of_beta = size_of_psi;
+        let alpha_vector = self.transcript.generate_rq_vector(ep.constraint_k);
+        let beta_vector = self.transcript.generate_rq_vector(size_of_beta);
+        let aggr_2 =
+            aggregate::AggregationTwo::new(&aggr_1, self.st, ep, &alpha_vector, &beta_vector);
         // Aggregation ends: ----------------------------------------------------------------
 
         // Step 4: Calculate h_ij, u_2, and z starts: ---------------------------------------

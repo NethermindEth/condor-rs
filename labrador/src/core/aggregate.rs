@@ -1,5 +1,5 @@
 use crate::core::{env_params::EnvironmentParameters, statement::Statement};
-use crate::prover::{Challenges, Witness};
+use crate::prover::Witness;
 use crate::ring::rq::Rq;
 use crate::ring::rq_vector::RqVector;
 use crate::ring::zq::Zq;
@@ -93,23 +93,25 @@ impl AggregationTwo {
         aggr_one: &AggregationOne,
         st: &Statement,
         ep: &EnvironmentParameters,
-        tr: &Challenges,
+        alpha_vector: &RqVector,
+        beta_vector: &RqVector,
     ) -> Self {
-        Self::aggregate(aggr_one, st, ep, tr)
+        Self::aggregate(aggr_one, st, ep, alpha_vector, beta_vector)
     }
 
     fn aggregate(
         aggr_one: &AggregationOne,
         st: &Statement,
         ep: &EnvironmentParameters,
-        tr: &Challenges,
+        alpha_vector: &RqVector,
+        beta_vector: &RqVector,
     ) -> Self {
         // calculate a_i
         let a_i = Self::get_a_i(
             &st.a_constraint,
             &aggr_one.a_ct_aggr,
-            &tr.random_alpha,
-            &tr.random_beta,
+            alpha_vector,
+            beta_vector,
             ep,
         );
 
@@ -117,8 +119,8 @@ impl AggregationTwo {
         let phi_i = Self::get_phi_i(
             &st.phi_constraint,
             &aggr_one.phi_ct_aggr,
-            &tr.random_alpha,
-            &tr.random_beta,
+            alpha_vector,
+            beta_vector,
             ep,
         );
 
@@ -126,8 +128,8 @@ impl AggregationTwo {
         let b_i = Self::get_b_i(
             &st.b_constraint,
             &aggr_one.b_ct_aggr,
-            &tr.random_alpha,
-            &tr.random_beta,
+            alpha_vector,
+            beta_vector,
             ep,
         );
 

@@ -37,7 +37,7 @@ impl<S: Sponge> LabradorTranscript<S> {
     }
 
     pub fn absorb_vector_b_ct_aggr(&mut self, input: RqVector) {
-        self.sponge.absorb_rq(&input.get_elements());
+        self.sponge.absorb_rq(input.get_elements());
         self.b_ct_aggr = input;
     }
 
@@ -92,8 +92,10 @@ impl<S: Sponge> LabradorTranscript<S> {
             .collect()
     }
 
-    pub fn generate_alpha(&mut self) {}
-    pub fn generate_beta(&mut self) {}
+    pub fn generate_rq_vector(&mut self, vector_length: usize) -> RqVector {
+        RqVector::new(self.sponge.squeeze_rq(vector_length))
+    }
+
     pub fn generate_ci(&mut self) {}
 }
 
@@ -199,6 +201,27 @@ mod test_generate_omega {
         let result = transcript.generate_vector_omega(k_range);
         assert_eq!(result.len(), k_range); // number_of_project_matrices
         assert_eq!(result[0].len(), 256);
+    }
+
+    // TODO: Testing randomness of the distribution is needed.
+}
+
+#[cfg(test)]
+mod test_generate_rq {
+    use super::*;
+    use crate::transcript::shake_sponge::ShakeSponge;
+
+    #[test]
+    fn test_generate_rq_has_correct_size() {
+        let (security_parameter, rank, multiplicity, k_range) = (128, 20, 9, 20);
+        let mut transcript = LabradorTranscript::new(
+            ShakeSponge::default(),
+            security_parameter,
+            rank,
+            multiplicity,
+        );
+        let result = transcript.generate_rq_vector(k_range);
+        assert_eq!(result.get_elements().len(), k_range); // number_of_project_matrices
     }
 
     // TODO: Testing randomness of the distribution is needed.
