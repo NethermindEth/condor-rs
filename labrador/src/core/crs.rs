@@ -33,7 +33,7 @@ impl PublicPrams {
         (0..row)
             .map(|_| {
                 (0..col)
-                    .map(|_| *ChallengeSet::new().get_challenges())
+                    .map(|_| ChallengeSet::new().get_challenges().clone())
                     .collect()
             })
             .collect()

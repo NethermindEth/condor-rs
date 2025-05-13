@@ -100,6 +100,7 @@ impl AjtaiCommitment {
         Ok(())
     }
 
+    /// Validates scheme parameters against cryptographic security requirements
     fn validate_parameters(beta: Zq, row_len: usize, col_len: usize) -> Result<(), ParameterError> {
         if [row_len, col_len].contains(&0) {
             return Err(ParameterError::ZeroParameter);

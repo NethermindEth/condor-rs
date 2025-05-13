@@ -104,7 +104,7 @@ pub fn calculate_b_constraint(
     // calculate \sum(a_{ij}^{k}<s_i, s_j>)
     let left_side = (0..size_s).map(|i| {
         (0..size_s).map(|j| {
-            a_constraint[i].get_elements()[j]
+            a_constraint[i].get_elements()[j].clone()
                 * s[i].inner_product_poly_vector(&s[j])
         })
         .fold(Rq::zero(), |acc, val| acc + val )

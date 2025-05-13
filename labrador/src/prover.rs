@@ -70,16 +70,16 @@ impl Challenges {
         // generate random alpha and beta from challenge set
         let cs_alpha: ChallengeSet = ChallengeSet::new();
         let random_alpha: RqVector = (0..ep.constraint_k)
-            .map(|_| *cs_alpha.get_challenges())
+            .map(|_| cs_alpha.get_challenges().clone())
             .collect();
 
         let cs_beta: ChallengeSet = ChallengeSet::new();
         let random_beta: RqVector = (0..ep.constraint_k)
-            .map(|_| *cs_beta.get_challenges())
+            .map(|_| cs_beta.get_challenges().clone())
             .collect();
 
         let cs_c: ChallengeSet = ChallengeSet::new();
-        let random_c: RqVector = (0..ep.r).map(|_| *cs_c.get_challenges()).collect();
+        let random_c: RqVector = (0..ep.r).map(|_| cs_c.get_challenges().clone()).collect();
 
         Self {
             pi,
@@ -156,12 +156,13 @@ impl<'a> LabradorProver<'a> {
         let mut garbage_polynomials = GarbagePolynomials::new(self.witness.s.clone());
         garbage_polynomials.compute_g();
         // calculate outer commitment u_1 = \sum(B_ik * t_i^(k)) + \sum(C_ijk * g_ij^(k))
-        let mut outer_commitments = OuterCommitment::new(self.pp.clone(), ep.clone());
+        let mut outer_commitments = OuterCommitment::new(self.pp.clone());
         outer_commitments.compute_u1(
             RqMatrix::new(t_i.clone()),
             DecompositionParameters::new(ep.b, ep.t_1).unwrap(),
             garbage_polynomials.g.clone(),
             DecompositionParameters::new(ep.b, ep.t_2).unwrap(),
+            ep.gamma_1,
         );
         // Step 1: Outer commitments u_1 ends: ----------------------------------------------
 
@@ -193,6 +194,7 @@ impl<'a> LabradorProver<'a> {
         outer_commitments.compute_u2(
             garbage_polynomials.h.clone(),
             DecompositionParameters::new(ep.b, ep.t_1).unwrap(),
+            ep.gamma_2,
         );
 
         // calculate z = c_1*s_1 + ... + c_r*s_r

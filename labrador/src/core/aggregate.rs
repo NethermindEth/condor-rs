@@ -278,7 +278,7 @@ fn calculate_aggr_ct_b(
         (0..ep.r).map(|i| {
             (0..ep.r).map(|j| {
                 // calculate a_{ij}^{''(k)} * <s_i, s_j>
-                a_ct_aggr[k][i].get_elements()[j]
+                a_ct_aggr[k][i].get_elements()[j].clone()
                     * witness[i].inner_product_poly_vector(&witness[j])
             })
             .fold(
@@ -319,13 +319,17 @@ fn calculate_aggr_a(
                     // calculate \sum(alpha_k * a_{ij}), k is constraint_k
                     let left_side = (0..ep.constraint_k)
                         .map(|k| {
-                            a_constraint[k][i].get_elements()[j] * random_alpha.get_elements()[k]
+                            a_constraint[k][i].get_elements()[j].clone()
+                                * random_alpha.get_elements()[k].clone()
                         })
                         .fold(Rq::zero(), |acc, val| acc + val);
 
                     // calculate \sum(beta_k * a_{ij}^{''(k)}), k is size k
                     let right_side = (0..ep.kappa)
-                        .map(|k| a_ct_aggr[k][i].get_elements()[j] * random_beta.get_elements()[k])
+                        .map(|k| {
+                            a_ct_aggr[k][i].get_elements()[j].clone()
+                                * random_beta.get_elements()[k].clone()
+                        })
                         .fold(Rq::zero(), |acc, val| acc + val);
 
                     left_side + right_side
@@ -405,11 +409,11 @@ fn calculate_aggr_b(
     ep: &EnvironmentParameters,
 ) -> Rq {
     let left_side = (0..ep.constraint_k)
-        .map(|k| b_constraint.get_elements()[k] * random_alpha.get_elements()[k])
+        .map(|k| b_constraint.get_elements()[k].clone() * random_alpha.get_elements()[k].clone())
         .fold(Rq::zero(), |acc, val| acc + val);
 
     let right_side = (0..ep.kappa)
-        .map(|k| b_ct_aggr.get_elements()[k] * random_beta.get_elements()[k])
+        .map(|k| b_ct_aggr.get_elements()[k].clone() * random_beta.get_elements()[k].clone())
         .fold(Rq::zero(), |acc, val| acc + val);
 
     left_side + right_side

@@ -178,12 +178,13 @@ impl<'a> LabradorVerifier<'a> {
         // 8. line 19: u_1 ?= \sum(\sum(B_ik * t_i^(k))) + \sum(\sum(C_ijk * g_ij^(k)))
 
         let u_1 = &proof.u_1;
-        let mut outer_commitments = OuterCommitment::new(self.pp.clone(), ep.clone());
+        let mut outer_commitments = OuterCommitment::new(self.pp.clone());
         outer_commitments.compute_u1(
             RqMatrix::new(proof.t_i.clone()),
             DecompositionParameters::new(ep.b, ep.t_1).unwrap(),
             proof.g_ij.clone(),
             DecompositionParameters::new(ep.b, ep.t_2).unwrap(),
+            ep.gamma_1,
         );
 
         if proof.u_1 != outer_commitments.u_1 {
@@ -197,6 +198,7 @@ impl<'a> LabradorVerifier<'a> {
         outer_commitments.compute_u2(
             proof.h_ij.clone(),
             DecompositionParameters::new(ep.b, ep.t_1).unwrap(),
+            ep.gamma_2,
         );
 
         if proof.u_2 != outer_commitments.u_2 {
@@ -215,8 +217,8 @@ impl<'a> LabradorVerifier<'a> {
             .map(|i| {
                 (0..r)
                     .map(|j| {
-                        (x_ij.get_cell_symmetric(i, j) * random_c.get_elements()[i])
-                            * random_c.get_elements()[j]
+                        (x_ij.get_cell_symmetric(i, j) * random_c.get_elements()[i].clone())
+                            * random_c.get_elements()[j].clone()
                     })
                     .fold(Rq::zero(), |acc, x| acc + x)
             })
@@ -255,8 +257,8 @@ impl<'a> LabradorVerifier<'a> {
         // walk only over the stored half: i ≤ j
         for i in 0..r {
             for j in 0..r {
-                sum_a_primes_g +=
-                    a_primes.get_elements()[i].get_elements()[j] * g.get_cell_symmetric(i, j);
+                sum_a_primes_g += a_primes.get_elements()[i].get_elements()[j].clone()
+                    * g.get_cell_symmetric(i, j);
             }
         }
 

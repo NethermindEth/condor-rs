@@ -153,7 +153,7 @@ impl Mul for &RqVector {
         self.elements
             .iter()
             .zip(rhs.elements.iter())
-            .map(|(a, b)| *a * *b)
+            .map(|(a, b)| a * b)
             .fold(Rq::zero(), |acc, x| acc + x)
     }
 }
