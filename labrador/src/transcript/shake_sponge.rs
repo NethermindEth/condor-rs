@@ -41,7 +41,7 @@ impl Sponge for ShakeSponge {
     }
 
     fn squeeze_bits(&mut self, bit_length: usize) -> Vec<bool> {
-        let byte_len = (bit_length + 7) / 8;
+        let byte_len = bit_length.div_ceil(8);
         let mut reader = self.hasher.clone().finalize_xof();
         let mut output_buffer = vec![u8::default(); byte_len];
         reader.read(&mut output_buffer);
