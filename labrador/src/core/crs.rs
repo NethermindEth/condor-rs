@@ -1,4 +1,7 @@
-use crate::core::{challenge_set::ChallengeSet, env_params::EnvironmentParameters};
+use rand::rng;
+
+use crate::core::env_params::EnvironmentParameters;
+use crate::ring::rq::Rq;
 use crate::ring::rq_matrix::RqMatrix;
 
 #[derive(Clone)]
@@ -31,11 +34,7 @@ impl PublicPrams {
 
     fn challenge_rq_matrix(row: usize, col: usize) -> RqMatrix {
         (0..row)
-            .map(|_| {
-                (0..col)
-                    .map(|_| *ChallengeSet::new().get_challenges())
-                    .collect()
-            })
+            .map(|_| (0..col).map(|_| Rq::random(&mut rng())).collect())
             .collect()
     }
 }

@@ -75,7 +75,7 @@ impl<
     /// rate/capacity split, forwarding to [`PoseidonPermutation::permute`] each
     /// time the rate section is filled. Returns an error only in pathological
     /// circumstances (e.g. writing out of bounds if `RATE`/`WIDTH` are
-    /// mis‑configured).
+    /// miss‑configured).
     fn absorb(&mut self) -> Result<(), PoseidonError> {
         let mut remaining = self.input.clone();
         let mut position = 0;

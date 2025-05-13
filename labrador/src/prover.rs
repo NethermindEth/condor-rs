@@ -9,10 +9,7 @@ use crate::ring::zq::ZqVector;
 use crate::transcript::lib::LabradorTranscript;
 use crate::transcript::shake_sponge::ShakeSponge;
 use crate::{
-    core::{
-        aggregate, challenge_set::ChallengeSet, crs::PublicPrams,
-        env_params::EnvironmentParameters, statement::Statement,
-    },
+    core::{aggregate, crs::PublicPrams, env_params::EnvironmentParameters, statement::Statement},
     ring::rq_vector::RqVector,
 };
 use rand::rng;
@@ -41,19 +38,6 @@ pub struct Proof {
     pub h_ij: RqMatrix,
 }
 
-// pub struct Challenges just for testing, should be replaced by the Transcript
-pub struct Challenges {
-    pub random_c: RqVector,
-}
-
-impl Challenges {
-    pub fn new(ep: &EnvironmentParameters) -> Self {
-        let cs_c: ChallengeSet = ChallengeSet::new();
-        let random_c: RqVector = (0..ep.r).map(|_| *cs_c.get_challenges()).collect();
-
-        Self { random_c }
-    }
-}
 pub struct Witness {
     pub s: Vec<RqVector>,
 }
@@ -71,7 +55,6 @@ pub struct LabradorProver<'a> {
     pub pp: &'a PublicPrams,
     pub witness: &'a Witness,
     pub st: &'a Statement,
-    pub tr: &'a Challenges,
     pub transcript: LabradorTranscript<ShakeSponge>,
 }
 
@@ -80,14 +63,12 @@ impl<'a> LabradorProver<'a> {
         pp: &'a PublicPrams,
         witness: &'a Witness,
         st: &'a Statement,
-        tr: &'a Challenges,
         transcript: LabradorTranscript<ShakeSponge>,
     ) -> Self {
         Self {
             pp,
             witness,
             st,
-            tr,
             transcript,
         }
     }
@@ -183,17 +164,19 @@ impl<'a> LabradorProver<'a> {
             garbage_polynomials.h.clone(),
             DecompositionParameters::new(ep.b, ep.t_1).unwrap(),
         );
+        self.transcript.absorb_u2(outer_commitments.u_2);
 
         // calculate z = c_1*s_1 + ... + c_r*s_r
-        let z = aggregate::calculate_z(&self.witness.s, &self.tr.random_c);
+        let challenges = self.transcript.generate_challenges(ep.operator_norm);
+        let z = aggregate::calculate_z(&self.witness.s, &challenges);
 
         // Step 4: Calculate h_ij, u_2, and z ends: -----------------------------------------
 
         Ok(Proof {
-            u_1: outer_commitments.u_1,
+            u_1: self.transcript.u1.clone(),
             p: self.transcript.vector_p.clone(),
             b_ct_aggr: self.transcript.b_ct_aggr.clone(),
-            u_2: outer_commitments.u_2,
+            u_2: self.transcript.u2.clone(),
             z,
             t_i,
             g_ij: garbage_polynomials.g,
@@ -265,12 +248,11 @@ mod tests {
         // generate the common reference string matrices A, B, C, D
         let pp = PublicPrams::new(&ep_1);
         // generate random challenges used between prover and verifier.
-        let tr = Challenges::new(&ep_1);
         let transcript =
             LabradorTranscript::new(ShakeSponge::default(), ep_1.lambda, ep_1.n, ep_1.r);
 
         // create a new prover
-        let mut prover = LabradorProver::new(&pp, &witness_1, &st, &tr, transcript);
+        let mut prover = LabradorProver::new(&pp, &witness_1, &st, transcript);
         let _proof = prover.prove(&ep_1).unwrap();
     }
 }

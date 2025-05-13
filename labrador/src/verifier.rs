@@ -4,7 +4,7 @@ use crate::commitments::outer_commitments::{DecompositionParameters, OuterCommit
 use crate::core::{
     aggregate, crs::PublicPrams, env_params::EnvironmentParameters, statement::Statement,
 };
-use crate::prover::{Challenges, Proof};
+use crate::prover::Proof;
 use crate::ring::rq::Rq;
 use crate::ring::rq_matrix::RqMatrix;
 use crate::ring::rq_vector::RqVector;
@@ -50,7 +50,6 @@ pub enum VerifierError {
 pub struct LabradorVerifier<'a> {
     pub pp: &'a PublicPrams,
     pub st: &'a Statement,
-    pub tr: &'a Challenges,
     pub transcript: LabradorTranscript<ShakeSponge>,
 }
 
@@ -58,15 +57,9 @@ impl<'a> LabradorVerifier<'a> {
     pub fn new(
         pp: &'a PublicPrams,
         st: &'a Statement,
-        tr: &'a Challenges,
         transcript: LabradorTranscript<ShakeSponge>,
     ) -> Self {
-        Self {
-            pp,
-            st,
-            tr,
-            transcript,
-        }
+        Self { pp, st, transcript }
     }
 
     /// All check conditions are from page 18
@@ -89,6 +82,8 @@ impl<'a> LabradorVerifier<'a> {
         let vector_alpha = self.transcript.generate_rq_vector(ep.constraint_k);
         let size_of_beta = size_of_psi;
         let vector_beta = self.transcript.generate_rq_vector(size_of_beta);
+        self.transcript.absorb_u2(proof.u_2.clone());
+        let challenges = self.transcript.generate_challenges(ep.operator_norm);
 
         // check b_0^{''(k)} ?= <omega^(k),p> + \sum(psi_l^(k) * b_0^{'(l)})
         Self::check_b_0_aggr(self, proof, ep, &psi, &omega).unwrap();
@@ -132,7 +127,7 @@ impl<'a> LabradorVerifier<'a> {
         // 4. line 15: check Az ?= c_1 * t_1 + ... + c_r * t_r
 
         let az = &self.pp.matrix_a * &proof.z;
-        let ct_sum = aggregate::calculate_z(&proof.t_i, &self.tr.random_c);
+        let ct_sum = aggregate::calculate_z(&proof.t_i, &challenges);
 
         if az != ct_sum {
             return Err(VerifierError::AzError {
@@ -144,7 +139,7 @@ impl<'a> LabradorVerifier<'a> {
         // 5. lne 16: check <z, z> ?= \sum(g_ij * c_i * c_j)
 
         let z_inner = proof.z.inner_product_poly_vector(&proof.z);
-        let sum_gij_cij = Self::calculate_gh_ci_cj(&proof.g_ij, &self.tr.random_c, ep.r);
+        let sum_gij_cij = Self::calculate_gh_ci_cj(&proof.g_ij, &challenges, ep.r);
 
         if z_inner != sum_gij_cij {
             return Err(VerifierError::ZInnerError {
@@ -163,8 +158,8 @@ impl<'a> LabradorVerifier<'a> {
             &vector_beta,
             ep,
         );
-        let sum_phi_z_c = Self::calculate_phi_z_c(&phi_i, &self.tr.random_c, &proof.z);
-        let sum_hij_cij = Self::calculate_gh_ci_cj(&proof.h_ij, &self.tr.random_c, ep.r);
+        let sum_phi_z_c = Self::calculate_phi_z_c(&phi_i, &challenges, &proof.z);
+        let sum_hij_cij = Self::calculate_gh_ci_cj(&proof.h_ij, &challenges, ep.r);
 
         // Left side multiple by 2 because of when we calculate h_ij, we didn't apply the division (divided by 2)
         if &sum_phi_z_c * &Zq::TWO != sum_hij_cij {
@@ -337,20 +332,18 @@ mod tests {
         let st: Statement = Statement::new(&witness_1, &ep_1);
         // generate the common reference string matrices
         let pp = PublicPrams::new(&ep_1);
-        // generate random challenges
-        let tr = Challenges::new(&ep_1);
 
         // create a new prover
         let transcript =
             LabradorTranscript::new(ShakeSponge::default(), ep_1.lambda, ep_1.n, ep_1.r);
 
-        let mut prover = LabradorProver::new(&pp, &witness_1, &st, &tr, transcript);
+        let mut prover = LabradorProver::new(&pp, &witness_1, &st, transcript);
         let proof = prover.prove(&ep_1).unwrap();
 
         // create a new verifier
         let transcript =
             LabradorTranscript::new(ShakeSponge::default(), ep_1.lambda, ep_1.n, ep_1.r);
-        let mut verifier = LabradorVerifier::new(&pp, &st, &tr, transcript);
+        let mut verifier = LabradorVerifier::new(&pp, &st, transcript);
         let result = verifier.verify(&proof, &ep_1);
         assert!(result.unwrap());
     }

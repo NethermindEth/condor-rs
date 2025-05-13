@@ -8,8 +8,10 @@ use crate::ring::{rq::Rq, zq::Zq};
 pub trait Sponge {
     fn absorb_zq(&mut self, input: &[Zq]);
     fn absorb_rq(&mut self, input: &[Rq]);
-    fn squeeze_zq(&mut self, output_lenght: usize) -> Vec<Zq>;
-    fn squeeze_rq(&mut self, output_lenght: usize) -> Vec<Rq>;
+    fn squeeze_zq(&mut self, output_length: usize) -> Vec<Zq>;
+    fn squeeze_rq(&mut self, output_length: usize) -> Vec<Rq>;
+    fn squeeze_bits(&mut self, bit_length: usize) -> Vec<bool>;
+    fn squeeze_bytes(&mut self, byte_length: usize) -> Vec<u8>;
 }
 
 #[derive(Default)]
@@ -38,9 +40,30 @@ impl Sponge for ShakeSponge {
         self.hasher.update(&u8_version_input);
     }
 
-    fn squeeze_zq(&mut self, output_lenght: usize) -> Vec<Zq> {
+    fn squeeze_bits(&mut self, bit_length: usize) -> Vec<bool> {
+        let byte_len = (bit_length + 7) / 8;
         let mut reader = self.hasher.clone().finalize_xof();
-        let mut output_buffer = vec![u8::default(); output_lenght * 4];
+        let mut output_buffer = vec![u8::default(); byte_len];
+        reader.read(&mut output_buffer);
+
+        let mut result = Vec::with_capacity(bit_length);
+        for byte in &output_buffer {
+            let mut mask = 1u8;
+            for _ in 0..8 {
+                if result.len() == bit_length {
+                    break;
+                }
+                result.push(byte & mask != 0);
+                mask <<= 1;
+            }
+        }
+        self.hasher.update(&output_buffer);
+        result
+    }
+
+    fn squeeze_zq(&mut self, output_length: usize) -> Vec<Zq> {
+        let mut reader = self.hasher.clone().finalize_xof();
+        let mut output_buffer = vec![u8::default(); output_length * 4];
         reader.read(&mut output_buffer);
 
         let zq_values: Vec<Zq> = output_buffer
@@ -55,9 +78,9 @@ impl Sponge for ShakeSponge {
         zq_values
     }
 
-    fn squeeze_rq(&mut self, output_lenght: usize) -> Vec<Rq> {
+    fn squeeze_rq(&mut self, output_length: usize) -> Vec<Rq> {
         let mut reader = self.hasher.clone().finalize_xof();
-        let mut output_buffer = vec![u8::default(); output_lenght * Rq::DEGREE * 4];
+        let mut output_buffer = vec![u8::default(); output_length * Rq::DEGREE * 4];
         reader.read(&mut output_buffer);
 
         let zq_values: Vec<Zq> = output_buffer
@@ -79,6 +102,14 @@ impl Sponge for ShakeSponge {
 
         self.absorb_rq(&result);
         result
+    }
+
+    fn squeeze_bytes(&mut self, byte_length: usize) -> Vec<u8> {
+        let mut reader = self.hasher.clone().finalize_xof();
+        let mut output_buffer = vec![u8::default(); byte_length];
+        reader.read(&mut output_buffer);
+        self.hasher.update(&output_buffer);
+        output_buffer
     }
 }
 
@@ -230,6 +261,19 @@ mod test_sponge_correctness {
         let mut s = ShakeSponge::default();
         assert!(s.squeeze_zq(0).is_empty());
         assert!(s.squeeze_rq(0).is_empty());
+    }
+
+    #[test]
+    fn squeeze_bits_deterministic_and_length() {
+        let mut s1 = ShakeSponge::default();
+        let mut s2 = ShakeSponge::default();
+        s1.absorb_zq(&[Zq::new(41)]);
+        s2.absorb_zq(&[Zq::new(41)]);
+
+        let b1 = s1.squeeze_bits(123);
+        let b2 = s2.squeeze_bits(123);
+        assert_eq!(b1, b2); // deterministic
+        assert_eq!(b1.len(), 123); // exact length
     }
 }
 
