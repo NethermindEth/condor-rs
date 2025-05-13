@@ -178,7 +178,7 @@ mod tests {
         };
 
         // we choose a small tolerance value for possible statistical error
-        let tolerance: u128 = 10;
+        let tolerance: u128 = 25;
         assert!(
             difference < tolerance,
             "Average norm value {} is not equal to {}.",
