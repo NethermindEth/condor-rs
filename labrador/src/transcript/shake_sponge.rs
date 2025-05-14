@@ -180,7 +180,11 @@ mod test_sponge_correctness {
         let polynomial_3 = Rq::new([Zq::new(9891741); Rq::DEGREE]);
 
         let mut sponge1 = ShakeSponge::default();
-        sponge1.absorb_rq(&[polynomial_1, polynomial_2, polynomial_3]);
+        sponge1.absorb_rq(&[
+            polynomial_1.clone(),
+            polynomial_2.clone(),
+            polynomial_3.clone(),
+        ]);
 
         let mut sponge2 = ShakeSponge::default();
         sponge2.absorb_rq(&[polynomial_1, polynomial_2, polynomial_3]);
@@ -235,7 +239,7 @@ mod test_sponge_correctness {
         let polynomial_2 = Rq::new([Zq::new(2131213); Rq::DEGREE]);
 
         let mut sponge1 = ShakeSponge::default();
-        sponge1.absorb_rq(&[polynomial_1, polynomial_2]);
+        sponge1.absorb_rq(&[polynomial_1.clone(), polynomial_2.clone()]);
 
         let mut sponge2 = ShakeSponge::default();
         sponge2.absorb_rq(&[polynomial_2, polynomial_1]);

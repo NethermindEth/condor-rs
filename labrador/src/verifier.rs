@@ -1,9 +1,8 @@
 #![allow(clippy::result_large_err)]
 
+use crate::commitments::common_instances::AjtaiInstances;
 use crate::commitments::outer_commitments::{DecompositionParameters, OuterCommitment};
-use crate::core::{
-    aggregate, crs::PublicPrams, env_params::EnvironmentParameters, statement::Statement,
-};
+use crate::core::{aggregate, env_params::EnvironmentParameters, statement::Statement};
 use crate::prover::Proof;
 use crate::ring::rq::Rq;
 use crate::ring::rq_matrix::RqMatrix;
@@ -48,14 +47,14 @@ pub enum VerifierError {
     },
 }
 pub struct LabradorVerifier<'a> {
-    pub pp: &'a PublicPrams,
+    pub pp: &'a AjtaiInstances,
     pub st: &'a Statement,
     pub transcript: LabradorTranscript<ShakeSponge>,
 }
 
 impl<'a> LabradorVerifier<'a> {
     pub fn new(
-        pp: &'a PublicPrams,
+        pp: &'a AjtaiInstances,
         st: &'a Statement,
         transcript: LabradorTranscript<ShakeSponge>,
     ) -> Self {
@@ -126,9 +125,8 @@ impl<'a> LabradorVerifier<'a> {
 
         // 4. line 15: check Az ?= c_1 * t_1 + ... + c_r * t_r
 
-        let az = &self.pp.matrix_a * &proof.z;
+        let az = self.pp.commitment_scheme_a.matrix() * &proof.z;
         let ct_sum = aggregate::calculate_z(&proof.t_i, &challenges);
-
         if az != ct_sum {
             return Err(VerifierError::AzError {
                 computed: az,
@@ -199,7 +197,7 @@ impl<'a> LabradorVerifier<'a> {
         // 8. line 19: u_1 ?= \sum(\sum(B_ik * t_i^(k))) + \sum(\sum(C_ijk * g_ij^(k)))
 
         let u_1 = &proof.u_1;
-        let mut outer_commitments = OuterCommitment::new(self.pp.clone(), ep.clone());
+        let mut outer_commitments = OuterCommitment::new(self.pp);
         outer_commitments.compute_u1(
             RqMatrix::new(proof.t_i.clone()),
             DecompositionParameters::new(ep.b, ep.t_1).unwrap(),
@@ -236,8 +234,8 @@ impl<'a> LabradorVerifier<'a> {
             .map(|i| {
                 (0..r)
                     .map(|j| {
-                        (x_ij.get_cell_symmetric(i, j) * random_c.get_elements()[i])
-                            * random_c.get_elements()[j]
+                        (x_ij.get_cell_symmetric(i, j) * random_c.get_elements()[i].clone())
+                            * random_c.get_elements()[j].clone()
                     })
                     .fold(Rq::zero(), |acc, x| acc + x)
             })
@@ -276,8 +274,8 @@ impl<'a> LabradorVerifier<'a> {
         // walk only over the stored half: i ≤ j
         for i in 0..r {
             for j in 0..r {
-                sum_a_primes_g +=
-                    a_primes.get_elements()[i].get_elements()[j] * g.get_cell_symmetric(i, j);
+                sum_a_primes_g += a_primes.get_elements()[i].get_elements()[j].clone()
+                    * g.get_cell_symmetric(i, j);
             }
         }
 
@@ -331,7 +329,7 @@ mod tests {
         // generate public statements based on witness_1
         let st: Statement = Statement::new(&witness_1, &ep_1);
         // generate the common reference string matrices
-        let pp = PublicPrams::new(&ep_1);
+        let pp = AjtaiInstances::new(&ep_1);
 
         // create a new prover
         let transcript =

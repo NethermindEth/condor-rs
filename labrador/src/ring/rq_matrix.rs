@@ -39,9 +39,9 @@ impl RqMatrix {
 
     pub fn get_cell_symmetric(&self, row: usize, col: usize) -> Rq {
         if row >= col {
-            self.elements[row].get_elements()[col]
+            self.elements[row].get_elements()[col].clone()
         } else {
-            self.elements[col].get_elements()[row]
+            self.elements[col].get_elements()[row].clone()
         }
     }
 

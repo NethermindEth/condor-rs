@@ -30,7 +30,7 @@ use super::rq_vector::RqVector;
 
 /// This module provides implementations for various operations
 /// in the polynomial ring R = Z_q\[X\] / (X^d + 1).
-#[derive(Debug, Clone, PartialEq, Eq, Copy)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Rq {
     coeffs: [Zq; Self::DEGREE],
 }
@@ -174,11 +174,11 @@ impl Rq {
     /// Where each p⁽ⁱ⁾ has small coefficients, using centered representatives
     pub fn decompose(&self, base: Zq, num_parts: usize) -> RqVector {
         let mut parts = Vec::with_capacity(num_parts);
-        let mut current = *self;
+        let mut current = self.clone();
 
         for i in 0..num_parts {
             if i == num_parts - 1 {
-                parts.push(current);
+                parts.push(current.clone());
             } else {
                 // Extract low part (mod base, centered around 0)
                 let mut low_coeffs = [Zq::ZERO; Self::DEGREE];
@@ -188,7 +188,7 @@ impl Rq {
                 }
 
                 let low_part = Self::new(low_coeffs);
-                parts.push(low_part);
+                parts.push(low_part.clone());
 
                 // Update current
                 current -= low_part;
@@ -580,7 +580,7 @@ mod tests {
         // Subtraction with zero polynomial
         let poly5: Rq = vec![Zq::ONE, Zq::new(2), Zq::new(3), Zq::new(4)].into();
         let poly6: Rq = vec![Zq::ZERO].into();
-        let result3 = poly6 - poly5;
+        let result3 = poly6.clone() - poly5.clone();
         let result4 = poly5 - poly6;
         assert_eq!(
             result3.coeffs,
@@ -852,7 +852,7 @@ mod tests {
 
         // Test reconstruction with all 3 parts
         let reconstructed =
-            parts[0] + parts[1].scalar_mul(Zq::new(4)) + parts[2].scalar_mul(Zq::new(16)); // 4²
+            parts[0].clone() + parts[1].scalar_mul(Zq::new(4)) + parts[2].scalar_mul(Zq::new(16)); // 4²
 
         // Verify reconstruction coefficient by coefficient
         for i in 0..4 {
@@ -917,7 +917,7 @@ mod tests {
         let parts = poly.decompose(Zq::new(3), 2);
 
         // Verify reconstruction
-        let reconstructed = parts[0] + parts[1].scalar_mul(Zq::new(3));
+        let reconstructed = parts[0].clone() + parts[1].scalar_mul(Zq::new(3));
 
         for i in 0..3 {
             assert_eq!(
@@ -977,7 +977,7 @@ mod tests {
             }
 
             // Verify reconstruction
-            let reconstructed = parts[0] + parts[1].scalar_mul(Zq::new(*base));
+            let reconstructed = parts[0].clone() + parts[1].scalar_mul(Zq::new(*base));
             assert_eq!(reconstructed, poly, "Base {}: Reconstruction failed", base);
         }
     }

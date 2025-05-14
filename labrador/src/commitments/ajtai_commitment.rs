@@ -38,12 +38,12 @@ pub enum VerificationError {
 
 /// Ajtai commitment scheme implementation with matrix-based operations
 #[derive(Debug)]
-pub struct AjtaiCommitment {
+pub struct AjtaiScheme {
     witness_bound: Zq,
     random_matrix: RqMatrix,
 }
 
-impl AjtaiCommitment {
+impl AjtaiScheme {
     pub fn new(
         beta: Zq,
         witness_bound: Zq,
@@ -100,6 +100,7 @@ impl AjtaiCommitment {
         Ok(())
     }
 
+    /// Validates scheme parameters against cryptographic security requirements
     fn validate_parameters(beta: Zq, row_len: usize, col_len: usize) -> Result<(), ParameterError> {
         if [row_len, col_len].contains(&0) {
             return Err(ParameterError::ZeroParameter);
@@ -191,7 +192,7 @@ mod tests {
     mod test_utils {
         use super::*;
 
-        pub fn valid_witness(scheme: &AjtaiCommitment) -> RqVector {
+        pub fn valid_witness(scheme: &AjtaiScheme) -> RqVector {
             vec![Rq::new([scheme.witness_bound(); Rq::DEGREE]); TEST_N].into()
         }
 
@@ -200,16 +201,16 @@ mod tests {
             RqVector::random_ternary(&mut rng, TEST_N)
         }
 
-        pub fn setup_scheme() -> AjtaiCommitment {
+        pub fn setup_scheme() -> AjtaiScheme {
             let mut rng = rand::rng();
             let random_matrix = RqMatrix::random(&mut rng, TEST_M, TEST_N);
-            AjtaiCommitment::new(Zq::ONE, Zq::ONE, random_matrix).unwrap()
+            AjtaiScheme::new(Zq::ONE, Zq::ONE, random_matrix).unwrap()
         }
     }
 
     #[test]
     fn rejects_invalid_parameters() {
-        assert!(AjtaiCommitment::new(
+        assert!(AjtaiScheme::new(
             Zq::ONE,
             Zq::ZERO,
             RqMatrix::new(vec![RqVector::new(vec![Rq::zero()])])

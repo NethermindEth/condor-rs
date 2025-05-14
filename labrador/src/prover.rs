@@ -1,4 +1,4 @@
-use crate::commitments::ajtai_commitment::AjtaiCommitment;
+use crate::commitments::common_instances::AjtaiInstances;
 use crate::commitments::outer_commitments::DecompositionParameters;
 use crate::commitments::outer_commitments::OuterCommitment;
 use crate::core::garbage_polynomials::GarbagePolynomials;
@@ -9,7 +9,7 @@ use crate::ring::zq::ZqVector;
 use crate::transcript::lib::LabradorTranscript;
 use crate::transcript::shake_sponge::ShakeSponge;
 use crate::{
-    core::{aggregate, crs::PublicPrams, env_params::EnvironmentParameters, statement::Statement},
+    core::{aggregate, env_params::EnvironmentParameters, statement::Statement},
     ring::rq_vector::RqVector,
 };
 use rand::rng;
@@ -37,7 +37,6 @@ pub struct Proof {
     pub g_ij: RqMatrix,
     pub h_ij: RqMatrix,
 }
-
 pub struct Witness {
     pub s: Vec<RqVector>,
 }
@@ -52,7 +51,7 @@ impl Witness {
 }
 
 pub struct LabradorProver<'a> {
-    pub pp: &'a PublicPrams,
+    pub pp: &'a AjtaiInstances,
     pub witness: &'a Witness,
     pub st: &'a Statement,
     pub transcript: LabradorTranscript<ShakeSponge>,
@@ -60,7 +59,7 @@ pub struct LabradorProver<'a> {
 
 impl<'a> LabradorProver<'a> {
     pub fn new(
-        pp: &'a PublicPrams,
+        pp: &'a AjtaiInstances,
         witness: &'a Witness,
         st: &'a Statement,
         transcript: LabradorTranscript<ShakeSponge>,
@@ -85,19 +84,14 @@ impl<'a> LabradorProver<'a> {
             .witness
             .s
             .iter()
-            .map(|s_i| {
-                AjtaiCommitment::new(ep.beta, ep.beta, self.pp.matrix_a.clone())
-                    .unwrap()
-                    .commit(s_i)
-                    .unwrap()
-            })
+            .map(|s_i| self.pp.commitment_scheme_a.commit(s_i).unwrap())
             .collect();
 
         // This replaces the following code
         let mut garbage_polynomials = GarbagePolynomials::new(self.witness.s.clone());
         garbage_polynomials.compute_g();
         // calculate outer commitment u_1 = \sum(B_ik * t_i^(k)) + \sum(C_ijk * g_ij^(k))
-        let mut outer_commitments = OuterCommitment::new(self.pp.clone(), ep.clone());
+        let mut outer_commitments = OuterCommitment::new(self.pp);
         outer_commitments.compute_u1(
             RqMatrix::new(t_i.clone()),
             DecompositionParameters::new(ep.b, ep.t_1).unwrap(),
@@ -246,7 +240,7 @@ mod tests {
         // generate public statement based on witness_1
         let st: Statement = Statement::new(&witness_1, &ep_1);
         // generate the common reference string matrices A, B, C, D
-        let pp = PublicPrams::new(&ep_1);
+        let pp = AjtaiInstances::new(&ep_1);
         // generate random challenges used between prover and verifier.
         let transcript =
             LabradorTranscript::new(ShakeSponge::default(), ep_1.lambda, ep_1.n, ep_1.r);
