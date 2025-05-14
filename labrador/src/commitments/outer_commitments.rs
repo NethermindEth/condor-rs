@@ -1,8 +1,7 @@
 use thiserror::Error;
 
-use super::ajtai_commitment::AjtaiCommitment;
 use crate::{
-    core::crs::PublicPrams,
+    commitments::common_instances::AjtaiInstances,
     ring::{rq_matrix::RqMatrix, rq_vector::RqVector, zq::Zq},
 };
 
@@ -49,14 +48,14 @@ impl DecompositionParameters {
     }
 }
 
-pub struct OuterCommitment {
-    crs: PublicPrams,
+pub struct OuterCommitment<'a> {
+    crs: &'a AjtaiInstances,
     pub u_1: RqVector,
     pub u_2: RqVector,
 }
 
-impl OuterCommitment {
-    pub fn new(crs: PublicPrams) -> Self {
+impl<'a> OuterCommitment<'a> {
+    pub fn new(crs: &'a AjtaiInstances) -> Self {
         Self {
             crs,
             u_1: RqVector::new(Vec::new()),
@@ -70,45 +69,28 @@ impl OuterCommitment {
         t_decomposition_params: DecompositionParameters,
         g: RqMatrix,
         g_decomposition_params: DecompositionParameters,
-        ajtai_witness_bound: Zq,
     ) {
-        let matrix_b = self.crs.matrix_b.clone();
-        let commitment_scheme =
-            AjtaiCommitment::new(ajtai_witness_bound, ajtai_witness_bound, matrix_b).unwrap();
         let decomposed_t = t.decompose_each_cell(
             t_decomposition_params.base,
             t_decomposition_params.num_parts,
         );
-        let u1_left = commitment_scheme.commit(&decomposed_t).unwrap();
+        let u1_left = self.crs.commitment_scheme_b.commit(&decomposed_t).unwrap();
 
-        let matrix_c = self.crs.matrix_c.clone();
-        // Todo: gamma_1 should be changed to a valid witness bound
-        let commitment_scheme =
-            AjtaiCommitment::new(ajtai_witness_bound, ajtai_witness_bound, matrix_c).unwrap();
         let decomposed_g = g.decompose_each_cell(
             g_decomposition_params.base,
             g_decomposition_params.num_parts,
         );
-        let u2_left = commitment_scheme.commit(&decomposed_g).unwrap();
+        let u2_left = self.crs.commitment_scheme_c.commit(&decomposed_g).unwrap();
 
         self.u_1 = &u1_left + &u2_left;
     }
 
-    pub fn compute_u2(
-        &mut self,
-        h: RqMatrix,
-        h_decomposition_params: DecompositionParameters,
-        ajtai_witness_bound: Zq,
-    ) {
-        let matrix_d = self.crs.matrix_d.clone();
-        // Todo: gamma_1 should be changed to a valid witness bound
-        let commitment_scheme =
-            AjtaiCommitment::new(ajtai_witness_bound, ajtai_witness_bound, matrix_d).unwrap();
+    pub fn compute_u2(&mut self, h: RqMatrix, h_decomposition_params: DecompositionParameters) {
         let decomposed_h = h.decompose_each_cell(
             h_decomposition_params.base,
             h_decomposition_params.num_parts,
         );
-        self.u_2 = commitment_scheme.commit(&decomposed_h).unwrap();
+        self.u_2 = self.crs.commitment_scheme_d.commit(&decomposed_h).unwrap();
     }
 }
 

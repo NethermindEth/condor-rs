@@ -1,4 +1,4 @@
-use crate::commitments::ajtai_commitment::AjtaiCommitment;
+use crate::commitments::common_instances::AjtaiInstances;
 use crate::commitments::outer_commitments::DecompositionParameters;
 use crate::commitments::outer_commitments::OuterCommitment;
 use crate::core::garbage_polynomials::GarbagePolynomials;
@@ -9,7 +9,6 @@ use crate::{
     core::{
         aggregate,
         challenge_set::ChallengeSet,
-        crs::PublicPrams,
         env_params::EnvironmentParameters,
         jl::{ProjectionMatrix, Projections},
         statement::Statement,
@@ -111,7 +110,7 @@ impl Witness {
 }
 
 pub struct LabradorProver<'a> {
-    pub pp: &'a PublicPrams,
+    pub pp: &'a AjtaiInstances,
     pub witness: &'a Witness,
     pub st: &'a Statement,
     pub tr: &'a Challenges,
@@ -119,7 +118,7 @@ pub struct LabradorProver<'a> {
 
 impl<'a> LabradorProver<'a> {
     pub fn new(
-        pp: &'a PublicPrams,
+        pp: &'a AjtaiInstances,
         witness: &'a Witness,
         st: &'a Statement,
         tr: &'a Challenges,
@@ -144,25 +143,19 @@ impl<'a> LabradorProver<'a> {
             .witness
             .s
             .iter()
-            .map(|s_i| {
-                AjtaiCommitment::new(ep.beta, ep.beta, self.pp.matrix_a.clone())
-                    .unwrap()
-                    .commit(s_i)
-                    .unwrap()
-            })
+            .map(|s_i| self.pp.commitment_scheme_a.commit(s_i).unwrap())
             .collect();
 
         // This replaces the following code
         let mut garbage_polynomials = GarbagePolynomials::new(self.witness.s.clone());
         garbage_polynomials.compute_g();
         // calculate outer commitment u_1 = \sum(B_ik * t_i^(k)) + \sum(C_ijk * g_ij^(k))
-        let mut outer_commitments = OuterCommitment::new(self.pp.clone());
+        let mut outer_commitments = OuterCommitment::new(self.pp);
         outer_commitments.compute_u1(
             RqMatrix::new(t_i.clone()),
             DecompositionParameters::new(ep.b, ep.t_1).unwrap(),
             garbage_polynomials.g.clone(),
             DecompositionParameters::new(ep.b, ep.t_2).unwrap(),
-            ep.gamma_1,
         );
         // Step 1: Outer commitments u_1 ends: ----------------------------------------------
 
@@ -194,7 +187,6 @@ impl<'a> LabradorProver<'a> {
         outer_commitments.compute_u2(
             garbage_polynomials.h.clone(),
             DecompositionParameters::new(ep.b, ep.t_1).unwrap(),
-            ep.gamma_2,
         );
 
         // calculate z = c_1*s_1 + ... + c_r*s_r
@@ -276,7 +268,7 @@ mod tests {
         // generate public statement based on witness_1
         let st: Statement = Statement::new(&witness_1, &ep_1);
         // generate the common reference string matrices A, B, C, D
-        let pp = PublicPrams::new(&ep_1);
+        let pp = AjtaiInstances::new(&ep_1);
         // generate random challenges used between prover and verifier.
         let tr = Challenges::new(&ep_1);
 

@@ -38,12 +38,12 @@ pub enum VerificationError {
 
 /// Ajtai commitment scheme implementation with matrix-based operations
 #[derive(Debug)]
-pub struct AjtaiCommitment {
+pub struct AjtaiScheme {
     witness_bound: Zq,
     random_matrix: RqMatrix,
 }
 
-impl AjtaiCommitment {
+impl AjtaiScheme {
     pub fn new(
         beta: Zq,
         witness_bound: Zq,
@@ -192,7 +192,7 @@ mod tests {
     mod test_utils {
         use super::*;
 
-        pub fn valid_witness(scheme: &AjtaiCommitment) -> RqVector {
+        pub fn valid_witness(scheme: &AjtaiScheme) -> RqVector {
             vec![Rq::new([scheme.witness_bound(); Rq::DEGREE]); TEST_N].into()
         }
 
@@ -201,16 +201,16 @@ mod tests {
             RqVector::random_ternary(&mut rng, TEST_N)
         }
 
-        pub fn setup_scheme() -> AjtaiCommitment {
+        pub fn setup_scheme() -> AjtaiScheme {
             let mut rng = rand::rng();
             let random_matrix = RqMatrix::random(&mut rng, TEST_M, TEST_N);
-            AjtaiCommitment::new(Zq::ONE, Zq::ONE, random_matrix).unwrap()
+            AjtaiScheme::new(Zq::ONE, Zq::ONE, random_matrix).unwrap()
         }
     }
 
     #[test]
     fn rejects_invalid_parameters() {
-        assert!(AjtaiCommitment::new(
+        assert!(AjtaiScheme::new(
             Zq::ONE,
             Zq::ZERO,
             RqMatrix::new(vec![RqVector::new(vec![Rq::zero()])])
