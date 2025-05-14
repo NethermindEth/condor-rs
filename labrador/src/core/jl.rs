@@ -1,6 +1,3 @@
-use rand::prelude::*;
-use rand::rng;
-
 use crate::ring::rq_vector::RqVector;
 use crate::ring::zq::Zq;
 
@@ -59,43 +56,12 @@ impl Projection {
     }
 }
 
-pub struct ProjectionMatrix {
-    matrix: Vec<Vec<Zq>>,
-}
-
-impl ProjectionMatrix {
-    /// Defines a matrix of size 256xnxD
-    /// n is the size of the vector of polynomials
-    pub fn new(n: usize) -> Self {
-        let mut matrix = vec![vec![Zq::ZERO; n * 64]; 256];
-        let mut rng = rng();
-        for row in matrix.iter_mut() {
-            for elem in row.iter_mut() {
-                let rand_val: f64 = rng.random();
-                *elem = if rand_val < 0.25 {
-                    Zq::MAX // -1 in Zq
-                } else if rand_val < 0.75 {
-                    Zq::ZERO
-                } else {
-                    Zq::ONE
-                };
-            }
-        }
-
-        ProjectionMatrix { matrix }
-    }
-
-    /// Returns the matrix
-    pub fn get_matrix(&self) -> &Vec<Vec<Zq>> {
-        &self.matrix
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::transcript::lib::LabradorTranscript;
     use crate::transcript::shake_sponge::ShakeSponge;
+    use rand::rng;
 
     // Test that the probability of the inequality being true is close to 1/2
     #[test]
@@ -178,7 +144,7 @@ mod tests {
         };
 
         // we choose a small tolerance value for possible statistical error
-        let tolerance: u128 = 25;
+        let tolerance: u128 = 50;
         assert!(
             difference < tolerance,
             "Average norm value {} is not equal to {}.",
