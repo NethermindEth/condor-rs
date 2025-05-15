@@ -111,8 +111,11 @@ impl<'a, S: Sponge> LabradorProver<'a, S> {
         // Step 2: JL projection starts: ----------------------------------------------------
 
         // JL projection p_j + check p_j = ct(sum(<\sigma_{-1}(pi_i^(j)), s_i>))
-        let projections = self.transcript.generate_projections();
-        let vector_p = projections.compute_batch_projection(&self.witness.s);
+        let vector_of_projection_matrices =
+            self.transcript.generate_vector_of_projection_matrices();
+        let vector_p =
+            jl::Projection::new(vector_of_projection_matrices.clone(), ep.security_parameter)
+                .compute_batch_projection(&self.witness.s);
         self.transcript.absorb_vector_p(vector_p);
         // Projections::new(pi, &self.witness.s);
 
