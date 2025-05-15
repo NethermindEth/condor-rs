@@ -26,8 +26,8 @@ impl Statement {
         // generate random a_constraint with size: constraint_k * r * n
         let a_constraint: Vec<Vec<RqVector>> = (0..ep.constraint_k)
             .map(|_| {
-                (0..ep.r)
-                    .map(|_| RqVector::random(&mut rand::rng(), ep.n))
+                (0..ep.multiplicity)
+                    .map(|_| RqVector::random(&mut rand::rng(), ep.rank))
                     .collect()
             })
             .collect();
@@ -35,8 +35,8 @@ impl Statement {
         // generate random phi_constraint with size: constraint_k * r * n
         let phi_constraint: Vec<Vec<RqVector>> = (0..ep.constraint_k)
             .map(|_| {
-                (0..ep.r)
-                    .map(|_| RqVector::random(&mut rand::rng(), ep.n))
+                (0..ep.multiplicity)
+                    .map(|_| RqVector::random(&mut rand::rng(), ep.rank))
                     .collect()
             })
             .collect();
@@ -49,8 +49,8 @@ impl Statement {
         // generate example a_ct with size: constraint_l * r * n
         let a_ct: Vec<Vec<RqVector>> = (0..ep.constraint_l)
             .map(|_| {
-                (0..ep.r)
-                    .map(|_| RqVector::random(&mut rand::rng(), ep.n))
+                (0..ep.multiplicity)
+                    .map(|_| RqVector::random(&mut rand::rng(), ep.rank))
                     .collect()
             })
             .collect();
@@ -59,8 +59,8 @@ impl Statement {
         // it is a k length vector of matrix with size: r * n
         let phi_ct: Vec<Vec<RqVector>> = (0..ep.constraint_l)
             .map(|_| {
-                (0..ep.r)
-                    .map(|_| RqVector::random(&mut rand::rng(), ep.n))
+                (0..ep.multiplicity)
+                    .map(|_| RqVector::random(&mut rand::rng(), ep.rank))
                     .collect()
             })
             .collect();
