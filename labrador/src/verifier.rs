@@ -25,8 +25,8 @@ pub enum VerifierError {
         computed: Zq,
     },
     NormSumExceeded {
-        norm: Zq,
-        allowed: Zq,
+        norm: f64,
+        allowed: f64,
     },
     AzError {
         computed: RqVector,
@@ -70,7 +70,7 @@ impl<'a> LabradorVerifier<'a> {
         self.transcript.absorb_u1(proof.u_1.clone());
         let pi = self.transcript.generate_vector_of_projection_matrices();
         self.transcript.absorb_vector_p(proof.p.clone());
-        let size_of_psi = usize::div_ceil(ep.lambda, ep.log_q);
+        let size_of_psi = usize::div_ceil(ep.security_parameter, ep.log_q);
         let size_of_omega = size_of_psi;
         let psi = self
             .transcript
@@ -110,7 +110,7 @@ impl<'a> LabradorVerifier<'a> {
             .collect();
         let norm_z_ij = z_ij
             .iter()
-            .fold(Zq::ZERO, |acc, p| acc + p.compute_norm_squared());
+            .fold(0.0, |acc, p| acc + p.compute_norm_squared());
         let norm_t_ij = Self::norm_squared(&t_ij);
         let norm_g_ij = Self::norm_squared(&g_ij);
         let norm_h_ij = Self::norm_squared(&h_ij);
@@ -137,7 +137,7 @@ impl<'a> LabradorVerifier<'a> {
         // 5. lne 16: check <z, z> ?= \sum(g_ij * c_i * c_j)
 
         let z_inner = proof.z.inner_product_poly_vector(&proof.z);
-        let sum_gij_cij = Self::calculate_gh_ci_cj(&proof.g_ij, &challenges, ep.r);
+        let sum_gij_cij = Self::calculate_gh_ci_cj(&proof.g_ij, &challenges, ep.multiplicity);
 
         if z_inner != sum_gij_cij {
             return Err(VerifierError::ZInnerError {
@@ -157,7 +157,7 @@ impl<'a> LabradorVerifier<'a> {
             ep,
         );
         let sum_phi_z_c = Self::calculate_phi_z_c(&phi_i, &challenges, &proof.z);
-        let sum_hij_cij = Self::calculate_gh_ci_cj(&proof.h_ij, &challenges, ep.r);
+        let sum_hij_cij = Self::calculate_gh_ci_cj(&proof.h_ij, &challenges, ep.multiplicity);
 
         // Left side multiple by 2 because of when we calculate h_ij, we didn't apply the division (divided by 2)
         if &sum_phi_z_c * &Zq::TWO != sum_hij_cij {
@@ -250,11 +250,11 @@ impl<'a> LabradorVerifier<'a> {
             .fold(Rq::zero(), |acc, x| acc + x)
     }
 
-    fn norm_squared(polys: &[Vec<RqVector>]) -> Zq {
-        polys.iter().fold(Zq::ZERO, |acc, poly| {
+    fn norm_squared(polys: &[Vec<RqVector>]) -> f64 {
+        polys.iter().fold(0.0, |acc, poly| {
             acc + poly
                 .iter()
-                .fold(Zq::ZERO, |acc, p| acc + p.compute_norm_squared())
+                .fold(0.0, |acc, p| acc + p.compute_norm_squared())
         })
     }
 
@@ -332,15 +332,23 @@ mod tests {
         let pp = AjtaiInstances::new(&ep_1);
 
         // create a new prover
-        let transcript =
-            LabradorTranscript::new(ShakeSponge::default(), ep_1.lambda, ep_1.n, ep_1.r);
+        let transcript = LabradorTranscript::new(
+            ShakeSponge::default(),
+            ep_1.security_parameter,
+            ep_1.rank,
+            ep_1.multiplicity,
+        );
 
         let mut prover = LabradorProver::new(&pp, &witness_1, &st, transcript);
         let proof = prover.prove(&ep_1).unwrap();
 
         // create a new verifier
-        let transcript =
-            LabradorTranscript::new(ShakeSponge::default(), ep_1.lambda, ep_1.n, ep_1.r);
+        let transcript = LabradorTranscript::new(
+            ShakeSponge::default(),
+            ep_1.security_parameter,
+            ep_1.rank,
+            ep_1.multiplicity,
+        );
         let mut verifier = LabradorVerifier::new(&pp, &st, transcript);
         let result = verifier.verify(&proof, &ep_1);
         assert!(result.unwrap());

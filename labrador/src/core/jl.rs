@@ -2,8 +2,8 @@ use crate::ring::rq_vector::RqVector;
 use crate::ring::zq::Zq;
 
 // LaBRADOR: Compact Proofs for R1CS from Module-SIS | Page 5 | Proving smallness section
-const UPPER_BOUND_FACTOR: Zq = Zq::new(128);
-const LOWER_BOUND_FACTOR: Zq = Zq::new(30);
+const UPPER_BOUND_FACTOR: f64 = 128.0;
+const LOWER_BOUND_FACTOR: f64 = 30.0;
 
 pub struct Projection {
     random_linear_map_vector: Vec<Vec<Vec<Zq>>>,
@@ -41,17 +41,19 @@ impl Projection {
         result
     }
 
-    fn norm_squared(projection: &[Zq]) -> Zq {
-        projection.iter().map(|coeff| *coeff * *coeff).sum()
+    #[allow(clippy::as_conversions)]
+    fn norm_squared(projection: &[Zq]) -> f64 {
+        let result: Zq = projection.iter().map(|coeff| *coeff * *coeff).sum();
+        result.get_value() as f64
     }
 
     // Function to verify upper bound of projection
-    pub fn verify_projection_upper_bound(projection: &[Zq], beta_squared: Zq) -> bool {
+    pub fn verify_projection_upper_bound(projection: &[Zq], beta_squared: f64) -> bool {
         Self::norm_squared(projection) < (UPPER_BOUND_FACTOR * beta_squared)
     }
 
     // Function to verify lower bound of projection
-    pub fn verify_projection_lower_bound(projection: &[Zq], beta_squared: Zq) -> bool {
+    pub fn verify_projection_lower_bound(projection: &[Zq], beta_squared: f64) -> bool {
         Self::norm_squared(projection) > (LOWER_BOUND_FACTOR * beta_squared)
     }
 }
@@ -114,11 +116,9 @@ mod tests {
         let trials: u128 = 10000;
 
         let witness = RqVector::random_ternary(&mut rand::rng(), rank);
-        let witness_norm = (Zq::new(security_parameter.try_into().unwrap())
-            * RqVector::compute_norm_squared(&witness))
-        .to_u128();
+        let witness_norm = security_parameter as f64 * RqVector::compute_norm_squared(&witness);
 
-        let mut norm_sum = Zq::ZERO;
+        let mut norm_sum = 0.0;
         // Run the test multiple times to simulate the probability
         for _ in 0..trials {
             let mut transcript = LabradorTranscript::new(
@@ -136,7 +136,7 @@ mod tests {
         }
 
         // Calculate the observed probability
-        let average = norm_sum.to_u128() / trials;
+        let average = norm_sum / trials as f64;
         let difference = if witness_norm <= average {
             average - witness_norm
         } else {
@@ -144,12 +144,12 @@ mod tests {
         };
 
         // we choose a small tolerance value for possible statistical error
-        let tolerance: u128 = 50;
+        let tolerance = 50.0;
         assert!(
             difference < tolerance,
             "Average norm value {} is not equal to {}.",
             average,
-            Zq::new(security_parameter.try_into().unwrap()) * witness.compute_norm_squared(),
+            security_parameter as f64 * witness.compute_norm_squared(),
         );
     }
 

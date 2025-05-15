@@ -2,7 +2,7 @@ use crate::ring::rq_vector::RqVector;
 use rand::{CryptoRng, Rng};
 use std::ops::Mul;
 
-use super::{rq::Rq, zq::Zq};
+use super::rq::Rq;
 
 /// Matrix of polynomials in Rq
 #[derive(Debug, Clone)]
@@ -58,7 +58,7 @@ impl RqMatrix {
         &self.elements
     }
 
-    pub fn decompose_each_cell(&self, base: Zq, num_parts: usize) -> RqVector {
+    pub fn decompose_each_cell(&self, base: usize, num_parts: usize) -> RqVector {
         let mut decomposed_vec = Vec::new();
         for ring_vector in self.get_elements() {
             for ring in ring_vector.get_elements() {

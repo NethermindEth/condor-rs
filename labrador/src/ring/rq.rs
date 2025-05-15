@@ -172,7 +172,9 @@ impl Rq {
     /// Decomposes a polynomial into base-B representation:
     /// p = p⁽⁰⁾ + p⁽¹⁾·B + p⁽²⁾·B² + ... + p⁽ᵗ⁻¹⁾·B^(t-1)
     /// Where each p⁽ⁱ⁾ has small coefficients, using centered representatives
-    pub fn decompose(&self, base: Zq, num_parts: usize) -> RqVector {
+    pub fn decompose(&self, base: usize, num_parts: usize) -> RqVector {
+        #[allow(clippy::as_conversions)]
+        let base = Zq::new(base as u32);
         let mut parts = Vec::with_capacity(num_parts);
         let mut current = self.clone();
 
@@ -695,7 +697,7 @@ mod tests {
     fn test_base2_decomposition() {
         // Test case 1: Base 2 decomposition
         let poly: Rq = vec![Zq::new(5), Zq::new(3), Zq::new(7), Zq::new(1)].into();
-        let parts = poly.decompose(Zq::TWO, 2);
+        let parts = poly.decompose(2, 2);
 
         // Part 0: remainders mod 2 (no centering needed for base 2)
         assert_eq!(
@@ -731,7 +733,7 @@ mod tests {
     fn test_base3_decomposition() {
         // Test case: Base 3 decomposition with centering
         let specific_poly: Rq = vec![Zq::new(8), Zq::new(11), Zq::new(4), Zq::new(15)].into();
-        let parts = specific_poly.decompose(Zq::new(3), 2);
+        let parts = specific_poly.decompose(3, 2);
 
         // Part 0: centered remainders mod 3
         assert_eq!(
@@ -769,7 +771,7 @@ mod tests {
     fn test_decomposition_edge_cases() {
         // Test zero polynomial
         let zero_poly: Rq = vec![Zq::ZERO; 4].into();
-        let parts = zero_poly.decompose(Zq::TWO, 2);
+        let parts = zero_poly.decompose(2, 2);
         assert!(
             parts.iter().all(|p| p.is_zero()),
             "Zero polynomial decomposition failed"
@@ -777,7 +779,7 @@ mod tests {
 
         // Test single part decomposition
         let simple_poly: Rq = vec![Zq::ONE, Zq::new(2), Zq::new(3), Zq::new(4)].into();
-        let parts = simple_poly.decompose(Zq::TWO, 1);
+        let parts = simple_poly.decompose(2, 1);
         assert_eq!(
             parts.get_elements().len(),
             1,
@@ -795,7 +797,7 @@ mod tests {
         let poly: Rq = vec![Zq::new(120), Zq::new(33), Zq::new(255), Zq::new(19)].into();
 
         // Base 8 decomposition
-        let parts_base8 = poly.decompose(Zq::new(8), 2);
+        let parts_base8 = poly.decompose(8, 2);
 
         // Part 0: centered remainders mod 8
         assert_eq!(
@@ -829,7 +831,7 @@ mod tests {
         }
 
         // Base 16 decomposition
-        let parts_base16 = poly.decompose(Zq::new(16), 2);
+        let parts_base16 = poly.decompose(16, 2);
 
         // Verify reconstruction for base 16
         for i in 0..4 {
@@ -847,7 +849,7 @@ mod tests {
         let poly: Rq = vec![Zq::new(123), Zq::new(456), Zq::new(789), Zq::new(101112)].into();
 
         // Decompose into 3 parts with base 4
-        let parts = poly.decompose(Zq::new(4), 3);
+        let parts = poly.decompose(4, 3);
         assert_eq!(parts.get_elements().len(), 3, "Should have 3 parts");
 
         // Test reconstruction with all 3 parts
@@ -875,7 +877,7 @@ mod tests {
             .collect::<Vec<Zq>>()
             .into();
 
-        let parts = poly.decompose(Zq::new(5), 2);
+        let parts = poly.decompose(5, 2);
 
         // Expected centered values for each coefficient:
         // 0 mod 5 = 0 -> 0
@@ -914,7 +916,7 @@ mod tests {
         let poly: Rq = vec![Zq::ZERO, Zq::MAX, Zq::MAX - Zq::ONE].into();
 
         // Decompose with base 3
-        let parts = poly.decompose(Zq::new(3), 2);
+        let parts = poly.decompose(3, 2);
 
         // Verify reconstruction
         let reconstructed = parts[0].clone() + parts[1].scalar_mul(Zq::new(3));
@@ -954,9 +956,10 @@ mod tests {
         ]
         .into();
 
-        for base in [2, 3, 4, 5, 8, 10, 16].iter() {
-            let parts = poly.decompose(Zq::new(*base), 2);
-            let half_base = Zq::new(*base).scale_by(Zq::TWO);
+        for base in [2usize, 3usize, 4usize, 5usize, 8usize, 10usize, 16usize].iter() {
+            let parts = poly.decompose(*base, 2);
+            #[allow(clippy::as_conversions)]
+            let half_base = Zq::new(*base as u32).scale_by(Zq::TWO);
 
             // Check that all coefficients in first part are properly "small"
             for coeff in parts[0].coeffs.iter() {
@@ -977,7 +980,8 @@ mod tests {
             }
 
             // Verify reconstruction
-            let reconstructed = parts[0].clone() + parts[1].scalar_mul(Zq::new(*base));
+            #[allow(clippy::as_conversions)]
+            let reconstructed = parts[0].clone() + parts[1].scalar_mul(Zq::new(*base as u32));
             assert_eq!(reconstructed, poly, "Base {}: Reconstruction failed", base);
         }
     }

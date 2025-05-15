@@ -1,32 +1,34 @@
-use crate::ring::zq::Zq;
+#![allow(clippy::as_conversions)]
+use crate::ring::rq::Rq;
 
 // Example Environment parameters used for LaBRADOR, can be expanded as required by testing.
 #[derive(Clone)]
 pub struct EnvironmentParameters {
+    /// Security Parameter
+    pub security_parameter: usize, // security parameter
+
     /// Relation R Parameters
-    pub n: usize, // rank (size of each witness s_i)
-    pub r: usize, // multiplicity (number of witness elements)
+    pub rank: usize, // size of each witness s_i
+    pub multiplicity: usize, // number of witness elements
 
     /// Decomposition Parameters
-    pub b: Zq, // z decomposition base
-    pub b_1: Zq,    // t_i decomposition base
+    pub b: usize, // z decomposition base
+    pub b_1: usize, // t_i decomposition base
     pub t_1: usize, // t_i number of parts
-    pub b_2: Zq,    // g_ij decomposition base
+    pub b_2: usize, // g_ij decomposition base
     pub t_2: usize, // g_ij number of parts
 
     /// Norm Bounds
-    pub beta: Zq, // Bound for witness s_i
-    pub gamma: Zq,   // Bound for z
-    pub gamma_1: Zq, // Bound for t
-    pub gamma_2: Zq, // Bound for g and h
+    pub beta: f64, // Bound for witness s_i
+    pub gamma: f64,   // Bound for z
+    pub gamma_1: f64, // Bound for t
+    pub gamma_2: f64, // Bound for g and h
+    pub beta_prime: f64,
 
     /// Commitment Matrices Sizes
     pub kappa: usize, // Number of rows in A
     pub kappa_1: usize, // Number of rows in B
     pub kappa_2: usize, // Number of rows in C
-
-    /// Security Parameter
-    pub lambda: usize, // security parameter
 
     /// Function Families Sizes
     pub constraint_k: usize, // Number of constraints of the form f
@@ -37,178 +39,313 @@ pub struct EnvironmentParameters {
     pub operator_norm: f64,
 }
 
-#[allow(clippy::too_many_arguments)]
 impl EnvironmentParameters {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
-        n: usize,
-        r: usize,
-        b: Zq,
-        b_1: Zq,
-        t_1: usize,
-        b_2: Zq,
-        t_2: usize,
-        beta: Zq,
-        gamma: Zq,
-        gamma_1: Zq,
-        gamma_2: Zq,
+        security_parameter: usize,
+        rank: usize,
+        multiplicity: usize,
+        beta: f64,
         kappa: usize,
         kappa_1: usize,
         kappa_2: usize,
-        lambda: usize,
         constraint_k: usize,
         constraint_l: usize,
-        log_q: usize,
+        tau: f64,
+        modulo_q: usize,
         operator_norm: f64,
     ) -> Self {
-        Self {
-            n,
-            r,
-            b,
-            b_1,
-            t_1,
-            b_2,
-            t_2,
+        let std_s = Self::compute_std_s(rank, multiplicity, beta);
+
+        // balanced radix for z‑split
+        let base_b = Self::compute_base_b(std_s, multiplicity, tau);
+
+        // Decomposition parameters for t and h
+        let parts_t1 = Self::compute_t1(modulo_q, base_b);
+        let base_b1 = Self::compute_b1(modulo_q, parts_t1);
+
+        // Decomposition parameters for g
+        let parts_t2 = Self::compute_t2(rank, std_s, base_b);
+        let base_b2 = Self::compute_b2(rank, std_s, parts_t2);
+
+        let gamma = Self::compute_gamma(beta, tau);
+        let gamma_1 =
+            Self::compute_gamma1(base_b1, parts_t1, multiplicity, kappa, base_b2, parts_t2);
+        let gamma_2 = Self::compute_gamma2(base_b1, parts_t1, multiplicity);
+        let beta_prime = Self::compute_beta_prime(base_b, gamma, gamma_1, gamma_2);
+        EnvironmentParameters {
+            security_parameter,
+            rank,
+            multiplicity,
+            b: Self::compute_base_b(std_s, multiplicity, tau),
+            b_1: base_b1,
+            t_1: parts_t1,
+            b_2: base_b2,
+            t_2: parts_t2,
             beta,
             gamma,
             gamma_1,
             gamma_2,
+            beta_prime,
             kappa,
             kappa_1,
             kappa_2,
-            lambda,
             constraint_k,
             constraint_l,
-            log_q,
+            log_q: (modulo_q as f64).log2() as usize, // Size of log(q) in bits, where q is the modulo
             operator_norm,
         }
+    }
+
+    // s = β / √(r·n·d)
+    fn compute_std_s(n: usize, r: usize, beta: f64) -> f64 {
+        beta / ((r * n * Rq::DEGREE) as f64).sqrt()
+    }
+
+    /// b = round( √(√(12 r τ) · s) ), but at least 2
+    fn compute_base_b(s: f64, multiplicity: usize, tau: f64) -> usize {
+        let raw = ((12.0 * multiplicity as f64 * tau).sqrt() * s).sqrt();
+        let mut b = raw.round() as usize;
+        if b < 2 {
+            b = 2;
+        }
+        b
+    }
+
+    /// t₁ = round( log_q / log_b )
+    fn compute_t1(q: usize, b: usize) -> usize {
+        let log_q = (q as f64).ln();
+        let log_b = (b as f64).ln();
+        (log_q / log_b).round() as usize
+    }
+
+    /// b₁ = ceil( q^(1/t₁) )
+    fn compute_b1(q: usize, t1: usize) -> usize {
+        let root = (q as f64).powf(1.0 / t1 as f64);
+        root.ceil() as usize
+    }
+
+    /// t₂ = ceil( log(√(24 n d) · s^2) / log(b) )
+    fn compute_t2(n: usize, std_s: f64, b: usize) -> usize {
+        (((24.0 * n as f64 * Rq::DEGREE as f64).sqrt() * std_s * std_s).ln() / (b as f64).ln())
+            .round() as usize
+    }
+
+    /// t₂ = ceil( log(√(24 n d) · s^2) / log(b) )
+    fn compute_b2(n: usize, std_s: f64, t2: usize) -> usize {
+        ((24.0 * n as f64 * Rq::DEGREE as f64).sqrt() * std_s * std_s)
+            .powf(1.0 / t2 as f64)
+            .round() as usize
+    }
+
+    /// γ = β·√τ
+    fn compute_gamma(beta: f64, tau: f64) -> f64 {
+        beta * (tau).sqrt()
+    }
+
+    /// γ₁ = √( (b₁² t₁ /12) · r κ d  +  (b₂² t₂ /12) · (r²+r)/2 · d )
+    #[allow(clippy::too_many_arguments)]
+    fn compute_gamma1(
+        b1: usize,
+        t1: usize,
+        multiplicity: usize,
+        kappa: usize,
+        b2: usize,
+        t2: usize,
+    ) -> f64 {
+        let term1 =
+            (b1.pow(2) * t1) as f64 / 12.0 * multiplicity as f64 * kappa as f64 * Rq::DEGREE as f64;
+        let term2 = (b2.pow(2) * t2) as f64 / 12.0
+            * ((multiplicity * multiplicity + multiplicity) as f64)
+            / 2.0
+            * Rq::DEGREE as f64;
+        (term1 + term2).sqrt()
+    }
+
+    /// γ₂ = √( (b₁² t₁ /12) · (r²+r)/2 · d )
+    fn compute_gamma2(b1: usize, t1: usize, multiplicity: usize) -> f64 {
+        let term = (b1.pow(2) * t1) as f64 / 12.0
+            * ((multiplicity * multiplicity + multiplicity) as f64)
+            / 2.0
+            * Rq::DEGREE as f64;
+        term.sqrt()
+    }
+
+    /// β' = √( 2 γ² / b²  +  γ₁²  +  γ₂² )
+    fn compute_beta_prime(b: usize, gamma: f64, gamma1: f64, gamma2: f64) -> f64 {
+        let part_z = 2.0 * (gamma * gamma) / (b * b) as f64;
+        (part_z + gamma1 * gamma1 + gamma2 * gamma2).sqrt()
     }
 }
 
 impl Default for EnvironmentParameters {
     fn default() -> Self {
-        Self {
-            n: 5,
-            r: 3,
-            b: Zq::new(2),
-            b_1: Zq::new(16),
-            t_1: 4,
-            b_2: Zq::new(16),
-            t_2: 4,
-            beta: Zq::new(65535),
-            gamma: Zq::new(16),
-            gamma_1: Zq::new(16),
-            gamma_2: Zq::new(16),
-            kappa: 4,
-            kappa_1: 5,
-            kappa_2: 5,
-            lambda: 128,
-            constraint_k: 5,
-            constraint_l: 5,
-            log_q: 32,
-            operator_norm: 15.0,
-        }
+        Self::new(
+            128,
+            5,
+            3,
+            65535.0,
+            4,
+            5,
+            5,
+            5,
+            5,
+            65535.0,
+            (1u64 << 32) as usize,
+            15.0,
+        )
     }
 }
 
-// Todo: Revise and complete the following functionality
-// /// Calculate optimal decomposition parameters based on Section 5.4 of the paper
-// #[allow(clippy::as_conversions)]
-// pub fn calculate_optimal_parameters(
-//     n: usize,  // Dimension of the witness vector
-//     s: f64,    // Standard deviation of witness coefficients
-//     beta: f64, // Ajtai commitment parameter
-// ) -> GarbageParameters {
-//     // Calculate estimated standard deviations based on Section 5.4
-//     // For g_{ij}, std dev is approximately s_g = sqrt(n*d) * s^2
-//     // For h_{ij}, std dev is approximately s_h = beta * sqrt(n*d) * s
-//     let n_d_sqrt = (n * d) as f64;
-//     let s_g = n_d_sqrt * s * s;
-//     let s_h = beta * n_d_sqrt * s;
+#[cfg(test)]
+mod tests {
+    use super::EnvironmentParameters;
+    use super::Rq;
 
-//     // Calculate optimal bases using formula from Section 5.4
-//     // B_i ≈ sqrt(12 * s_i)
-//     let b2 = ((12.0 * s_g).sqrt() as u32).max(2);
-//     let b1 = ((12.0 * s_h).sqrt() as u32).max(2);
+    #[test]
+    fn test_std_s_matches_formula() {
+        let (n, r, beta) = (12, 5, 42.0);
+        let result = EnvironmentParameters::compute_std_s(n, r, beta);
+        let expected = beta / ((r * n * Rq::DEGREE) as f64).sqrt();
+        assert_eq!(result, expected);
+    }
 
-//     // Calculate optimal number of parts
-//     // t_i ≈ log_B_i(q)
-//     let t2 = ((32.0 / (b2 as f64).log2()).ceil() as usize).max(2);
-//     let t1 = ((32.0 / (b1 as f64).log2()).ceil() as usize).max(2);
+    #[test]
+    fn test_compute_base_b_not_below_two() {
+        let b = EnvironmentParameters::compute_base_b(0.001, 1, 0.0001);
+        assert!(b >= 2);
+    }
 
-//     GarbageParameters {
-//         g_base: Zq::new(b2),
-//         g_parts: t2,
-//         h_base: Zq::new(b1),
-//         h_parts: t1,
-//     }
-// }
+    #[test]
+    fn test_base_b_formula_and_floor() {
+        let s = 0.17;
+        let (r, tau) = (3, 12.0);
+        let result = EnvironmentParameters::compute_base_b(s, r, tau);
+        let expected = ((12.0 * r as f64 * tau).sqrt() * s).sqrt().round().max(2.0) as usize;
+        assert_eq!(result, expected, "balanced radix b");
+    }
 
-// #[test]
-// #[allow(clippy::as_conversions)]
-// fn test_optimal_parameters_accuracy() {
-//     // Choose small, simple values for manual calculation
-//     let n = 4; // Small dimension
-//     let d = 4; // Small degree
-//     let s = 2.0; // Simple standard deviation
-//     let beta = 1.0; // Simple beta value
+    #[test]
+    fn test_t1_rounding() {
+        let (q, b) = (257usize, 4usize); // ln(q)/ln(b)=~4.006
+        let got = EnvironmentParameters::compute_t1(q, b);
+        assert_eq!(got, 4, "t1 = round(log_q / log_b)");
+    }
 
-//     // Manually calculate the expected values according to the paper's formulas
-//     let n_d_sqrt = (n * d) as f64; // = 4.0
+    #[test]
+    fn test_b1_is_ceil_root() {
+        let (q, t1) = (1usize << 20, 5usize);
+        let result = EnvironmentParameters::compute_b1(q, t1);
+        let expected = (q as f64).powf(1.0 / t1 as f64).ceil() as usize;
+        assert_eq!(result, expected);
+    }
 
-//     // s_g = sqrt(n*d) * s^2 = 4.0 * 4.0 = 16.0
-//     let s_g = n_d_sqrt * s * s;
+    #[test]
+    fn test_t1_and_b1_are_consistent() {
+        let q = 1usize << 23;
+        let b = 137usize;
+        let t1 = EnvironmentParameters::compute_t1(q, b);
+        let b1 = EnvironmentParameters::compute_b1(q, t1);
+        assert!(b1.pow(t1 as u32) >= q);
+    }
 
-//     // s_h = beta * sqrt(n*d) * s = 1.0 * 4.0 * 2.0 = 8.0
-//     let s_h = beta * n_d_sqrt * s;
+    #[test]
+    fn test_t2_b2_pair_match() {
+        let (n, s, b) = (10usize, 0.12, 150usize);
+        let t2: usize = EnvironmentParameters::compute_t2(n, s, b);
+        let b2 = EnvironmentParameters::compute_b2(n, s, t2);
+        // recompute tmp and double-check injectivity analogue
+        let tmp_ln = ((24.0 * n as f64 * Rq::DEGREE as f64).sqrt() * s * s).ln();
+        let expected_t2 = (tmp_ln / (b as f64).ln()).round() as usize;
+        assert_eq!(t2, expected_t2, "t2 formula");
+        let lhs = (b2 as f64).powf(t2 as f64);
+        let rhs = (24.0 * n as f64 * Rq::DEGREE as f64).sqrt() * s * s;
+        assert!(lhs >= rhs - 1.0);
+    }
 
-//     // b2 ≈ sqrt(12 * s_g) = sqrt(12 * 16.0) = sqrt(192) ≈ 13.856... => 13
-//     let expected_b2 = (12.0 * s_g).sqrt() as u32;
+    #[test]
+    fn test_gamma_functions() {
+        let (beta, tau) = (32.0, 49.0);
+        let gamma = EnvironmentParameters::compute_gamma(beta, tau);
+        assert_eq!(gamma, beta * tau.sqrt());
 
-//     // b1 ≈ sqrt(12 * s_h) = sqrt(12 * 8.0) = sqrt(96) ≈ 9.798... => 9
-//     let expected_b1 = (12.0 * s_h).sqrt() as u32;
+        // simple numeric spot-check for γ₁, γ₂
+        let (b1, t1, r, kappa, b2, t2) = (7, 3, 2, 4, 5, 2);
+        let manual1 = ((b1 * b1 * t1) as f64 / 12.0 * r as f64 * kappa as f64 * Rq::DEGREE as f64
+            + (b2 * b2 * t2) as f64 / 12.0 * ((r * r + r) as f64) / 2.0 * Rq::DEGREE as f64)
+            .sqrt();
+        let got1 = EnvironmentParameters::compute_gamma1(b1, t1, r, kappa, b2, t2);
+        assert_eq!(got1, manual1);
 
-//     // For q = 2^32:
-//     // t2 ≈ log_b2(q) = log_13(2^32) = 32/log_2(13) ≈ 32/3.7 ≈ 8.65 => 9
-//     let expected_t2 = ((32.0 / (expected_b2 as f64).log2()).ceil() as usize).max(2);
+        let manual2 = ((b1.pow(2) * t1) as f64 / 12.0 * ((r * r + r) as f64) / 2.0
+            * Rq::DEGREE as f64)
+            .sqrt();
+        let got2 = EnvironmentParameters::compute_gamma2(b1, t1, r);
+        assert_eq!(got2, manual2);
+    }
 
-//     // t1 ≈ log_b1(q) = log_9(2^32) = 32/log_2(9) ≈ 32/3.17 ≈ 10.09 => 11
-//     let expected_t1 = ((32.0 / (expected_b1 as f64).log2()).ceil() as usize).max(2);
+    #[test]
+    fn beta_prime_formula() {
+        let (b, gamma, g1, g2) = (11usize, 3.3, 7.7, 2.2);
+        let expected = ((2.0 * gamma * gamma) / (b * b) as f64 + g1 * g1 + g2 * g2).sqrt();
+        let result = EnvironmentParameters::compute_beta_prime(b, gamma, g1, g2);
+        assert_eq!(expected, result);
+    }
 
-//     // Call the function under test
-//     let params =
-//         GarbagePolynomialCommitment::<TEST_M, TEST_N, TEST_D>::calculate_optimal_parameters(
-//             n, d, s, beta,
-//         );
+    #[test]
+    fn test_gamma_and_beta_prime_are_positive() {
+        let beta = 100.0;
+        let tau = 64.0;
+        let gamma = EnvironmentParameters::compute_gamma(beta, tau);
+        assert!(gamma > 0.0);
+        let beta_p = EnvironmentParameters::compute_beta_prime(3, gamma, 2.0, 1.0);
+        assert!(beta_p > 0.0);
+    }
 
-//     // Check results
-//     assert!(
-//         params.g_base.to_u128() >= expected_b2 as u128 - 1
-//             && params.g_base.to_u128() <= expected_b2 as u128 + 1,
-//         "g_base {}, expected {}",
-//         params.g_base.to_u128(),
-//         expected_b2
-//     );
+    #[test]
+    fn default_instance_is_consistent() {
+        let p = EnvironmentParameters::default();
 
-//     assert!(
-//         params.h_base.to_u128() >= expected_b1 as u128 - 1
-//             && params.h_base.to_u128() <= expected_b1 as u128 + 1,
-//         "h_base {}, expected {}",
-//         params.h_base.to_u128(),
-//         expected_b1
-//     );
+        assert!(p.b >= 2 && p.b_1 >= 2 && p.b_2 >= 2);
+        assert!(p.t_1 > 0 && p.t_2 > 0);
 
-//     // For part counts, use approximate comparison due to potential floating point differences
-//     assert!(
-//         params.g_parts >= expected_t2 - 1 && params.g_parts <= expected_t2 + 1,
-//         "g_parts {}, expected {}",
-//         params.g_parts,
-//         expected_t2
-//     );
+        assert!((p.b_1 as u64).pow(p.t_1 as u32) >= p.log_q as u64);
+        assert!((p.b_2 as u64).pow(p.t_2 as u32) > 1);
 
-//     assert!(
-//         params.h_parts >= expected_t1 - 1 && params.h_parts <= expected_t1 + 1,
-//         "h_parts {}, expected {}",
-//         params.h_parts,
-//         expected_t1
-//     );
-// }
+        // c)  norm bounds are non-negative
+        assert!(p.gamma > 0.0 && p.gamma_1 > 0.0 && p.gamma_2 > 0.0);
+        assert!(p.beta_prime >= p.gamma_1.max(p.gamma_2));
+    }
+
+    #[test]
+    fn random_parameter_sets_hold_invariants() {
+        for seed in 1..=20 {
+            let rank = 2 + seed as usize % 8; // 2..9
+            let multiplicity = 1 + seed as usize % 5; // 1..5
+            let beta = 10.0 + seed as f64;
+            let tau = 32.0 + seed as f64;
+            let q = (1usize << 20) + (seed as usize * 12345);
+            let params = EnvironmentParameters::new(
+                128,
+                rank,
+                multiplicity,
+                beta,
+                4,
+                4,
+                4,
+                3,
+                3,
+                tau,
+                q,
+                15.0, // operator norm
+            );
+
+            // main invariants
+            assert!(params.b >= 2);
+            assert!(params.t_1 >= 1 && params.t_2 >= 1);
+            assert!((params.b_1 as u64).pow(params.t_1 as u32) >= q as u64);
+            assert!(params.gamma > 0.0);
+            assert!(params.beta_prime >= params.gamma_1.max(params.gamma_2));
+        }
+    }
+}

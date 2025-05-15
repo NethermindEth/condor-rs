@@ -74,15 +74,19 @@ impl RqVector {
     }
 
     // Compute the squared norm of a vector of polynomials
-    pub fn compute_norm_squared(&self) -> Zq {
-        self.elements
+    pub fn compute_norm_squared(&self) -> f64 {
+        let result: Zq = self
+            .elements
             .iter()
             .flat_map(|poly| poly.get_coefficients()) // Collect coefficients from all polynomials
             .map(|coeff| *coeff * *coeff)
-            .sum()
+            .sum();
+        #[allow(clippy::as_conversions)]
+        let result = result.get_value() as f64;
+        result
     }
 
-    pub fn decompose(&self, b: Zq, parts: usize) -> Vec<RqVector> {
+    pub fn decompose(&self, b: usize, parts: usize) -> Vec<RqVector> {
         self.iter().map(|i| Rq::decompose(i, b, parts)).collect()
     }
 }
@@ -218,15 +222,15 @@ mod tests {
             vec![Zq::ZERO, Zq::ZERO, Zq::new(5), Zq::ONE].into(),
         ]
         .into();
-        let result = Zq::new(53);
+        let result = 53.0;
         assert!(poly.compute_norm_squared() == result);
 
         let poly2: RqVector = vec![vec![Zq::new(5), Zq::ONE, Zq::MAX, Zq::ZERO].into()].into();
-        let result2 = Zq::new(27);
+        let result2 = 27.0;
         assert!(poly2.compute_norm_squared() == result2);
 
         let poly_zero: RqVector = RqVector::zero(4);
-        let result_zero = Zq::ZERO;
+        let result_zero = 0.0;
         assert!(poly_zero.compute_norm_squared() == result_zero);
     }
 }

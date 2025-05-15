@@ -2,13 +2,13 @@ use thiserror::Error;
 
 use crate::{
     commitments::common_instances::AjtaiInstances,
-    ring::{rq_matrix::RqMatrix, rq_vector::RqVector, zq::Zq},
+    ring::{rq_matrix::RqMatrix, rq_vector::RqVector},
 };
 
 #[derive(Debug, Error)]
 pub enum DecompositionError {
     #[error("invalid decomposition base: {0}")]
-    InvalidBase(Zq),
+    InvalidBase(usize),
     #[error("invalid number of parts: {0}")]
     InvalidPartCount(usize),
 }
@@ -18,7 +18,7 @@ pub enum DecompositionError {
 /// The num_parts parameter determines how many parts each coefficient is split into
 #[derive(Debug, Clone)]
 pub struct DecompositionParameters {
-    base: Zq,
+    base: usize,
     num_parts: usize,
 }
 
@@ -26,8 +26,8 @@ impl DecompositionParameters {
     /// Creates new decomposition parameters with validation
     /// - base must be greater than 1 for meaningful decomposition
     /// - num_parts must be positive to ensure decomposition occurs
-    pub fn new(base: Zq, num_parts: usize) -> Result<Self, DecompositionError> {
-        if base <= Zq::ONE {
+    pub fn new(base: usize, num_parts: usize) -> Result<Self, DecompositionError> {
+        if base <= 1 {
             return Err(DecompositionError::InvalidBase(base));
         }
         if num_parts == 0 {
@@ -38,7 +38,7 @@ impl DecompositionParameters {
     }
 
     /// Returns the decomposition base
-    pub fn base(&self) -> Zq {
+    pub fn base(&self) -> usize {
         self.base
     }
 
@@ -100,10 +100,10 @@ mod tests {
 
     #[test]
     fn test_decomposition_parameters() {
-        assert!(DecompositionParameters::new(Zq::ZERO, 2).is_err());
-        assert!(DecompositionParameters::new(Zq::TWO, 0).is_err());
-        let params = DecompositionParameters::new(Zq::new(8), 3).unwrap();
-        assert_eq!(params.base(), Zq::new(8));
+        assert!(DecompositionParameters::new(0, 2).is_err());
+        assert!(DecompositionParameters::new(2, 0).is_err());
+        let params = DecompositionParameters::new(8, 3).unwrap();
+        assert_eq!(params.base(), 8);
         assert_eq!(params.num_parts(), 3);
     }
 }
