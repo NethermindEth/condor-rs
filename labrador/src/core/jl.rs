@@ -196,6 +196,7 @@ mod tests {
             }
         }
         // Number of elements in the matrix as f64 (256x4x1000)
+        #[allow(clippy::as_conversions)]
         let total: f64 = (256 * Rq::DEGREE * n) as f64;
         println!("this is the total amount of elements{}", total);
         let expected = [0.25, 0.5, 0.25];
@@ -249,8 +250,8 @@ mod tests {
     #[test]
     #[cfg(not(feature = "skip-slow-tests"))]
     fn average_value() {
-        // 10000 was chosen to provide a reasonably large sample size
-        let trials: u128 = 10000;
+        // 20000 was chosen to provide a reasonably large sample size
+        let trials: u128 = 20000;
         let n = 3;
         let mut rng = rng();
         let polynomials = RqVector::random_ternary(&mut rng, 3);
