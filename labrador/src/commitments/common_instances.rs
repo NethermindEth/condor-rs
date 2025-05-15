@@ -22,26 +22,32 @@ impl AjtaiInstances {
             commitment_scheme_a: AjtaiScheme::new(
                 ep.beta,
                 ep.beta,
-                Self::challenge_rq_matrix(ep.kappa, ep.n),
+                Self::challenge_rq_matrix(ep.kappa, ep.rank),
             )
             .unwrap(),
             commitment_scheme_b: AjtaiScheme::new(
                 ep.gamma_1,
                 ep.gamma_1,
-                Self::challenge_rq_matrix(ep.kappa_1, ep.r * ep.t_1 * ep.kappa),
+                Self::challenge_rq_matrix(ep.kappa_1, ep.multiplicity * ep.t_1 * ep.kappa),
             )
             .unwrap(),
             // Todo: gamma_1 should be changed to a valid witness bound
             commitment_scheme_c: AjtaiScheme::new(
                 ep.gamma_1,
                 ep.gamma_1,
-                Self::challenge_rq_matrix(ep.kappa_1, ep.t_2 * ((ep.r.pow(2)) + ep.r) / 2),
+                Self::challenge_rq_matrix(
+                    ep.kappa_1,
+                    ep.t_2 * ((ep.multiplicity.pow(2)) + ep.multiplicity) / 2,
+                ),
             )
             .unwrap(),
             commitment_scheme_d: AjtaiScheme::new(
                 ep.gamma_2,
                 ep.gamma_2,
-                Self::challenge_rq_matrix(ep.kappa_2, ep.t_1 * ((ep.r.pow(2)) + ep.r) / 2),
+                Self::challenge_rq_matrix(
+                    ep.kappa_2,
+                    ep.t_1 * ((ep.multiplicity.pow(2)) + ep.multiplicity) / 2,
+                ),
             )
             .unwrap(),
         }
