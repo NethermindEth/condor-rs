@@ -74,13 +74,21 @@ impl<'a> OuterCommitment<'a> {
             t_decomposition_params.base,
             t_decomposition_params.num_parts,
         );
-        let u1_left = self.crs.commitment_scheme_b.commit(&decomposed_t).unwrap();
+        let u1_left = self
+            .crs
+            .commitment_scheme_b
+            .commit(&decomposed_t)
+            .expect("Commitment error in committing to decomposed t");
 
         let decomposed_g = g.decompose_each_cell(
             g_decomposition_params.base,
             g_decomposition_params.num_parts,
         );
-        let u2_left = self.crs.commitment_scheme_c.commit(&decomposed_g).unwrap();
+        let u2_left = self
+            .crs
+            .commitment_scheme_c
+            .commit(&decomposed_g)
+            .expect("Commitment error in committing to decomposed g");
 
         self.u_1 = &u1_left + &u2_left;
     }
@@ -90,7 +98,11 @@ impl<'a> OuterCommitment<'a> {
             h_decomposition_params.base,
             h_decomposition_params.num_parts,
         );
-        self.u_2 = self.crs.commitment_scheme_d.commit(&decomposed_h).unwrap();
+        self.u_2 = self
+            .crs
+            .commitment_scheme_d
+            .commit(&decomposed_h)
+            .expect("Commitment error in committing to decomposed h");
     }
 }
 

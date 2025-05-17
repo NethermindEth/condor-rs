@@ -174,10 +174,6 @@ impl AjtaiScheme {
     pub fn get_row_size(&self) -> usize {
         self.random_matrix.get_elements().len()
     }
-
-    pub fn get_col_size(&self) -> usize {
-        self.random_matrix.get_elements()[0].get_elements().len()
-    }
 }
 
 #[cfg(test)]

@@ -85,7 +85,7 @@ impl<'a> LabradorVerifier<'a> {
         let challenges = self.transcript.generate_challenges(ep.operator_norm);
 
         // check b_0^{''(k)} ?= <omega^(k),p> + \sum(psi_l^(k) * b_0^{'(l)})
-        Self::check_b_0_aggr(self, proof, ep, &psi, &omega).unwrap();
+        Self::check_b_0_aggr(self, proof, ep, &psi, &omega).expect("b_0^{''(k)} equation failed");
 
         // 3. line 14: check norm_sum(z, t, g, h) <= (beta')^2
 
@@ -200,9 +200,11 @@ impl<'a> LabradorVerifier<'a> {
         let mut outer_commitments = OuterCommitment::new(self.pp);
         outer_commitments.compute_u1(
             RqMatrix::new(proof.t_i.clone()),
-            DecompositionParameters::new(ep.b, ep.t_1).unwrap(),
+            DecompositionParameters::new(ep.b, ep.t_1)
+                .expect("Decomposition error in decomposing t"),
             proof.g_ij.clone(),
-            DecompositionParameters::new(ep.b, ep.t_2).unwrap(),
+            DecompositionParameters::new(ep.b, ep.t_2)
+                .expect("Decomposition error in decomposing g"),
         );
 
         if proof.u_1 != outer_commitments.u_1 {
@@ -215,7 +217,8 @@ impl<'a> LabradorVerifier<'a> {
         // 9. line 20: u_2 ?= \sum(\sum(D_ijk * h_ij^(k)))
         outer_commitments.compute_u2(
             proof.h_ij.clone(),
-            DecompositionParameters::new(ep.b, ep.t_1).unwrap(),
+            DecompositionParameters::new(ep.b, ep.t_1)
+                .expect("Decomposition error in decomposing h"),
         );
 
         if proof.u_2 != outer_commitments.u_2 {

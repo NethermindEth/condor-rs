@@ -76,7 +76,7 @@ impl<'a> LabradorProver<'a> {
     pub fn prove(&mut self, ep: &EnvironmentParameters) -> Result<Proof, ProverError> {
         // check the L2 norm of the witness
         // not sure whether this should be handled during the proving or managed by the witness generator.
-        Self::check_witness_l2norm(self, ep).unwrap();
+        Self::check_witness_l2norm(self, ep).expect("Witness l2 norm exceed the bound");
         // Step 1: Outer commitments u_1 starts: --------------------------------------------
 
         // Ajtai Commitments t_i = A * s_i
@@ -84,7 +84,12 @@ impl<'a> LabradorProver<'a> {
             .witness
             .s
             .iter()
-            .map(|s_i| self.pp.commitment_scheme_a.commit(s_i).unwrap())
+            .map(|s_i| {
+                self.pp
+                    .commitment_scheme_a
+                    .commit(s_i)
+                    .expect("Commitment error in committing to s_i")
+            })
             .collect();
 
         // This replaces the following code
@@ -94,9 +99,11 @@ impl<'a> LabradorProver<'a> {
         let mut outer_commitments = OuterCommitment::new(self.pp);
         outer_commitments.compute_u1(
             RqMatrix::new(t_i.clone()),
-            DecompositionParameters::new(ep.b, ep.t_1).unwrap(),
+            DecompositionParameters::new(ep.b, ep.t_1)
+                .expect("Decomposition error in decomposing t"),
             garbage_polynomials.g.clone(),
-            DecompositionParameters::new(ep.b, ep.t_2).unwrap(),
+            DecompositionParameters::new(ep.b, ep.t_2)
+                .expect("Decomposition error in decomposing g"),
         );
         self.transcript.absorb_u1(outer_commitments.u_1.clone());
         // Step 1: Outer commitments u_1 ends: ----------------------------------------------
@@ -119,7 +126,7 @@ impl<'a> LabradorProver<'a> {
             &self.transcript.vector_p,
             vector_of_projection_matrices.clone(),
         )
-        .unwrap();
+        .expect("Projection check failed");
         // Step 2: JL projection ends: ------------------------------------------------------
 
         // Step 3: Aggregation starts: --------------------------------------------------------------
@@ -156,7 +163,8 @@ impl<'a> LabradorProver<'a> {
         garbage_polynomials.compute_h(&phi_i);
         outer_commitments.compute_u2(
             garbage_polynomials.h.clone(),
-            DecompositionParameters::new(ep.b, ep.t_1).unwrap(),
+            DecompositionParameters::new(ep.b, ep.t_1)
+                .expect("Decomposition error in decomposing h"),
         );
         self.transcript.absorb_u2(outer_commitments.u_2);
 
