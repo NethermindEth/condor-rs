@@ -95,7 +95,7 @@ impl<'a, S: Sponge> LabradorProver<'a, S> {
             .collect::<Result<_, _>>()?;
 
         // This replaces the following code
-        let mut garbage_polynomials = GarbagePolynomials::new(self.witness.s.clone());
+        let mut garbage_polynomials = GarbagePolynomials::new(&self.witness.s);
         garbage_polynomials.compute_g();
         // calculate outer commitment u_1 = \sum(B_ik * t_i^(k)) + \sum(C_ijk * g_ij^(k))
         let mut outer_commitments = OuterCommitment::new(self.pp);

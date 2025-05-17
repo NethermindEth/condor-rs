@@ -1,13 +1,13 @@
 use crate::ring::{rq_matrix::RqMatrix, rq_vector::RqVector};
 
-pub struct GarbagePolynomials {
-    witness_vector: Vec<RqVector>,
+pub struct GarbagePolynomials<'a> {
+    witness_vector: &'a [RqVector],
     pub g: RqMatrix,
     pub h: RqMatrix,
 }
 
-impl GarbagePolynomials {
-    pub fn new(witness_vector: Vec<RqVector>) -> Self {
+impl<'a> GarbagePolynomials<'a> {
+    pub fn new(witness_vector: &'a [RqVector]) -> Self {
         Self {
             witness_vector,
             g: RqMatrix::new(Vec::new()),
@@ -200,7 +200,7 @@ mod tests {
     fn test_g_matrix_size() {
         let multiplicity = 3;
         let (witnesses, _) = create_test_witnesses(multiplicity);
-        let mut garbage_polynomial = GarbagePolynomials::new(witnesses.clone());
+        let mut garbage_polynomial = GarbagePolynomials::new(&witnesses);
         garbage_polynomial.compute_g();
 
         assert_eq!(garbage_polynomial.g.get_row_len(), 3);
@@ -217,7 +217,7 @@ mod tests {
     fn test_g_calculation() {
         let (witnesses, _) = create_test_witnesses(3);
 
-        let mut garbage_polynomial = GarbagePolynomials::new(witnesses.clone());
+        let mut garbage_polynomial = GarbagePolynomials::new(&witnesses);
         garbage_polynomial.compute_g();
 
         // Verify a few specific values
@@ -236,7 +236,7 @@ mod tests {
     fn test_h_matrix_size() {
         let multiplicity = 3;
         let (witnesses, phi) = create_test_witnesses(multiplicity);
-        let mut garbage_polynomial = GarbagePolynomials::new(witnesses.clone());
+        let mut garbage_polynomial = GarbagePolynomials::new(&witnesses);
         garbage_polynomial.compute_h(&phi);
 
         assert_eq!(garbage_polynomial.h.get_row_len(), 3);
@@ -252,7 +252,7 @@ mod tests {
     #[test]
     fn test_h_calculation() {
         let (witnesses, phi) = create_test_witnesses(3);
-        let mut garbage_polynomial = GarbagePolynomials::new(witnesses.clone());
+        let mut garbage_polynomial = GarbagePolynomials::new(&witnesses);
         garbage_polynomial.compute_h(&phi);
 
         // Verify a specific value
