@@ -57,7 +57,7 @@ impl Statement {
 
         // generate random phi_ct with size: constraint_k * r * n
         // it is a k length vector of matrix with size: r * n
-        let phi_ct: Vec<Vec<RqVector>> = (0..ep.constraint_k)
+        let phi_ct: Vec<Vec<RqVector>> = (0..ep.constraint_l)
             .map(|_| {
                 (0..ep.r)
                     .map(|_| RqVector::random(&mut rand::rng(), ep.n))

@@ -36,9 +36,8 @@ impl Zq {
         self.value == 0
     }
 
-    #[allow(clippy::as_conversions)]
-    pub fn get_value(&self) -> usize {
-        self.value as usize
+    pub fn get_value(&self) -> u32 {
+        self.value
     }
 
     /// Returns the centered representative modulo the given bound

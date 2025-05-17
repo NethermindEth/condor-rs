@@ -34,6 +34,7 @@ pub struct EnvironmentParameters {
 
     /// Other Parameters
     pub log_q: usize, // Size of log(q) in bits, where q is the modulo
+    pub operator_norm: f64,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -57,6 +58,7 @@ impl EnvironmentParameters {
         constraint_k: usize,
         constraint_l: usize,
         log_q: usize,
+        operator_norm: f64,
     ) -> Self {
         Self {
             n,
@@ -77,6 +79,7 @@ impl EnvironmentParameters {
             constraint_k,
             constraint_l,
             log_q,
+            operator_norm,
         }
     }
 }
@@ -102,6 +105,7 @@ impl Default for EnvironmentParameters {
             constraint_k: 5,
             constraint_l: 5,
             log_q: 32,
+            operator_norm: 15.0,
         }
     }
 }

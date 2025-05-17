@@ -1,5 +1,8 @@
+use rand::rng;
+
 use crate::commitments::ajtai_commitment::AjtaiScheme;
-use crate::core::{challenge_set::ChallengeSet, env_params::EnvironmentParameters};
+use crate::core::env_params::EnvironmentParameters;
+use crate::ring::rq::Rq;
 use crate::ring::rq_matrix::RqMatrix;
 
 pub struct AjtaiInstances {
@@ -21,36 +24,32 @@ impl AjtaiInstances {
                 ep.beta,
                 Self::challenge_rq_matrix(ep.kappa, ep.n),
             )
-            .unwrap(),
+            .expect("Invalid Parameters for commitment scheme A"),
             commitment_scheme_b: AjtaiScheme::new(
                 ep.gamma_1,
                 ep.gamma_1,
                 Self::challenge_rq_matrix(ep.kappa_1, ep.r * ep.t_1 * ep.kappa),
             )
-            .unwrap(),
+            .expect("Invalid Parameters for commitment scheme B"),
             // Todo: gamma_1 should be changed to a valid witness bound
             commitment_scheme_c: AjtaiScheme::new(
                 ep.gamma_1,
                 ep.gamma_1,
                 Self::challenge_rq_matrix(ep.kappa_1, ep.t_2 * ((ep.r.pow(2)) + ep.r) / 2),
             )
-            .unwrap(),
+            .expect("Invalid Parameters for commitment scheme C"),
             commitment_scheme_d: AjtaiScheme::new(
                 ep.gamma_2,
                 ep.gamma_2,
                 Self::challenge_rq_matrix(ep.kappa_2, ep.t_1 * ((ep.r.pow(2)) + ep.r) / 2),
             )
-            .unwrap(),
+            .expect("Invalid Parameters for commitment scheme D"),
         }
     }
 
     fn challenge_rq_matrix(row: usize, col: usize) -> RqMatrix {
         (0..row)
-            .map(|_| {
-                (0..col)
-                    .map(|_| ChallengeSet::new().get_challenges().clone())
-                    .collect()
-            })
+            .map(|_| (0..col).map(|_| Rq::random(&mut rng())).collect())
             .collect()
     }
 }
