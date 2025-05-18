@@ -22,7 +22,7 @@ impl AggregationOne {
         pi: &[Vec<Vec<Zq>>],
         psi: &[Vec<Zq>],
         omega: &[Vec<Zq>],
-    ) -> Self {
+    ) -> (Vec<Vec<RqVector>>, Vec<Vec<RqVector>>, RqVector) {
         Self::aggregate(witness, st, ep, pi, psi, omega)
     }
 
@@ -33,7 +33,7 @@ impl AggregationOne {
         pi: &[Vec<Vec<Zq>>],
         psi: &[Vec<Zq>],
         omega: &[Vec<Zq>],
-    ) -> Self {
+    ) -> (Vec<Vec<RqVector>>, Vec<Vec<RqVector>>, RqVector) {
         // calculate a_{ij}^{''(k)}
         let a_ct_aggr: Vec<Vec<RqVector>> = Self::get_a_ct_aggr(psi, &st.a_ct, ep);
 
@@ -43,11 +43,7 @@ impl AggregationOne {
         // calculate b^{''(k)}
         let b_ct_aggr: RqVector = Self::get_b_ct_aggr(&a_ct_aggr, &phi_ct_aggr, witness, ep);
 
-        Self {
-            a_ct_aggr,
-            phi_ct_aggr,
-            b_ct_aggr,
-        }
+        (a_ct_aggr, phi_ct_aggr, b_ct_aggr)
     }
 
     pub fn get_a_ct_aggr(
@@ -90,48 +86,48 @@ pub struct AggregationTwo {
 
 impl AggregationTwo {
     pub fn new(
-        aggr_one: &AggregationOne,
+        a_ct_aggr: &[Vec<RqVector>],
+        phi_ct_aggr: &[Vec<RqVector>],
+        b_ct_aggr: &RqVector,
         st: &Statement,
         ep: &EnvironmentParameters,
         alpha_vector: &RqVector,
         beta_vector: &RqVector,
     ) -> Self {
-        Self::aggregate(aggr_one, st, ep, alpha_vector, beta_vector)
+        Self::aggregate(
+            a_ct_aggr,
+            phi_ct_aggr,
+            b_ct_aggr,
+            st,
+            ep,
+            alpha_vector,
+            beta_vector,
+        )
     }
 
     fn aggregate(
-        aggr_one: &AggregationOne,
+        a_ct_aggr: &[Vec<RqVector>],
+        phi_ct_aggr: &[Vec<RqVector>],
+        b_ct_aggr: &RqVector,
         st: &Statement,
         ep: &EnvironmentParameters,
         alpha_vector: &RqVector,
         beta_vector: &RqVector,
     ) -> Self {
         // calculate a_i
-        let a_i = Self::get_a_i(
-            &st.a_constraint,
-            &aggr_one.a_ct_aggr,
-            alpha_vector,
-            beta_vector,
-            ep,
-        );
+        let a_i = Self::get_a_i(&st.a_constraint, a_ct_aggr, alpha_vector, beta_vector, ep);
 
         // calculate phi_i
         let phi_i = Self::get_phi_i(
             &st.phi_constraint,
-            &aggr_one.phi_ct_aggr,
+            phi_ct_aggr,
             alpha_vector,
             beta_vector,
             ep,
         );
 
         // calculate b_i
-        let b_i = Self::get_b_i(
-            &st.b_constraint,
-            &aggr_one.b_ct_aggr,
-            alpha_vector,
-            beta_vector,
-            ep,
-        );
+        let b_i = Self::get_b_i(&st.b_constraint, b_ct_aggr, alpha_vector, beta_vector, ep);
 
         Self { a_i, phi_i, b_i }
     }

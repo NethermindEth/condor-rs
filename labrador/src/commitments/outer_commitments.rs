@@ -50,26 +50,20 @@ impl DecompositionParameters {
 
 pub struct OuterCommitment<'a> {
     crs: &'a AjtaiInstances,
-    pub u_1: RqVector,
-    pub u_2: RqVector,
 }
 
 impl<'a> OuterCommitment<'a> {
     pub fn new(crs: &'a AjtaiInstances) -> Self {
-        Self {
-            crs,
-            u_1: RqVector::new(Vec::new()),
-            u_2: RqVector::new(Vec::new()),
-        }
+        Self { crs }
     }
 
     pub fn compute_u1(
         &mut self,
-        t: RqMatrix,
+        t: &RqMatrix,
         t_decomposition_params: DecompositionParameters,
-        g: RqMatrix,
+        g: &RqMatrix,
         g_decomposition_params: DecompositionParameters,
-    ) {
+    ) -> RqVector {
         let decomposed_t = t.decompose_each_cell(
             t_decomposition_params.base,
             t_decomposition_params.num_parts,
@@ -90,19 +84,22 @@ impl<'a> OuterCommitment<'a> {
             .commit(&decomposed_g)
             .expect("Commitment error in committing to decomposed g");
 
-        self.u_1 = &u1_left + &u2_left;
+        &u1_left + &u2_left
     }
 
-    pub fn compute_u2(&mut self, h: RqMatrix, h_decomposition_params: DecompositionParameters) {
+    pub fn compute_u2(
+        &mut self,
+        h: &RqMatrix,
+        h_decomposition_params: DecompositionParameters,
+    ) -> RqVector {
         let decomposed_h = h.decompose_each_cell(
             h_decomposition_params.base,
             h_decomposition_params.num_parts,
         );
-        self.u_2 = self
-            .crs
+        self.crs
             .commitment_scheme_d
             .commit(&decomposed_h)
-            .expect("Commitment error in committing to decomposed h");
+            .expect("Commitment error in committing to decomposed h")
     }
 }
 

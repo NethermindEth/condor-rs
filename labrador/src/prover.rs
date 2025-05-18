@@ -40,7 +40,7 @@ pub struct Proof {
     pub b_ct_aggr: RqVector,
     pub u_2: RqVector,
     pub z: RqVector,
-    pub t_i: Vec<RqVector>,
+    pub t_i: RqMatrix,
     pub g_ij: RqMatrix,
     pub h_ij: RqMatrix,
 }
@@ -87,25 +87,33 @@ impl<'a, S: Sponge> LabradorProver<'a, S> {
         // Step 1: Outer commitments u_1 starts: --------------------------------------------
 
         // Ajtai Commitments t_i = A * s_i
-        let t_i: Vec<RqVector> = self
-            .witness
-            .s
-            .iter()
-            .map(|s_i| self.pp.commitment_scheme_a.commit(s_i))
-            .collect::<Result<_, _>>()?;
+        let t_i = RqMatrix::new(
+            self.witness
+                .s
+                .iter()
+                .map(|s_i| {
+                    self.pp
+                        .commitment_scheme_a
+                        .commit(s_i)
+                        .expect("Commitment error in committing to s_i")
+                })
+                .collect(),
+        );
 
         // This replaces the following code
         let mut garbage_polynomials = GarbagePolynomials::new(&self.witness.s);
         garbage_polynomials.compute_g();
         // calculate outer commitment u_1 = \sum(B_ik * t_i^(k)) + \sum(C_ijk * g_ij^(k))
         let mut outer_commitments = OuterCommitment::new(self.pp);
-        outer_commitments.compute_u1(
-            RqMatrix::new(t_i.clone()),
-            DecompositionParameters::new(ep.b, ep.t_1)?,
-            garbage_polynomials.g.clone(),
-            DecompositionParameters::new(ep.b, ep.t_2)?,
+        let commitment_u1 = outer_commitments.compute_u1(
+            &t_i,
+            DecompositionParameters::new(ep.b, ep.t_1)
+                .expect("Decomposition error in decomposing t"),
+            &garbage_polynomials.g,
+            DecompositionParameters::new(ep.b, ep.t_2)
+                .expect("Decomposition error in decomposing g"),
         );
-        self.transcript.absorb_u1(outer_commitments.u_1.clone());
+        self.transcript.absorb_u1(commitment_u1);
         // Step 1: Outer commitments u_1 ends: ----------------------------------------------
 
         // Step 2: JL projection starts: ----------------------------------------------------
@@ -113,9 +121,9 @@ impl<'a, S: Sponge> LabradorProver<'a, S> {
         // JL projection p_j + check p_j = ct(sum(<\sigma_{-1}(pi_i^(j)), s_i>))
         let vector_of_projection_matrices =
             self.transcript.generate_vector_of_projection_matrices();
-        let vector_p =
-            jl::Projection::new(vector_of_projection_matrices.clone(), ep.security_parameter)
-                .compute_batch_projection(&self.witness.s);
+        let jl_projection =
+            jl::Projection::new(vector_of_projection_matrices, ep.security_parameter);
+        let vector_p = jl_projection.compute_batch_projection(&self.witness.s);
         self.transcript.absorb_vector_p(vector_p);
         // Projections::new(pi, &self.witness.s);
 
@@ -125,8 +133,9 @@ impl<'a, S: Sponge> LabradorProver<'a, S> {
         Self::check_projection(
             self,
             &self.transcript.vector_p,
-            projections.get_projection_matrices(),
-        )?;
+            jl_projection.get_random_linear_map_vector(),
+        )
+        .expect("Projection check failed");
         // Step 2: JL projection ends: ------------------------------------------------------
 
         // Step 3: Aggregation starts: --------------------------------------------------------------
@@ -138,34 +147,41 @@ impl<'a, S: Sponge> LabradorProver<'a, S> {
             .generate_vector_psi(size_of_psi, ep.constraint_l);
         let vector_omega = self.transcript.generate_vector_omega(size_of_omega);
         // first aggregation
-        let aggr_1 = aggregate::AggregationOne::new(
+        let (a_ct_aggt, phi_ct_aggr, b_ct_aggr) = aggregate::AggregationOne::new(
             self.witness,
             self.st,
             ep,
-            projections.get_projection_matrices(),
+            jl_projection.get_random_linear_map_vector(),
             &vector_psi,
             &vector_omega,
         );
-        self.transcript
-            .absorb_vector_b_ct_aggr(aggr_1.b_ct_aggr.clone());
+        self.transcript.absorb_vector_b_ct_aggr(b_ct_aggr);
 
         // second aggregation
         let size_of_beta = size_of_psi;
         let alpha_vector = self.transcript.generate_rq_vector(ep.constraint_k);
         let beta_vector = self.transcript.generate_rq_vector(size_of_beta);
-        let aggr_2 =
-            aggregate::AggregationTwo::new(&aggr_1, self.st, ep, &alpha_vector, &beta_vector);
+        let aggr_2 = aggregate::AggregationTwo::new(
+            &a_ct_aggt,
+            &phi_ct_aggr,
+            &self.transcript.b_ct_aggr,
+            self.st,
+            ep,
+            &alpha_vector,
+            &beta_vector,
+        );
         // Aggregation ends: ----------------------------------------------------------------
 
         // Step 4: Calculate h_ij, u_2, and z starts: ---------------------------------------
 
         let phi_i = aggr_2.phi_i;
         garbage_polynomials.compute_h(&phi_i);
-        outer_commitments.compute_u2(
-            garbage_polynomials.h.clone(),
-            DecompositionParameters::new(ep.b, ep.t_1)?,
+        let commitment_u2 = outer_commitments.compute_u2(
+            &garbage_polynomials.h,
+            DecompositionParameters::new(ep.b, ep.t_1)
+                .expect("Decomposition error in decomposing h"),
         );
-        self.transcript.absorb_u2(outer_commitments.u_2);
+        self.transcript.absorb_u2(commitment_u2);
 
         // calculate z = c_1*s_1 + ... + c_r*s_r
         let challenges = self.transcript.generate_challenges(ep.operator_norm);

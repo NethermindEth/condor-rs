@@ -95,6 +95,7 @@ impl<'a, S: Sponge> LabradorVerifier<'a, S> {
         let z_ij = RqVector::decompose(&proof.z, ep.b, 2);
         let t_ij: Vec<Vec<RqVector>> = proof
             .t_i
+            .get_elements()
             .iter()
             .map(|i| RqVector::decompose(i, ep.b, ep.t_1))
             .collect();
@@ -128,7 +129,7 @@ impl<'a, S: Sponge> LabradorVerifier<'a, S> {
         // 4. line 15: check Az ?= c_1 * t_1 + ... + c_r * t_r
 
         let az = self.pp.commitment_scheme_a.matrix() * &proof.z;
-        let ct_sum = aggregate::calculate_z(&proof.t_i, &challenges);
+        let ct_sum = aggregate::calculate_z(proof.t_i.get_elements(), &challenges);
         if az != ct_sum {
             return Err(VerifierError::AzError {
                 computed: az,
@@ -205,29 +206,32 @@ impl<'a, S: Sponge> LabradorVerifier<'a, S> {
 
         let u_1 = &proof.u_1;
         let mut outer_commitments = OuterCommitment::new(self.pp);
-        outer_commitments.compute_u1(
-            RqMatrix::new(proof.t_i.clone()),
-            DecompositionParameters::new(ep.b, ep.t_1)?,
-            proof.g_ij.clone(),
-            DecompositionParameters::new(ep.b, ep.t_2)?,
+        let commitment_u1 = outer_commitments.compute_u1(
+            &proof.t_i,
+            DecompositionParameters::new(ep.b, ep.t_1)
+                .expect("Decomposition error in decomposing t"),
+            &proof.g_ij,
+            DecompositionParameters::new(ep.b, ep.t_2)
+                .expect("Decomposition error in decomposing g"),
         );
 
-        if proof.u_1 != outer_commitments.u_1 {
+        if proof.u_1 != commitment_u1 {
             return Err(VerifierError::OuterCommitError {
                 computed: u_1.clone(),
-                expected: outer_commitments.u_1,
+                expected: commitment_u1,
             });
         }
 
         // 9. line 20: u_2 ?= \sum(\sum(D_ijk * h_ij^(k)))
-        outer_commitments.compute_u2(
-            proof.h_ij.clone(),
-            DecompositionParameters::new(ep.b, ep.t_1)?,
+        let commitment_u2 = outer_commitments.compute_u2(
+            &proof.h_ij,
+            DecompositionParameters::new(ep.b, ep.t_1)
+                .expect("Decomposition error in decomposing h"),
         );
 
-        if proof.u_2 != outer_commitments.u_2 {
+        if proof.u_2 != commitment_u2 {
             return Err(VerifierError::OuterCommitError {
-                computed: outer_commitments.u_2.clone(),
+                computed: commitment_u2,
                 expected: proof.u_2.clone(),
             });
         }

@@ -18,6 +18,10 @@ impl Projection {
         }
     }
 
+    pub fn get_random_linear_map_vector(&self) -> &[Vec<Vec<Zq>>] {
+        &self.random_linear_map_vector
+    }
+
     fn compute_projection(&self, index: usize, witness: &RqVector) -> Vec<Zq> {
         let mut projection = vec![Zq::ZERO; 2 * self.security_level];
         let coefficients = witness.concatenate_coefficients();
