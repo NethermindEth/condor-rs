@@ -77,7 +77,7 @@ impl EnvironmentParameters {
             security_parameter,
             rank,
             multiplicity,
-            b: Zq::from(base_b as u32),
+            b: Zq::new(base_b as u32),
             b_1: base_b1,
             t_1: parts_t1,
             b_2: base_b2,

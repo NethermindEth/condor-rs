@@ -37,11 +37,11 @@ impl RqMatrix {
         }
     }
 
-    pub fn get_cell_symmetric(&self, row: usize, col: usize) -> Rq {
+    pub fn get_cell_symmetric(&self, row: usize, col: usize) -> &Rq {
         if row >= col {
-            self.elements[row].get_elements()[col].clone()
+            &self.elements[row].get_elements()[col]
         } else {
-            self.elements[col].get_elements()[row].clone()
+            &self.elements[col].get_elements()[row]
         }
     }
 
@@ -62,7 +62,7 @@ impl RqMatrix {
         let mut decomposed_vec = Vec::new();
         for ring_vector in self.get_elements() {
             for ring in ring_vector.get_elements() {
-                decomposed_vec.append(&mut ring.decompose(base, num_parts).get_elements().clone());
+                decomposed_vec.extend(ring.decompose(base, num_parts).into_inner());
             }
         }
         RqVector::new(decomposed_vec)

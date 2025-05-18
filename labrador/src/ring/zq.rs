@@ -107,12 +107,6 @@ impl_arithmetic!(Add, AddAssign, add, add_assign, wrapping_add);
 impl_arithmetic!(Sub, SubAssign, sub, sub_assign, wrapping_sub);
 impl_arithmetic!(Mul, MulAssign, mul, mul_assign, wrapping_mul);
 
-impl From<u32> for Zq {
-    fn from(value: u32) -> Self {
-        Self::new(value)
-    }
-}
-
 impl fmt::Display for Zq {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // Shows value with modulus for clarity
@@ -141,7 +135,7 @@ impl UniformSampler for UniformZq {
         UniformInt::<u32>::new_inclusive(low.borrow().value, high.borrow().value).map(UniformZq)
     }
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> Self::X {
-        self.0.sample(rng).into()
+        Self::X::new(self.0.sample(rng))
     }
 }
 
@@ -316,7 +310,7 @@ mod tests {
 
     #[test]
     fn test_conversion_from_u32() {
-        let a: Zq = 5_u32.into();
+        let a: Zq = Zq::new(5);
         assert_eq!(a.value, 5, "Conversion from u32 should preserve value");
     }
 

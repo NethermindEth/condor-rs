@@ -45,7 +45,7 @@ impl<'a> GarbagePolynomials<'a> {
                 // Only calculate for j ≤ i (upper triangular)
                 let inner_phi_i_s_j = phi[i].inner_product_poly_vector(&self.witness_vector[j]);
                 let inner_phi_j_s_i = phi[j].inner_product_poly_vector(&self.witness_vector[i]);
-                h_ij.push(inner_phi_i_s_j + inner_phi_j_s_i);
+                h_ij.push(&inner_phi_i_s_j + &inner_phi_j_s_i);
             }
             h_i.push(RqVector::new(h_ij));
         }
@@ -227,9 +227,18 @@ mod tests {
 
         let expected_g_22 = witnesses[2].inner_product_poly_vector(&witnesses[2]);
 
-        assert_eq!(garbage_polynomial.g.get_cell_symmetric(0, 1), expected_g_01);
-        assert_eq!(garbage_polynomial.g.get_cell_symmetric(1, 0), expected_g_10);
-        assert_eq!(garbage_polynomial.g.get_cell_symmetric(2, 2), expected_g_22);
+        assert_eq!(
+            *garbage_polynomial.g.get_cell_symmetric(0, 1),
+            expected_g_01
+        );
+        assert_eq!(
+            *garbage_polynomial.g.get_cell_symmetric(1, 0),
+            expected_g_10
+        );
+        assert_eq!(
+            *garbage_polynomial.g.get_cell_symmetric(2, 2),
+            expected_g_22
+        );
     }
 
     #[test]
@@ -258,13 +267,16 @@ mod tests {
         // Verify a specific value
         let phi_0_s_1 = phi[0].inner_product_poly_vector(&witnesses[1]);
         let phi_1_s_0 = phi[1].inner_product_poly_vector(&witnesses[0]);
-        let expected_h_01 = phi_0_s_1 + phi_1_s_0;
+        let expected_h_01 = &phi_0_s_1 + &phi_1_s_0;
 
         assert_eq!(
             garbage_polynomial.h.get_cell_symmetric(0, 1),
             garbage_polynomial.h.get_cell_symmetric(1, 0)
         );
-        assert_eq!(expected_h_01, garbage_polynomial.h.get_cell_symmetric(0, 1));
+        assert_eq!(
+            expected_h_01,
+            *garbage_polynomial.h.get_cell_symmetric(0, 1)
+        );
     }
 
     // #[test]

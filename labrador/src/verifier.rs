@@ -245,12 +245,12 @@ impl<'a, S: Sponge> LabradorVerifier<'a, S> {
             .map(|i| {
                 (0..r)
                     .map(|j| {
-                        &(&x_ij.get_cell_symmetric(i, j) * &random_c.get_elements()[i])
+                        &(x_ij.get_cell_symmetric(i, j) * &random_c.get_elements()[i])
                             * &random_c.get_elements()[j]
                     })
-                    .fold(Rq::zero(), |acc, x| acc + x)
+                    .fold(Rq::zero(), |acc, x| &acc + &x)
             })
-            .fold(Rq::zero(), |acc, x| acc + x)
+            .fold(Rq::zero(), |acc, x| &acc + &x)
     }
 
     /// calculate the left hand side of line 17, \sum(<\phi_z, z> * c_i)
@@ -258,7 +258,7 @@ impl<'a, S: Sponge> LabradorVerifier<'a, S> {
         phi.iter()
             .zip(c.iter())
             .map(|(phi_i, c_i)| &(phi_i.inner_product_poly_vector(z)) * c_i)
-            .fold(Rq::zero(), |acc, x| acc + x)
+            .fold(Rq::zero(), |acc, x| &acc + &x)
     }
 
     fn norm_squared(polys: &[Vec<RqVector>]) -> Zq {
@@ -285,17 +285,17 @@ impl<'a, S: Sponge> LabradorVerifier<'a, S> {
         // walk only over the stored half: i ≤ j
         for i in 0..r {
             for j in 0..r {
-                sum_a_primes_g += a_primes.get_elements()[i].get_elements()[j]
-                    .multiplication(&g.get_cell_symmetric(i, j));
+                sum_a_primes_g = &sum_a_primes_g
+                    + &(&a_primes.get_elements()[i].get_elements()[j] * g.get_cell_symmetric(i, j));
             }
         }
 
-        let sum_h_ii = (0..r).fold(Rq::zero(), |acc, i| acc + h.get_cell_symmetric(i, i));
+        let sum_h_ii = (0..r).fold(Rq::zero(), |acc, i| &acc + h.get_cell_symmetric(i, i));
 
         let b_primes2 = b_primes * &Zq::TWO;
         let sum_a_primes_g2 = &sum_a_primes_g * &Zq::TWO;
 
-        sum_a_primes_g2 + sum_h_ii == b_primes2
+        &sum_a_primes_g2 + &sum_h_ii == b_primes2
     }
 
     fn check_b_0_aggr(
