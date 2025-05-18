@@ -245,8 +245,8 @@ impl<'a, S: Sponge> LabradorVerifier<'a, S> {
             .map(|i| {
                 (0..r)
                     .map(|j| {
-                        (x_ij.get_cell_symmetric(i, j) * random_c.get_elements()[i].clone())
-                            * random_c.get_elements()[j].clone()
+                        &(&x_ij.get_cell_symmetric(i, j) * &random_c.get_elements()[i])
+                            * &random_c.get_elements()[j]
                     })
                     .fold(Rq::zero(), |acc, x| acc + x)
             })
@@ -285,8 +285,8 @@ impl<'a, S: Sponge> LabradorVerifier<'a, S> {
         // walk only over the stored half: i ≤ j
         for i in 0..r {
             for j in 0..r {
-                sum_a_primes_g += a_primes.get_elements()[i].get_elements()[j].clone()
-                    * g.get_cell_symmetric(i, j);
+                sum_a_primes_g += a_primes.get_elements()[i].get_elements()[j]
+                    .multiplication(&g.get_cell_symmetric(i, j));
             }
         }
 

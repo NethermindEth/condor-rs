@@ -324,7 +324,7 @@ macro_rules! impl_arithmetic {
 
 impl_arithmetic!(Add, AddAssign, add, add_assign, addition);
 impl_arithmetic!(Sub, SubAssign, sub, sub_assign, subtraction);
-impl_arithmetic!(Mul, MulAssign, mul, mul_assign, multiplication);
+// impl_arithmetic!(Mul, MulAssign, mul, mul_assign, multiplication);
 
 impl From<Vec<Zq>> for Rq {
     fn from(vec: Vec<Zq>) -> Self {
@@ -526,7 +526,7 @@ mod tests {
         // Multiplication with wrapping
         let poly1: Rq = vec![Zq::ONE, Zq::ONE, Zq::new(2)].into();
         let poly2: Rq = vec![Zq::ONE, Zq::ONE].into();
-        let result = poly1 * poly2;
+        let result = &poly1 * &poly2;
         assert_eq!(
             result.coeffs,
             helper::padded(&[Zq::new(1), Zq::new(2), Zq::new(3), Zq::new(2)])
@@ -535,7 +535,7 @@ mod tests {
         // Multiplication with zero polynomial
         let poly3: Rq = vec![Zq::ONE, Zq::ONE, Zq::new(2)].into();
         let poly4: Rq = vec![Zq::ZERO].into();
-        let result2 = poly3 * poly4;
+        let result2 = &poly3 * &poly4;
         assert_eq!(
             result2.coeffs,
             helper::padded(&[Zq::ZERO, Zq::ZERO, Zq::ZERO])
@@ -988,7 +988,7 @@ mod tests {
         let poly2 = helper::rq_from(&[Zq::new(4), Zq::new(5), Zq::new(6)]);
         let inner_12 = poly1.inner_product(&poly2);
         let conjugated_1 = poly1.conjugate_automorphism();
-        let inner_conjugated_12 = conjugated_1 * poly2;
+        let inner_conjugated_12 = &conjugated_1 * &poly2;
 
         assert_eq!(inner_conjugated_12.coeffs.len(), Rq::DEGREE);
         assert_eq!(inner_conjugated_12.get_coefficients()[0], Zq::from(32));
