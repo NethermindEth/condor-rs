@@ -8,8 +8,7 @@ use crate::ring::rq::Rq;
 use crate::ring::rq_matrix::RqMatrix;
 use crate::ring::rq_vector::RqVector;
 use crate::ring::zq::{Zq, ZqVector};
-use crate::transcript::lib::LabradorTranscript;
-use crate::transcript::shake_sponge::ShakeSponge;
+use crate::transcript::{LabradorTranscript, Sponge};
 
 #[derive(Debug)]
 pub enum VerifierError {
@@ -46,17 +45,17 @@ pub enum VerifierError {
         expected: RqVector,
     },
 }
-pub struct LabradorVerifier<'a> {
+pub struct LabradorVerifier<'a, S: Sponge> {
     pub pp: &'a AjtaiInstances,
     pub st: &'a Statement,
-    pub transcript: LabradorTranscript<ShakeSponge>,
+    pub transcript: LabradorTranscript<S>,
 }
 
-impl<'a> LabradorVerifier<'a> {
+impl<'a, S: Sponge> LabradorVerifier<'a, S> {
     pub fn new(
         pp: &'a AjtaiInstances,
         st: &'a Statement,
-        transcript: LabradorTranscript<ShakeSponge>,
+        transcript: LabradorTranscript<S>,
     ) -> Self {
         Self { pp, st, transcript }
     }
@@ -322,6 +321,7 @@ impl<'a> LabradorVerifier<'a> {
 mod tests {
     use super::*;
     use crate::prover::{LabradorProver, Witness};
+    use crate::transcript::sponges::shake::ShakeSponge;
 
     #[test]
     fn test_verify() {

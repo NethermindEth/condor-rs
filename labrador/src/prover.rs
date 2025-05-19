@@ -6,8 +6,7 @@ use crate::core::jl;
 use crate::ring::rq_matrix::RqMatrix;
 use crate::ring::zq::Zq;
 use crate::ring::zq::ZqVector;
-use crate::transcript::lib::LabradorTranscript;
-use crate::transcript::shake_sponge::ShakeSponge;
+use crate::transcript::{LabradorTranscript, Sponge};
 use crate::{
     core::{aggregate, env_params::EnvironmentParameters, statement::Statement},
     ring::rq_vector::RqVector,
@@ -50,19 +49,19 @@ impl Witness {
     }
 }
 
-pub struct LabradorProver<'a> {
+pub struct LabradorProver<'a, S: Sponge> {
     pub pp: &'a AjtaiInstances,
     pub witness: &'a Witness,
     pub st: &'a Statement,
-    pub transcript: LabradorTranscript<ShakeSponge>,
+    pub transcript: LabradorTranscript<S>,
 }
 
-impl<'a> LabradorProver<'a> {
+impl<'a, S: Sponge> LabradorProver<'a, S> {
     pub fn new(
         pp: &'a AjtaiInstances,
         witness: &'a Witness,
         st: &'a Statement,
-        transcript: LabradorTranscript<ShakeSponge>,
+        transcript: LabradorTranscript<S>,
     ) -> Self {
         Self {
             pp,
@@ -238,6 +237,7 @@ impl<'a> LabradorProver<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::transcript::sponges::shake::ShakeSponge;
 
     #[test]
     fn test_prove() {

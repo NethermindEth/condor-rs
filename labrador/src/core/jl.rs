@@ -59,8 +59,8 @@ impl Projection {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::transcript::lib::LabradorTranscript;
-    use crate::transcript::shake_sponge::ShakeSponge;
+    use crate::transcript::sponges::shake::ShakeSponge;
+    use crate::transcript::LabradorTranscript;
     use rand::rng;
 
     // Test that the probability of the inequality being true is close to 1/2
