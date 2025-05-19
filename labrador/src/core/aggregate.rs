@@ -37,7 +37,6 @@ pub fn calculate_aggr_ct_a(
     aprimes
 }
 
-
 /// calculate \phi_{i}^{''(k)} = \sum_{l=1}^{L}\psi_l^{k}\phi_{i}^{'(l)} + \sum(\omega_j^{k} * \sigma_{-1} * pi_i^{j})
 /// in the prover process, page 17 from the paper.
 ///
@@ -136,7 +135,6 @@ pub fn calculate_aggr_ct_b(
         })
     }).collect()
 }
-
 
 /// calculate a_i = \sum(alpha_k * a_{ij}) + \sum(beta_k * a_{ij}^{''(k)})
 /// equation 5, in the verifier process, page 18 from the paper.

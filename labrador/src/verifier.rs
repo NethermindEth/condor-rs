@@ -116,7 +116,7 @@ impl<'a> LabradorVerifier<'a> {
         let norm_h_ij = Self::norm_squared(&h_ij);
         let norm_sum = norm_z_ij + norm_t_ij + norm_g_ij + norm_h_ij;
 
-        if norm_sum > ep.beta * ep.beta {
+        if norm_sum > ep.beta_prime * ep.beta_prime {
             return Err(VerifierError::NormSumExceeded {
                 norm: norm_sum,
                 allowed: ep.beta * ep.beta,
@@ -148,7 +148,13 @@ impl<'a> LabradorVerifier<'a> {
 
         // 6. line 17: check \sum(<\phi_i, z>c_i) ?= \sum(h_ij * c_i * c_j)
         let phi_ct_aggr = aggregate::calculate_aggr_ct_phi(&self.st.phi_ct, &pi, &psi, &omega, ep);
-        let phi_i = aggregate::calculate_aggr_phi(&self.st.phi_constraint, &phi_ct_aggr, &vector_alpha, &vector_beta, ep);
+        let phi_i = aggregate::calculate_aggr_phi(
+            &self.st.phi_constraint,
+            &phi_ct_aggr,
+            &vector_alpha,
+            &vector_beta,
+            ep,
+        );
         let sum_phi_z_c = Self::calculate_phi_z_c(&phi_i, &challenges, &proof.z);
         let sum_hij_cij = Self::calculate_gh_ci_cj(&proof.h, &challenges, ep.multiplicity);
 
@@ -163,10 +169,14 @@ impl<'a> LabradorVerifier<'a> {
         // 7. line 18: check \sum(a_ij * g_ij) + \sum(h_ii) - b ?= 0
 
         let a_ct_aggr = aggregate::calculate_aggr_ct_a(&psi, &self.st.a_ct, ep);
-        let a_primes = aggregate::calculate_aggr_a(&self.st.a_constraint, 
-            &a_ct_aggr, &vector_alpha, &vector_beta, ep);
-        
-        
+        let a_primes = aggregate::calculate_aggr_a(
+            &self.st.a_constraint,
+            &a_ct_aggr,
+            &vector_alpha,
+            &vector_beta,
+            ep,
+        );
+
         let b_primes = aggregate::calculate_aggr_b(
             &self.st.b_constraint,
             &proof.b_ct_aggr,

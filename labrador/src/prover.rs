@@ -94,7 +94,6 @@ impl<'a> LabradorProver<'a> {
         // Compute outer commitments u1 and u2
         let mut outer_commitments = OuterCommitment::new(self.pp);
 
-
         // Step 1: Outer commitments u_1 starts: --------------------------------------------
 
         // Ajtai Commitments t_i = A * s_i
@@ -113,14 +112,14 @@ impl<'a> LabradorProver<'a> {
         transcript.set_u1(commitment_u1);
         // Step 1: Outer commitments u_1 ends: ----------------------------------------------
 
-
         // Step 2: JL projection starts: ----------------------------------------------------
         let vector_of_projection_matrices = transcript.generate_vector_of_projection_matrices(
             ep.security_parameter,
             ep.rank,
             ep.multiplicity,
         );
-        let jl_projection_instance = jl::Projection::new(vector_of_projection_matrices, ep.security_parameter);
+        let jl_projection_instance =
+            jl::Projection::new(vector_of_projection_matrices, ep.security_parameter);
         let vector_p = jl_projection_instance.compute_batch_projection(&self.witness.s);
         transcript.set_vector_p(vector_p);
         // Notice that this check is resource-intensive due to the multiplication of two ZqVector<256> instances,
@@ -134,7 +133,6 @@ impl<'a> LabradorProver<'a> {
         .expect("Projection check failed");
         // Step 2: JL projection ends: ------------------------------------------------------
 
-
         // Step 3: Aggregation starts: --------------------------------------------------------------
         let size_of_psi = usize::div_ceil(ep.security_parameter, ep.log_q);
         let size_of_omega = size_of_psi;
@@ -142,15 +140,28 @@ impl<'a> LabradorProver<'a> {
         let vector_omega = transcript.generate_vector_omega(size_of_omega, ep.security_parameter);
         // first aggregation
         let a_ct_aggr = aggregate::calculate_aggr_ct_a(&vector_psi, &self.st.a_ct, ep);
-        let phi_ct_aggr = aggregate::calculate_aggr_ct_phi(&self.st.phi_ct, jl_projection_instance.get_random_linear_map_vector(), &vector_psi, &vector_omega, ep);
-        let b_ct_aggr = aggregate::calculate_aggr_ct_b(&a_ct_aggr, &phi_ct_aggr, &self.witness.s, ep);
+        let phi_ct_aggr = aggregate::calculate_aggr_ct_phi(
+            &self.st.phi_ct,
+            jl_projection_instance.get_random_linear_map_vector(),
+            &vector_psi,
+            &vector_omega,
+            ep,
+        );
+        let b_ct_aggr =
+            aggregate::calculate_aggr_ct_b(&a_ct_aggr, &phi_ct_aggr, &self.witness.s, ep);
         transcript.set_vector_b_ct_aggr(b_ct_aggr);
 
         // second aggregation
         let size_of_beta = size_of_psi;
         let alpha_vector = transcript.generate_rq_vector(ep.constraint_k);
         let beta_vector = transcript.generate_rq_vector(size_of_beta);
-        let phi_i = aggregate::calculate_aggr_phi(&self.st.phi_constraint, &phi_ct_aggr, &alpha_vector, &beta_vector, ep);
+        let phi_i = aggregate::calculate_aggr_phi(
+            &self.st.phi_constraint,
+            &phi_ct_aggr,
+            &alpha_vector,
+            &beta_vector,
+            ep,
+        );
         // Aggregation ends: ----------------------------------------------------------------
 
         // Step 4: Calculate h_ij, u_2, and z starts: ---------------------------------------
