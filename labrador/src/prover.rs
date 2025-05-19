@@ -17,10 +17,6 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum ProverError {
-    /// Indicates that the L2 norm (squared) of the witness exceeded the allowed threshold.
-    #[error("invalid witness size: norm_squared {norm_squared}, allowed {allowed}")]
-    WitnessL2NormViolated { norm_squared: Zq, allowed: Zq },
-    #[error("Invalid Projection of index {index}. Expected {expected}, got {computed}")]
     ProjectionError {
         index: usize,
         expected: Zq,
@@ -38,10 +34,25 @@ pub struct Witness {
 
 impl Witness {
     pub fn new(ep: &EnvironmentParameters) -> Self {
-        let s = (0..ep.multiplicity)
-            .map(|_| RqVector::random_ternary(&mut rng(), ep.rank))
-            .collect();
-        Self { s }
+        loop {
+            let s: Vec<RqVector> = (0..ep.multiplicity)
+                .map(|_| RqVector::random_ternary(&mut rng(), ep.rank))
+                .collect();
+            if Self::validate_l2_norm(&s, ep) {
+                return Self { s };
+            }
+        }
+    }
+
+    fn validate_l2_norm(candidate: &[RqVector], ep: &EnvironmentParameters) -> bool {
+        let beta2 = ep.beta * ep.beta;
+        for polys in candidate {
+            let witness_l2norm_squared = RqVector::compute_norm_squared(polys);
+            if witness_l2norm_squared > beta2 {
+                return false;
+            }
+        }
+        true
     }
 }
 
@@ -56,20 +67,8 @@ impl<'a> LabradorProver<'a> {
         Self { pp, witness, st }
     }
 
-    /// all prove steps are from page 17
-    pub fn prove(
-        &mut self,
-        ep: &EnvironmentParameters,
-    ) -> Result<LabradorTranscript<ShakeSponge>, ProverError> {
-        // generate random challenges used between prover and verifier.
-        let mut transcript = LabradorTranscript::new(ShakeSponge::default());
-        // check the L2 norm of the witness
-        // not sure whether this should be handled during the proving or managed by the witness generator.
-        Self::check_witness_l2norm(self, ep)?;
-        // Step 1: Outer commitments u_1 starts: --------------------------------------------
-
-        // Ajtai Commitments t_i = A * s_i
-        let t_i = RqMatrix::new(
+    fn compute_vector_ti(&self) -> RqMatrix {
+        RqMatrix::new(
             self.witness
                 .s
                 .iter()
@@ -80,13 +79,29 @@ impl<'a> LabradorProver<'a> {
                         .expect("Commitment error in committing to s_i")
                 })
                 .collect(),
-        );
+        )
+    }
 
-        // This replaces the following code
+    /// all prove steps are from page 17
+    pub fn prove(
+        &mut self,
+        ep: &EnvironmentParameters,
+    ) -> Result<LabradorTranscript<ShakeSponge>, ProverError> {
+        // Generate random challenges used between prover and verifier
+        let mut transcript = LabradorTranscript::new(ShakeSponge::default());
+        // Compute garbage polynomials g and h
         let mut garbage_polynomials = GarbagePolynomials::new(&self.witness.s);
+        // Compute outer commitments u1 and u2
+        let mut outer_commitments = OuterCommitment::new(self.pp);
+
+
+        // Step 1: Outer commitments u_1 starts: --------------------------------------------
+
+        // Ajtai Commitments t_i = A * s_i
+        let t_i = self.compute_vector_ti();
+        // g_ij = <s_i, s_j>
         garbage_polynomials.compute_g();
         // calculate outer commitment u_1 = \sum(B_ik * t_i^(k)) + \sum(C_ijk * g_ij^(k))
-        let mut outer_commitments = OuterCommitment::new(self.pp);
         let commitment_u1 = outer_commitments.compute_u1(
             &t_i,
             DecompositionParameters::new(ep.b, ep.t_1)
@@ -98,66 +113,47 @@ impl<'a> LabradorProver<'a> {
         transcript.set_u1(commitment_u1);
         // Step 1: Outer commitments u_1 ends: ----------------------------------------------
 
-        // Step 2: JL projection starts: ----------------------------------------------------
 
-        // JL projection p_j + check p_j = ct(sum(<\sigma_{-1}(pi_i^(j)), s_i>))
+        // Step 2: JL projection starts: ----------------------------------------------------
         let vector_of_projection_matrices = transcript.generate_vector_of_projection_matrices(
             ep.security_parameter,
             ep.rank,
             ep.multiplicity,
         );
-        let jl_projection =
-            jl::Projection::new(vector_of_projection_matrices, ep.security_parameter);
-        let vector_p = jl_projection.compute_batch_projection(&self.witness.s);
+        let jl_projection_instance = jl::Projection::new(vector_of_projection_matrices, ep.security_parameter);
+        let vector_p = jl_projection_instance.compute_batch_projection(&self.witness.s);
         transcript.set_vector_p(vector_p);
-        // Projections::new(pi, &self.witness.s);
-
         // Notice that this check is resource-intensive due to the multiplication of two ZqVector<256> instances,
         // followed by the removal of high-degree terms. It might not be a necessary check.
         // Omid's Note: This can be removed later. However, we need to ensure a correct projection matrix with correct upper-bound.
         Self::check_projection(
             self,
             &transcript.vector_p,
-            jl_projection.get_random_linear_map_vector(),
+            jl_projection_instance.get_random_linear_map_vector(),
         )
         .expect("Projection check failed");
         // Step 2: JL projection ends: ------------------------------------------------------
 
-        // Step 3: Aggregation starts: --------------------------------------------------------------
 
+        // Step 3: Aggregation starts: --------------------------------------------------------------
         let size_of_psi = usize::div_ceil(ep.security_parameter, ep.log_q);
         let size_of_omega = size_of_psi;
         let vector_psi = transcript.generate_vector_psi(size_of_psi, ep.constraint_l);
         let vector_omega = transcript.generate_vector_omega(size_of_omega, ep.security_parameter);
         // first aggregation
-        let (a_ct_aggt, phi_ct_aggr, b_ct_aggr) = aggregate::AggregationOne::new(
-            self.witness,
-            self.st,
-            ep,
-            jl_projection.get_random_linear_map_vector(),
-            &vector_psi,
-            &vector_omega,
-        );
+        let a_ct_aggr = aggregate::calculate_aggr_ct_a(&vector_psi, &self.st.a_ct, ep);
+        let phi_ct_aggr = aggregate::calculate_aggr_ct_phi(&self.st.phi_ct, jl_projection_instance.get_random_linear_map_vector(), &vector_psi, &vector_omega, ep);
+        let b_ct_aggr = aggregate::calculate_aggr_ct_b(&a_ct_aggr, &phi_ct_aggr, &self.witness.s, ep);
         transcript.set_vector_b_ct_aggr(b_ct_aggr);
 
         // second aggregation
         let size_of_beta = size_of_psi;
         let alpha_vector = transcript.generate_rq_vector(ep.constraint_k);
         let beta_vector = transcript.generate_rq_vector(size_of_beta);
-        let aggr_2 = aggregate::AggregationTwo::new(
-            &a_ct_aggt,
-            &phi_ct_aggr,
-            &transcript.b_ct_aggr,
-            self.st,
-            ep,
-            &alpha_vector,
-            &beta_vector,
-        );
+        let phi_i = aggregate::calculate_aggr_phi(&self.st.phi_constraint, &phi_ct_aggr, &alpha_vector, &beta_vector, ep);
         // Aggregation ends: ----------------------------------------------------------------
 
         // Step 4: Calculate h_ij, u_2, and z starts: ---------------------------------------
-
-        let phi_i = aggr_2.phi_i;
         garbage_polynomials.compute_h(&phi_i);
         let commitment_u2 = outer_commitments.compute_u2(
             &garbage_polynomials.h,
@@ -176,7 +172,9 @@ impl<'a> LabradorProver<'a> {
         Ok(transcript)
     }
 
-    /// check p_j? = ct(sum(<σ−1(pi_i^(j)), s_i>))
+    // The following is not part of the prover.
+    // Todo: Add jl projection constraints to the statement.
+    // /// check p_j? = ct(sum(<σ−1(pi_i^(j)), s_i>))
     fn check_projection(&self, p: &[Zq], pi: &[Vec<Vec<Zq>>]) -> Result<bool, ProverError> {
         let s_coeffs: Vec<Vec<Zq>> = self
             .witness
@@ -207,21 +205,6 @@ impl<'a> LabradorProver<'a> {
         }
 
         Ok(true)
-    }
-
-    /// check the L2 norm of the witness, || s_i || <= beta
-    fn check_witness_l2norm(&self, ep: &EnvironmentParameters) -> Result<(), ProverError> {
-        let beta2 = ep.beta * ep.beta;
-        for polys in &self.witness.s {
-            let witness_l2norm_squared = RqVector::compute_norm_squared(polys);
-            if witness_l2norm_squared > beta2 {
-                return Err(ProverError::WitnessL2NormViolated {
-                    norm_squared: witness_l2norm_squared,
-                    allowed: beta2,
-                });
-            }
-        }
-        Ok(())
     }
 }
 

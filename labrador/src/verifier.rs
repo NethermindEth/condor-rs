@@ -147,20 +147,8 @@ impl<'a> LabradorVerifier<'a> {
         }
 
         // 6. line 17: check \sum(<\phi_i, z>c_i) ?= \sum(h_ij * c_i * c_j)
-        let phi_ct_aggr = aggregate::AggregationOne::get_phi_ct_aggr(
-            &self.st.phi_ct,
-            projections.get_projection_matrices(),
-            &psi,
-            &omega,
-            ep,
-        );
-        let phi_i = aggregate::AggregationTwo::get_phi_i(
-            &self.st.phi_constraint,
-            &phi_ct_aggr,
-            &vector_alpha,
-            &vector_beta,
-            ep,
-        );
+        let phi_ct_aggr = aggregate::calculate_aggr_ct_phi(&self.st.phi_ct, &pi, &psi, &omega, ep);
+        let phi_i = aggregate::calculate_aggr_phi(&self.st.phi_constraint, &phi_ct_aggr, &vector_alpha, &vector_beta, ep);
         let sum_phi_z_c = Self::calculate_phi_z_c(&phi_i, &challenges, &proof.z);
         let sum_hij_cij = Self::calculate_gh_ci_cj(&proof.h, &challenges, ep.multiplicity);
 
@@ -174,15 +162,12 @@ impl<'a> LabradorVerifier<'a> {
 
         // 7. line 18: check \sum(a_ij * g_ij) + \sum(h_ii) - b ?= 0
 
-        let a_ct_aggr = aggregate::AggregationOne::get_a_ct_aggr(&psi, &self.st.a_ct, ep);
-        let a_primes = aggregate::AggregationTwo::get_a_i(
-            &self.st.a_constraint,
-            &a_ct_aggr,
-            &vector_alpha,
-            &vector_beta,
-            ep,
-        );
-        let b_primes = aggregate::AggregationTwo::get_b_i(
+        let a_ct_aggr = aggregate::calculate_aggr_ct_a(&psi, &self.st.a_ct, ep);
+        let a_primes = aggregate::calculate_aggr_a(&self.st.a_constraint, 
+            &a_ct_aggr, &vector_alpha, &vector_beta, ep);
+        
+        
+        let b_primes = aggregate::calculate_aggr_b(
             &self.st.b_constraint,
             &proof.b_ct_aggr,
             &vector_alpha,

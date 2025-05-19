@@ -1,167 +1,7 @@
-use crate::core::{env_params::EnvironmentParameters, statement::Statement};
-use crate::prover::Witness;
+use crate::core::env_params::EnvironmentParameters;
 use crate::ring::rq::Rq;
 use crate::ring::rq_vector::RqVector;
 use crate::ring::zq::Zq;
-
-/// First step of aggregation
-pub struct AggregationOne {
-    // a_{ij}^{''(k)}
-    pub a_ct_aggr: Vec<Vec<RqVector>>,
-    // \phi_{i}^{''(k)}
-    pub phi_ct_aggr: Vec<Vec<RqVector>>,
-    // b^{''(k)}
-    pub b_ct_aggr: RqVector,
-}
-
-impl AggregationOne {
-    pub fn new(
-        witness: &Witness,
-        st: &Statement,
-        ep: &EnvironmentParameters,
-        pi: &[Vec<Vec<Zq>>],
-        psi: &[Vec<Zq>],
-        omega: &[Vec<Zq>],
-    ) -> (Vec<Vec<RqVector>>, Vec<Vec<RqVector>>, RqVector) {
-        Self::aggregate(witness, st, ep, pi, psi, omega)
-    }
-
-    fn aggregate(
-        witness: &Witness,
-        st: &Statement,
-        ep: &EnvironmentParameters,
-        pi: &[Vec<Vec<Zq>>],
-        psi: &[Vec<Zq>],
-        omega: &[Vec<Zq>],
-    ) -> (Vec<Vec<RqVector>>, Vec<Vec<RqVector>>, RqVector) {
-        // calculate a_{ij}^{''(k)}
-        let a_ct_aggr: Vec<Vec<RqVector>> = Self::get_a_ct_aggr(psi, &st.a_ct, ep);
-
-        // calculate \phi_{i}^{''(k)}
-        let phi_ct_aggr: Vec<Vec<RqVector>> = Self::get_phi_ct_aggr(&st.phi_ct, pi, psi, omega, ep);
-
-        // calculate b^{''(k)}
-        let b_ct_aggr: RqVector = Self::get_b_ct_aggr(&a_ct_aggr, &phi_ct_aggr, witness, ep);
-
-        (a_ct_aggr, phi_ct_aggr, b_ct_aggr)
-    }
-
-    pub fn get_a_ct_aggr(
-        psi: &[Vec<Zq>],
-        a_ct: &[Vec<RqVector>],
-        ep: &EnvironmentParameters,
-    ) -> Vec<Vec<RqVector>> {
-        calculate_aggr_ct_a(psi, a_ct, ep)
-    }
-
-    pub fn get_phi_ct_aggr(
-        phi_ct: &[Vec<RqVector>],
-        pi: &[Vec<Vec<Zq>>],
-        psi: &[Vec<Zq>],
-        omega: &[Vec<Zq>],
-        ep: &EnvironmentParameters,
-    ) -> Vec<Vec<RqVector>> {
-        calculate_aggr_ct_phi(phi_ct, pi, psi, omega, ep)
-    }
-
-    pub fn get_b_ct_aggr(
-        a_ct_aggr: &[Vec<RqVector>],
-        phi_ct_aggr: &[Vec<RqVector>],
-        witness: &Witness,
-        ep: &EnvironmentParameters,
-    ) -> RqVector {
-        calculate_aggr_ct_b(a_ct_aggr, phi_ct_aggr, &witness.s, ep)
-    }
-}
-
-/// Second step of aggregation
-pub struct AggregationTwo {
-    // a_{ij}
-    pub a_i: Vec<RqVector>,
-    // \phi_{i}
-    pub phi_i: Vec<RqVector>,
-    // b
-    pub b_i: Rq,
-}
-
-impl AggregationTwo {
-    pub fn new(
-        a_ct_aggr: &[Vec<RqVector>],
-        phi_ct_aggr: &[Vec<RqVector>],
-        b_ct_aggr: &RqVector,
-        st: &Statement,
-        ep: &EnvironmentParameters,
-        alpha_vector: &RqVector,
-        beta_vector: &RqVector,
-    ) -> Self {
-        Self::aggregate(
-            a_ct_aggr,
-            phi_ct_aggr,
-            b_ct_aggr,
-            st,
-            ep,
-            alpha_vector,
-            beta_vector,
-        )
-    }
-
-    fn aggregate(
-        a_ct_aggr: &[Vec<RqVector>],
-        phi_ct_aggr: &[Vec<RqVector>],
-        b_ct_aggr: &RqVector,
-        st: &Statement,
-        ep: &EnvironmentParameters,
-        alpha_vector: &RqVector,
-        beta_vector: &RqVector,
-    ) -> Self {
-        // calculate a_i
-        let a_i = Self::get_a_i(&st.a_constraint, a_ct_aggr, alpha_vector, beta_vector, ep);
-
-        // calculate phi_i
-        let phi_i = Self::get_phi_i(
-            &st.phi_constraint,
-            phi_ct_aggr,
-            alpha_vector,
-            beta_vector,
-            ep,
-        );
-
-        // calculate b_i
-        let b_i = Self::get_b_i(&st.b_constraint, b_ct_aggr, alpha_vector, beta_vector, ep);
-
-        Self { a_i, phi_i, b_i }
-    }
-
-    pub fn get_a_i(
-        a_constraint: &[Vec<RqVector>],
-        a_ct_aggr: &[Vec<RqVector>],
-        random_alpha: &RqVector,
-        random_beta: &RqVector,
-        ep: &EnvironmentParameters,
-    ) -> Vec<RqVector> {
-        calculate_aggr_a(a_constraint, a_ct_aggr, random_alpha, random_beta, ep)
-    }
-
-    pub fn get_phi_i(
-        phi_constraint: &[Vec<RqVector>],
-        phi_ct_aggr: &[Vec<RqVector>],
-        random_alpha: &RqVector,
-        random_beta: &RqVector,
-        ep: &EnvironmentParameters,
-    ) -> Vec<RqVector> {
-        calculate_aggr_phi(phi_constraint, phi_ct_aggr, random_alpha, random_beta, ep)
-    }
-
-    pub fn get_b_i(
-        b_constraint: &RqVector,
-        b_ct_aggr: &RqVector,
-        random_alpha: &RqVector,
-        random_beta: &RqVector,
-        ep: &EnvironmentParameters,
-    ) -> Rq {
-        calculate_aggr_b(b_constraint, b_ct_aggr, random_alpha, random_beta, ep)
-    }
-}
 
 /// Calculate aprimes from aprime_l, a_{i,j}^{''k} = \sum_{l=1}^{L}\psi_l^{k}a_{ij}^{'(l)}
 ///
@@ -171,7 +11,7 @@ impl AggregationTwo {
 ///
 /// @return: a_{ij}^{'(k)}, return a vector length k of matrix a_{ij}
 #[rustfmt::skip]
-fn calculate_aggr_ct_a(
+pub fn calculate_aggr_ct_a(
     random_psi: &[Vec<Zq>],
     a_ct: &[Vec<RqVector>],
     ep: &EnvironmentParameters,
@@ -197,6 +37,7 @@ fn calculate_aggr_ct_a(
     aprimes
 }
 
+
 /// calculate \phi_{i}^{''(k)} = \sum_{l=1}^{L}\psi_l^{k}\phi_{i}^{'(l)} + \sum(\omega_j^{k} * \sigma_{-1} * pi_i^{j})
 /// in the prover process, page 17 from the paper.
 ///
@@ -208,7 +49,7 @@ fn calculate_aggr_ct_a(
 /// @param: security_level2: 256 in the paper
 ///
 /// return: \phi_{i}^{''(k)}
-fn calculate_aggr_ct_phi(
+pub fn calculate_aggr_ct_phi(
     phi_ct: &[Vec<RqVector>],
     pi: &[Vec<Vec<Zq>>],
     random_psi: &[Vec<Zq>],
@@ -269,7 +110,7 @@ fn calculate_aggr_ct_phi(
 ///
 /// @return: b^{''(k)}
 #[rustfmt::skip]
-fn calculate_aggr_ct_b(
+pub fn calculate_aggr_ct_b(
     a_ct_aggr: &[Vec<RqVector>],
     phi_ct_aggr: &[Vec<RqVector>],
     witness: &[RqVector],
@@ -296,6 +137,7 @@ fn calculate_aggr_ct_b(
     }).collect()
 }
 
+
 /// calculate a_i = \sum(alpha_k * a_{ij}) + \sum(beta_k * a_{ij}^{''(k)})
 /// equation 5, in the verifier process, page 18 from the paper.
 ///
@@ -306,7 +148,7 @@ fn calculate_aggr_ct_b(
 /// @param: ep: struct SizeParams
 ///
 /// @return: a_i
-fn calculate_aggr_a(
+pub fn calculate_aggr_a(
     a_constraint: &[Vec<RqVector>],
     a_ct_aggr: &[Vec<RqVector>],
     random_alpha: &RqVector,
@@ -350,7 +192,7 @@ fn calculate_aggr_a(
 /// param: ep: struct SizeParams
 ///
 /// return: phi_i
-fn calculate_aggr_phi(
+pub fn calculate_aggr_phi(
     phi_constraint: &[Vec<RqVector>],
     phi_ct_aggr: &[Vec<RqVector>],
     random_alpha: &RqVector,
@@ -400,7 +242,7 @@ fn calculate_aggr_phi(
 /// @param: ep: struct SizeParams
 ///
 /// @return: b_i
-fn calculate_aggr_b(
+pub fn calculate_aggr_b(
     b_constraint: &RqVector,
     b_ct_aggr: &RqVector,
     random_alpha: &RqVector,
