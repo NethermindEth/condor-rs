@@ -1,7 +1,9 @@
 #![allow(clippy::result_large_err)]
 
+use thiserror::Error;
+
 use crate::commitments::common_instances::AjtaiInstances;
-use crate::commitments::outer_commitments::{DecompositionParameters, OuterCommitment};
+use crate::commitments::outer_commitments::{self, DecompositionParameters, OuterCommitment};
 use crate::core::{aggregate, env_params::EnvironmentParameters, statement::Statement};
 use crate::prover::Proof;
 use crate::ring::rq::Rq;
@@ -10,40 +12,41 @@ use crate::ring::rq_vector::RqVector;
 use crate::ring::zq::{Zq, ZqVector};
 use crate::transcript::{LabradorTranscript, Sponge};
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum VerifierError {
+    #[error("matrix not symmetric at ({i},{j}): expected {expected:?}, found {found:?}")]
     NotSymmetric {
         i: usize,
         j: usize,
         expected: Rq,
         found: Rq,
     },
+    #[error("B0 mismatch at index {index}: expected {expected}, computed {computed}")]
     B0Mismatch {
         index: usize,
         expected: Zq,
         computed: Zq,
     },
-    NormSumExceeded {
-        norm: Zq,
-        allowed: Zq,
-    },
+    #[error("‖z‖² = {norm} exceeds allowed bound {allowed}")]
+    NormSumExceeded { norm: Zq, allowed: Zq },
+    #[error("A·z check failed: expected {expected:?}, computed {computed:?}")]
     AzError {
         computed: RqVector,
         expected: RqVector,
     },
-    ZInnerError {
-        computed: Rq,
-        expected: Rq,
-    },
-    PhiError {
-        computed: Rq,
-        expected: Rq,
-    },
+    #[error("⟨z,z⟩ mismatch: expected {expected:?}, computed {computed:?}")]
+    ZInnerError { computed: Rq, expected: Rq },
+    #[error("φ(z) mismatch: expected {expected:?}, computed {computed:?}")]
+    PhiError { computed: Rq, expected: Rq },
+    #[error("relation check failed")]
     RelationCheckFailed,
+    #[error("outer commitment mismatch: expected {expected:?}, computed {computed:?}")]
     OuterCommitError {
         computed: RqVector,
         expected: RqVector,
     },
+    #[error(transparent)]
+    DecompositionError(#[from] outer_commitments::DecompositionError),
 }
 pub struct LabradorVerifier<'a, S: Sponge> {
     pub pp: &'a AjtaiInstances,
@@ -84,7 +87,7 @@ impl<'a, S: Sponge> LabradorVerifier<'a, S> {
         let challenges = self.transcript.generate_challenges(ep.operator_norm);
 
         // check b_0^{''(k)} ?= <omega^(k),p> + \sum(psi_l^(k) * b_0^{'(l)})
-        Self::check_b_0_aggr(self, proof, ep, &psi, &omega).expect("b_0^{''(k)} equation failed");
+        Self::check_b_0_aggr(self, proof, ep, &psi, &omega)?;
 
         // 3. line 14: check norm_sum(z, t, g, h) <= (beta')^2
 
@@ -204,11 +207,9 @@ impl<'a, S: Sponge> LabradorVerifier<'a, S> {
         let mut outer_commitments = OuterCommitment::new(self.pp);
         outer_commitments.compute_u1(
             RqMatrix::new(proof.t_i.clone()),
-            DecompositionParameters::new(ep.b, ep.t_1)
-                .expect("Decomposition error in decomposing t"),
+            DecompositionParameters::new(ep.b, ep.t_1)?,
             proof.g_ij.clone(),
-            DecompositionParameters::new(ep.b, ep.t_2)
-                .expect("Decomposition error in decomposing g"),
+            DecompositionParameters::new(ep.b, ep.t_2)?,
         );
 
         if proof.u_1 != outer_commitments.u_1 {
@@ -221,8 +222,7 @@ impl<'a, S: Sponge> LabradorVerifier<'a, S> {
         // 9. line 20: u_2 ?= \sum(\sum(D_ijk * h_ij^(k)))
         outer_commitments.compute_u2(
             proof.h_ij.clone(),
-            DecompositionParameters::new(ep.b, ep.t_1)
-                .expect("Decomposition error in decomposing h"),
+            DecompositionParameters::new(ep.b, ep.t_1)?,
         );
 
         if proof.u_2 != outer_commitments.u_2 {

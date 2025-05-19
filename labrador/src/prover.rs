@@ -1,4 +1,6 @@
+use crate::commitments::ajtai_commitment;
 use crate::commitments::common_instances::AjtaiInstances;
+use crate::commitments::outer_commitments;
 use crate::commitments::outer_commitments::DecompositionParameters;
 use crate::commitments::outer_commitments::OuterCommitment;
 use crate::core::garbage_polynomials::GarbagePolynomials;
@@ -11,16 +13,23 @@ use crate::{
     ring::rq_vector::RqVector,
 };
 use rand::rng;
+use thiserror::Error;
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum ProverError {
     /// Indicates that the L2 norm (squared) of the witness exceeded the allowed threshold.
+    #[error("invalid witness size: norm_squared {norm_squared}, allowed {allowed}")]
     WitnessL2NormViolated { norm_squared: Zq, allowed: Zq },
+    #[error("Invalid Projection of index {index}. Expected {expected}, got {computed}")]
     ProjectionError {
         index: usize,
         expected: Zq,
         computed: Zq,
     },
+    #[error("commitment failure")]
+    CommitmentError(#[from] ajtai_commitment::CommitError),
+    #[error("decomposition failure")]
+    DecompositionError(#[from] outer_commitments::DecompositionError),
 }
 
 // Proof contains the parameters will be sent to verifier
@@ -74,7 +83,7 @@ impl<'a, S: Sponge> LabradorProver<'a, S> {
     pub fn prove(&mut self, ep: &EnvironmentParameters) -> Result<Proof, ProverError> {
         // check the L2 norm of the witness
         // not sure whether this should be handled during the proving or managed by the witness generator.
-        Self::check_witness_l2norm(self, ep).expect("Witness l2 norm exceed the bound");
+        Self::check_witness_l2norm(self, ep)?;
         // Step 1: Outer commitments u_1 starts: --------------------------------------------
 
         // Ajtai Commitments t_i = A * s_i
@@ -82,13 +91,8 @@ impl<'a, S: Sponge> LabradorProver<'a, S> {
             .witness
             .s
             .iter()
-            .map(|s_i| {
-                self.pp
-                    .commitment_scheme_a
-                    .commit(s_i)
-                    .expect("Commitment error in committing to s_i")
-            })
-            .collect();
+            .map(|s_i| self.pp.commitment_scheme_a.commit(s_i))
+            .collect::<Result<_, _>>()?;
 
         // This replaces the following code
         let mut garbage_polynomials = GarbagePolynomials::new(self.witness.s.clone());
@@ -97,11 +101,9 @@ impl<'a, S: Sponge> LabradorProver<'a, S> {
         let mut outer_commitments = OuterCommitment::new(self.pp);
         outer_commitments.compute_u1(
             RqMatrix::new(t_i.clone()),
-            DecompositionParameters::new(ep.b, ep.t_1)
-                .expect("Decomposition error in decomposing t"),
+            DecompositionParameters::new(ep.b, ep.t_1)?,
             garbage_polynomials.g.clone(),
-            DecompositionParameters::new(ep.b, ep.t_2)
-                .expect("Decomposition error in decomposing g"),
+            DecompositionParameters::new(ep.b, ep.t_2)?,
         );
         self.transcript.absorb_u1(outer_commitments.u_1.clone());
         // Step 1: Outer commitments u_1 ends: ----------------------------------------------
@@ -121,8 +123,7 @@ impl<'a, S: Sponge> LabradorProver<'a, S> {
             self,
             &self.transcript.vector_p,
             projections.get_projection_matrices(),
-        )
-        .expect("Projection check failed");
+        )?;
         // Step 2: JL projection ends: ------------------------------------------------------
 
         // Step 3: Aggregation starts: --------------------------------------------------------------
@@ -159,8 +160,7 @@ impl<'a, S: Sponge> LabradorProver<'a, S> {
         garbage_polynomials.compute_h(&phi_i);
         outer_commitments.compute_u2(
             garbage_polynomials.h.clone(),
-            DecompositionParameters::new(ep.b, ep.t_1)
-                .expect("Decomposition error in decomposing h"),
+            DecompositionParameters::new(ep.b, ep.t_1)?,
         );
         self.transcript.absorb_u2(outer_commitments.u_2);
 
@@ -216,7 +216,7 @@ impl<'a, S: Sponge> LabradorProver<'a, S> {
     }
 
     /// check the L2 norm of the witness, || s_i || <= beta
-    fn check_witness_l2norm(&self, ep: &EnvironmentParameters) -> Result<bool, ProverError> {
+    fn check_witness_l2norm(&self, ep: &EnvironmentParameters) -> Result<(), ProverError> {
         let beta2 = ep.beta * ep.beta;
         for polys in &self.witness.s {
             let witness_l2norm_squared = RqVector::compute_norm_squared(polys);
@@ -227,7 +227,7 @@ impl<'a, S: Sponge> LabradorProver<'a, S> {
                 });
             }
         }
-        Ok(true)
+        Ok(())
     }
 }
 
