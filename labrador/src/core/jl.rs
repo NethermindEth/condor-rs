@@ -41,6 +41,10 @@ impl Projection {
         result
     }
 
+    pub fn get_projection_matrices(&self) -> &[Vec<Vec<Zq>>] {
+        &self.random_linear_map_vector
+    }
+
     fn norm_squared(projection: &[Zq]) -> Zq {
         projection.iter().map(|coeff| *coeff * *coeff).sum()
     }
@@ -81,11 +85,10 @@ mod tests {
             );
             // This gives randomness to the transcript, to generate random projection matrices.
             transcript.absorb_u1(RqVector::random(&mut rng(), 1));
-            let projection_matrix = transcript.generate_vector_of_projection_matrices();
-            let projection = Projection::new(projection_matrix, security_parameter);
+            let projections = transcript.generate_projections();
 
             let witness = RqVector::random(&mut rand::rng(), rank);
-            let result = projection.compute_projection(0, &witness);
+            let result = projections.compute_projection(0, &witness);
 
             let beta = witness.compute_norm_squared();
             // Check if the norm of the projection is smaller than 128 * (squared norm of the projection of the random polynomial)
@@ -129,9 +132,8 @@ mod tests {
             );
             // This gives randomness to the transcript, to generate random projection matrices.
             transcript.absorb_u1(RqVector::random(&mut rng(), 1));
-            let projection_matrix = transcript.generate_vector_of_projection_matrices();
-            let result = Projection::new(projection_matrix, security_parameter)
-                .compute_projection(0, &witness);
+            let projections = transcript.generate_projections();
+            let result = projections.compute_projection(0, &witness);
             norm_sum += Projection::norm_squared(&result);
         }
 
@@ -165,13 +167,14 @@ mod tests {
             multiplicity,
         );
         transcript.absorb_u1(RqVector::random(&mut rng(), 1));
-        let projection_matrix = transcript.generate_vector_of_projection_matrices();
+        let projections = transcript.generate_projections();
         let witness = RqVector::random_ternary(&mut rng(), rank);
 
-        let projection =
-            Projection::new(projection_matrix, security_parameter).compute_projection(0, &witness);
         let beta = witness.compute_norm_squared();
         // Check if the norm of the projection is bigger than 30 * (squared norm of the projection of the random polynomial)
-        assert!(Projection::verify_projection_lower_bound(&projection, beta));
+        assert!(Projection::verify_projection_lower_bound(
+            &projections.compute_projection(0, &witness),
+            beta
+        ));
     }
 }

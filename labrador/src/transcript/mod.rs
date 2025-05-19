@@ -1,6 +1,9 @@
 pub mod sponges;
 
-use crate::ring::{rq::Rq, rq_vector::RqVector, zq::Zq};
+use crate::{
+    core::jl::Projection,
+    ring::{rq::Rq, rq_vector::RqVector, zq::Zq},
+};
 pub use sponges::Sponge;
 
 pub struct LabradorTranscript<S: Sponge> {
@@ -48,12 +51,12 @@ impl<S: Sponge> LabradorTranscript<S> {
         self.u2 = u2;
     }
 
-    pub fn generate_vector_of_projection_matrices(&mut self) -> Vec<Vec<Vec<Zq>>> {
+    pub fn generate_projections(&mut self) -> Projection {
         // r vectors, each of length 256 * nD
         let row_size = 2 * self.security_parameter;
         let col_size = self.rank * Rq::DEGREE;
 
-        (0..self.multiplicity)
+        let matrices = (0..self.multiplicity)
             .map(|_| {
                 let linear_projection_randomness = self.sponge.squeeze_zq(row_size * col_size);
                 linear_projection_randomness
@@ -74,7 +77,8 @@ impl<S: Sponge> LabradorTranscript<S> {
                     })
                     .collect()
             })
-            .collect()
+            .collect();
+        Projection::new(matrices, self.security_parameter)
     }
 
     pub fn generate_vector_psi(
@@ -154,10 +158,16 @@ mod tests_generate_pi {
             rank,
             multiplicity,
         );
-        let result = transcript.generate_vector_of_projection_matrices();
-        assert_eq!(result.len(), multiplicity); // number_of_project_matrices
-        assert_eq!(result[0].len(), 2 * security_parameter);
-        assert_eq!(result[0][0].len(), rank * Rq::DEGREE);
+        let projections = transcript.generate_projections();
+        assert_eq!(projections.get_projection_matrices().len(), multiplicity); // number_of_project_matrices
+        assert_eq!(
+            projections.get_projection_matrices()[0].len(),
+            2 * security_parameter
+        );
+        assert_eq!(
+            projections.get_projection_matrices()[0][0].len(),
+            rank * Rq::DEGREE
+        );
     }
 
     // Test the distribution of values in the random matrix
@@ -171,13 +181,13 @@ mod tests_generate_pi {
             rank,
             multiplicity,
         );
-        let projection_matrix_vector = transcript.generate_vector_of_projection_matrices();
+        let projections = transcript.generate_projections();
 
-        for projection_matrix in projection_matrix_vector {
+        for projection_matrix in projections.get_projection_matrices() {
             let mut counts = [0.0, 0.0, 0.0]; // -1, 0, 1
             for row in projection_matrix {
                 for cell in row {
-                    match cell {
+                    match *cell {
                         Zq::ZERO => counts[1] += 1.0,
                         Zq::ONE => counts[2] += 1.0,
                         Zq::MAX => counts[0] += 1.0,

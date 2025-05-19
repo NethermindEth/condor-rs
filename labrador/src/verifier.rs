@@ -67,7 +67,7 @@ impl<'a, S: Sponge> LabradorVerifier<'a, S> {
         ep: &EnvironmentParameters,
     ) -> Result<bool, VerifierError> {
         self.transcript.absorb_u1(proof.u_1.clone());
-        let pi = self.transcript.generate_vector_of_projection_matrices();
+        let projections = self.transcript.generate_projections();
         self.transcript.absorb_vector_p(proof.p.clone());
         let size_of_psi = usize::div_ceil(ep.lambda, ep.log_q);
         let size_of_omega = size_of_psi;
@@ -146,8 +146,13 @@ impl<'a, S: Sponge> LabradorVerifier<'a, S> {
         }
 
         // 6. line 17: check \sum(<\phi_i, z>c_i) ?= \sum(h_ij * c_i * c_j)
-        let phi_ct_aggr =
-            aggregate::AggregationOne::get_phi_ct_aggr(&self.st.phi_ct, &pi, &psi, &omega, ep);
+        let phi_ct_aggr = aggregate::AggregationOne::get_phi_ct_aggr(
+            &self.st.phi_ct,
+            projections.get_projection_matrices(),
+            &psi,
+            &omega,
+            ep,
+        );
         let phi_i = aggregate::AggregationTwo::get_phi_i(
             &self.st.phi_constraint,
             &phi_ct_aggr,

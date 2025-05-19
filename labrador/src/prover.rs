@@ -2,7 +2,6 @@ use crate::commitments::common_instances::AjtaiInstances;
 use crate::commitments::outer_commitments::DecompositionParameters;
 use crate::commitments::outer_commitments::OuterCommitment;
 use crate::core::garbage_polynomials::GarbagePolynomials;
-use crate::core::jl;
 use crate::ring::rq_matrix::RqMatrix;
 use crate::ring::zq::Zq;
 use crate::ring::zq::ZqVector;
@@ -110,10 +109,8 @@ impl<'a, S: Sponge> LabradorProver<'a, S> {
         // Step 2: JL projection starts: ----------------------------------------------------
 
         // JL projection p_j + check p_j = ct(sum(<\sigma_{-1}(pi_i^(j)), s_i>))
-        let vector_of_projection_matrices =
-            self.transcript.generate_vector_of_projection_matrices();
-        let vector_p = jl::Projection::new(vector_of_projection_matrices.clone(), ep.lambda)
-            .compute_batch_projection(&self.witness.s);
+        let projections = self.transcript.generate_projections();
+        let vector_p = projections.compute_batch_projection(&self.witness.s);
         self.transcript.absorb_vector_p(vector_p);
         // Projections::new(pi, &self.witness.s);
 
@@ -123,7 +120,7 @@ impl<'a, S: Sponge> LabradorProver<'a, S> {
         Self::check_projection(
             self,
             &self.transcript.vector_p,
-            vector_of_projection_matrices.clone(),
+            projections.get_projection_matrices(),
         )
         .expect("Projection check failed");
         // Step 2: JL projection ends: ------------------------------------------------------
@@ -141,7 +138,7 @@ impl<'a, S: Sponge> LabradorProver<'a, S> {
             self.witness,
             self.st,
             ep,
-            &vector_of_projection_matrices,
+            projections.get_projection_matrices(),
             &vector_psi,
             &vector_omega,
         );
@@ -186,7 +183,7 @@ impl<'a, S: Sponge> LabradorProver<'a, S> {
     }
 
     /// check p_j? = ct(sum(<σ−1(pi_i^(j)), s_i>))
-    fn check_projection(&self, p: &[Zq], pi: Vec<Vec<Vec<Zq>>>) -> Result<bool, ProverError> {
+    fn check_projection(&self, p: &[Zq], pi: &[Vec<Vec<Zq>>]) -> Result<bool, ProverError> {
         let s_coeffs: Vec<Vec<Zq>> = self
             .witness
             .s
