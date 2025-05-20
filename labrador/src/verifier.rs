@@ -1,64 +1,93 @@
 #![allow(clippy::result_large_err)]
 
+use thiserror::Error;
+
 use crate::commitments::common_instances::AjtaiInstances;
-use crate::commitments::outer_commitments::{DecompositionParameters, OuterCommitment};
+use crate::commitments::outer_commitments::{self, DecompositionParameters, OuterCommitment};
 use crate::core::{aggregate, env_params::EnvironmentParameters, statement::Statement};
-use crate::prover::{Challenges, Proof};
+use crate::prover::Proof;
 use crate::ring::rq::Rq;
 use crate::ring::rq_matrix::RqMatrix;
 use crate::ring::rq_vector::RqVector;
 use crate::ring::zq::{Zq, ZqVector};
+use crate::transcript::{LabradorTranscript, Sponge};
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum VerifierError {
+    #[error("matrix not symmetric at ({i},{j}): expected {expected:?}, found {found:?}")]
     NotSymmetric {
         i: usize,
         j: usize,
         expected: Rq,
         found: Rq,
     },
+    #[error("B0 mismatch at index {index}: expected {expected}, computed {computed}")]
     B0Mismatch {
         index: usize,
         expected: Zq,
         computed: Zq,
     },
-    NormSumExceeded {
-        norm: Zq,
-        allowed: Zq,
-    },
+    #[error("‖z‖² = {norm} exceeds allowed bound {allowed}")]
+    NormSumExceeded { norm: Zq, allowed: Zq },
+    #[error("A·z check failed: expected {expected:?}, computed {computed:?}")]
     AzError {
         computed: RqVector,
         expected: RqVector,
     },
-    ZInnerError {
-        computed: Rq,
-        expected: Rq,
-    },
-    PhiError {
-        computed: Rq,
-        expected: Rq,
-    },
+    #[error("⟨z,z⟩ mismatch: expected {expected:?}, computed {computed:?}")]
+    ZInnerError { computed: Rq, expected: Rq },
+    #[error("φ(z) mismatch: expected {expected:?}, computed {computed:?}")]
+    PhiError { computed: Rq, expected: Rq },
+    #[error("relation check failed")]
     RelationCheckFailed,
+    #[error("outer commitment mismatch: expected {expected:?}, computed {computed:?}")]
     OuterCommitError {
         computed: RqVector,
         expected: RqVector,
     },
+    #[error(transparent)]
+    DecompositionError(#[from] outer_commitments::DecompositionError),
 }
-pub struct LabradorVerifier<'a> {
+pub struct LabradorVerifier<'a, S: Sponge> {
     pub pp: &'a AjtaiInstances,
     pub st: &'a Statement,
-    pub tr: &'a Challenges,
+    pub transcript: LabradorTranscript<S>,
 }
 
-impl<'a> LabradorVerifier<'a> {
-    pub fn new(pp: &'a AjtaiInstances, st: &'a Statement, tr: &'a Challenges) -> Self {
-        Self { pp, st, tr }
+impl<'a, S: Sponge> LabradorVerifier<'a, S> {
+    pub fn new(
+        pp: &'a AjtaiInstances,
+        st: &'a Statement,
+        transcript: LabradorTranscript<S>,
+    ) -> Self {
+        Self { pp, st, transcript }
     }
 
     /// All check conditions are from page 18
-    pub fn verify(&self, proof: &Proof, ep: &EnvironmentParameters) -> Result<bool, VerifierError> {
+    pub fn verify(
+        &mut self,
+        proof: &Proof,
+        ep: &EnvironmentParameters,
+    ) -> Result<bool, VerifierError> {
+        self.transcript.absorb_u1(proof.u_1.clone());
+        let projections = self.transcript.generate_projections();
+        self.transcript.absorb_vector_p(proof.p.clone());
+        let size_of_psi = usize::div_ceil(ep.lambda, ep.log_q);
+        let size_of_omega = size_of_psi;
+        let psi = self
+            .transcript
+            .generate_vector_psi(size_of_psi, ep.constraint_l);
+        let omega = self.transcript.generate_vector_omega(size_of_omega);
+        self.transcript
+            .absorb_vector_b_ct_aggr(proof.b_ct_aggr.clone());
+        let vector_alpha = self.transcript.generate_rq_vector(ep.constraint_k);
+        let size_of_beta = size_of_psi;
+        let vector_beta = self.transcript.generate_rq_vector(size_of_beta);
+        self.transcript.absorb_u2(proof.u_2.clone());
+        let challenges = self.transcript.generate_challenges(ep.operator_norm);
+
         // check b_0^{''(k)} ?= <omega^(k),p> + \sum(psi_l^(k) * b_0^{'(l)})
-        Self::check_b_0_aggr(self, proof, ep).unwrap();
+        Self::check_b_0_aggr(self, proof, ep, &psi, &omega)?;
 
         // 3. line 14: check norm_sum(z, t, g, h) <= (beta')^2
 
@@ -99,8 +128,7 @@ impl<'a> LabradorVerifier<'a> {
         // 4. line 15: check Az ?= c_1 * t_1 + ... + c_r * t_r
 
         let az = self.pp.commitment_scheme_a.matrix() * &proof.z;
-        let ct_sum = aggregate::calculate_z(&proof.t_i, &self.tr.random_c);
-
+        let ct_sum = aggregate::calculate_z(&proof.t_i, &challenges);
         if az != ct_sum {
             return Err(VerifierError::AzError {
                 computed: az,
@@ -111,7 +139,7 @@ impl<'a> LabradorVerifier<'a> {
         // 5. lne 16: check <z, z> ?= \sum(g_ij * c_i * c_j)
 
         let z_inner = proof.z.inner_product_poly_vector(&proof.z);
-        let sum_gij_cij = Self::calculate_gh_ci_cj(&proof.g_ij, &self.tr.random_c, ep.r);
+        let sum_gij_cij = Self::calculate_gh_ci_cj(&proof.g_ij, &challenges, ep.r);
 
         if z_inner != sum_gij_cij {
             return Err(VerifierError::ZInnerError {
@@ -121,23 +149,22 @@ impl<'a> LabradorVerifier<'a> {
         }
 
         // 6. line 17: check \sum(<\phi_i, z>c_i) ?= \sum(h_ij * c_i * c_j)
-
         let phi_ct_aggr = aggregate::AggregationOne::get_phi_ct_aggr(
             &self.st.phi_ct,
-            &self.tr.pi,
-            &self.tr.psi,
-            &self.tr.omega,
+            projections.get_projection_matrices(),
+            &psi,
+            &omega,
             ep,
         );
         let phi_i = aggregate::AggregationTwo::get_phi_i(
             &self.st.phi_constraint,
             &phi_ct_aggr,
-            &self.tr.random_alpha,
-            &self.tr.random_beta,
+            &vector_alpha,
+            &vector_beta,
             ep,
         );
-        let sum_phi_z_c = Self::calculate_phi_z_c(&phi_i, &self.tr.random_c, &proof.z);
-        let sum_hij_cij = Self::calculate_gh_ci_cj(&proof.h_ij, &self.tr.random_c, ep.r);
+        let sum_phi_z_c = Self::calculate_phi_z_c(&phi_i, &challenges, &proof.z);
+        let sum_hij_cij = Self::calculate_gh_ci_cj(&proof.h_ij, &challenges, ep.r);
 
         // Left side multiple by 2 because of when we calculate h_ij, we didn't apply the division (divided by 2)
         if &sum_phi_z_c * &Zq::TWO != sum_hij_cij {
@@ -149,19 +176,19 @@ impl<'a> LabradorVerifier<'a> {
 
         // 7. line 18: check \sum(a_ij * g_ij) + \sum(h_ii) - b ?= 0
 
-        let a_ct_aggr = aggregate::AggregationOne::get_a_ct_aggr(&self.tr.psi, &self.st.a_ct, ep);
+        let a_ct_aggr = aggregate::AggregationOne::get_a_ct_aggr(&psi, &self.st.a_ct, ep);
         let a_primes = aggregate::AggregationTwo::get_a_i(
             &self.st.a_constraint,
             &a_ct_aggr,
-            &self.tr.random_alpha,
-            &self.tr.random_beta,
+            &vector_alpha,
+            &vector_beta,
             ep,
         );
         let b_primes = aggregate::AggregationTwo::get_b_i(
             &self.st.b_constraint,
             &proof.b_ct_aggr,
-            &self.tr.random_alpha,
-            &self.tr.random_beta,
+            &vector_alpha,
+            &vector_beta,
             ep,
         );
 
@@ -180,9 +207,9 @@ impl<'a> LabradorVerifier<'a> {
         let mut outer_commitments = OuterCommitment::new(self.pp);
         outer_commitments.compute_u1(
             RqMatrix::new(proof.t_i.clone()),
-            DecompositionParameters::new(ep.b, ep.t_1).unwrap(),
+            DecompositionParameters::new(ep.b, ep.t_1)?,
             proof.g_ij.clone(),
-            DecompositionParameters::new(ep.b, ep.t_2).unwrap(),
+            DecompositionParameters::new(ep.b, ep.t_2)?,
         );
 
         if proof.u_1 != outer_commitments.u_1 {
@@ -195,7 +222,7 @@ impl<'a> LabradorVerifier<'a> {
         // 9. line 20: u_2 ?= \sum(\sum(D_ijk * h_ij^(k)))
         outer_commitments.compute_u2(
             proof.h_ij.clone(),
-            DecompositionParameters::new(ep.b, ep.t_1).unwrap(),
+            DecompositionParameters::new(ep.b, ep.t_1)?,
         );
 
         if proof.u_2 != outer_commitments.u_2 {
@@ -271,13 +298,16 @@ impl<'a> LabradorVerifier<'a> {
         &self,
         proof: &Proof,
         ep: &EnvironmentParameters,
+        psi: &[Vec<Zq>],
+        omega: &[Vec<Zq>],
     ) -> Result<bool, VerifierError> {
         for k in 0..ep.kappa {
             let b_0_poly = proof.b_ct_aggr.get_elements()[k].get_coefficients()[0];
             let mut b_0: Zq = (0..ep.constraint_l)
-                .map(|l| self.tr.psi[k][l] * self.st.b_0_ct[l])
+                .map(|l| psi[k][l] * self.st.b_0_ct[l])
                 .sum();
-            let inner_omega_p = self.tr.omega[k].inner_product(proof.p.get_projection());
+
+            let inner_omega_p = omega[k].inner_product(&proof.p);
             b_0 += inner_omega_p;
             if b_0 != b_0_poly {
                 return Err(VerifierError::B0Mismatch {
@@ -296,6 +326,7 @@ impl<'a> LabradorVerifier<'a> {
 mod tests {
     use super::*;
     use crate::prover::{LabradorProver, Witness};
+    use crate::transcript::sponges::shake::ShakeSponge;
 
     #[test]
     fn test_verify() {
@@ -307,15 +338,18 @@ mod tests {
         let st: Statement = Statement::new(&witness_1, &ep_1);
         // generate the common reference string matrices
         let pp = AjtaiInstances::new(&ep_1);
-        // generate random challenges
-        let tr = Challenges::new(&ep_1);
 
         // create a new prover
-        let prover = LabradorProver::new(&pp, &witness_1, &st, &tr);
+        let transcript =
+            LabradorTranscript::new(ShakeSponge::default(), ep_1.lambda, ep_1.n, ep_1.r);
+
+        let mut prover = LabradorProver::new(&pp, &witness_1, &st, transcript);
         let proof = prover.prove(&ep_1).unwrap();
 
         // create a new verifier
-        let verifier = LabradorVerifier::new(&pp, &st, &tr);
+        let transcript =
+            LabradorTranscript::new(ShakeSponge::default(), ep_1.lambda, ep_1.n, ep_1.r);
+        let mut verifier = LabradorVerifier::new(&pp, &st, transcript);
         let result = verifier.verify(&proof, &ep_1);
         assert!(result.unwrap());
     }
