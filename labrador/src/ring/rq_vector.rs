@@ -23,6 +23,10 @@ impl RqVector {
         }
     }
 
+    pub fn set(&mut self, index: usize, value: Rq) {
+        self.elements[index] = value;
+    }
+
     pub fn into_inner(self) -> Vec<Rq> {
         self.elements
     }

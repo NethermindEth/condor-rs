@@ -28,6 +28,10 @@ impl RqMatrix {
         self.elements[0].get_length()
     }
 
+    pub fn set_sell(&mut self, row: usize, col: usize, value: Rq) {
+        self.elements[row].set(col, value);
+    }
+
     /// Create a random matrix of polynomials
     pub fn random<R: Rng + CryptoRng>(rng: &mut R, row_len: usize, col_len: usize) -> Self {
         Self {
