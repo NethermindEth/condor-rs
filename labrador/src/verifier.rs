@@ -47,7 +47,7 @@ pub enum VerifierError {
     #[error(transparent)]
     DecompositionError(#[from] outer_commitments::DecompositionError),
 }
-pub struct LabradorVerifier<'a, S: Sponge> {
+pub struct LabradorVerifier<'a> {
     pub pp: &'a AjtaiInstances,
     pub st: &'a Statement,
 }
@@ -58,19 +58,16 @@ impl<'a> LabradorVerifier<'a> {
     }
 
     /// All check conditions are from page 18
-    pub fn verify(
+    pub fn verify<S: Sponge>(
         &mut self,
-        proof: &LabradorTranscript<ShakeSponge>,
+        proof: &LabradorTranscript<S>,
         ep: &EnvironmentParameters,
     ) -> Result<bool, VerifierError> {
-        let mut transcript = LabradorTranscript::new(ShakeSponge::default());
+        let mut transcript = LabradorTranscript::new(S::default());
 
         transcript.absorb_u1(&proof.u1);
-        let pi = transcript.generate_vector_of_projection_matrices(
-            ep.security_parameter,
-            ep.rank,
-            ep.multiplicity,
-        );
+        let projections =
+            transcript.generate_projections(ep.security_parameter, ep.rank, ep.multiplicity);
         transcript.absorb_vector_p(&proof.vector_p);
         let size_of_psi = usize::div_ceil(ep.security_parameter, ep.log_q);
         let size_of_omega = size_of_psi;
@@ -116,7 +113,7 @@ impl<'a> LabradorVerifier<'a> {
         let norm_h_ij = Self::norm_squared(&h_ij);
         let norm_sum = norm_z_ij + norm_t_ij + norm_g_ij + norm_h_ij;
 
-        if norm_sum > ep.beta_prime * ep.beta_prime {
+        if norm_sum > ep.beta * ep.beta {
             return Err(VerifierError::NormSumExceeded {
                 norm: norm_sum,
                 allowed: ep.beta * ep.beta,
@@ -147,7 +144,13 @@ impl<'a> LabradorVerifier<'a> {
         }
 
         // 6. line 17: check \sum(<\phi_i, z>c_i) ?= \sum(h_ij * c_i * c_j)
-        let phi_ct_aggr = aggregate::calculate_aggr_ct_phi(&self.st.phi_ct, &pi, &psi, &omega, ep);
+        let phi_ct_aggr = aggregate::calculate_aggr_ct_phi(
+            &self.st.phi_ct,
+            projections.get_projection_matrices(),
+            &psi,
+            &omega,
+            ep,
+        );
         let phi_i = aggregate::calculate_aggr_phi(
             &self.st.phi_constraint,
             &phi_ct_aggr,
@@ -195,11 +198,9 @@ impl<'a> LabradorVerifier<'a> {
         let mut outer_commitments = OuterCommitment::new(self.pp);
         let commitment_u1 = outer_commitments.compute_u1(
             &proof.t,
-            DecompositionParameters::new(ep.b, ep.t_1)
-                .expect("Decomposition error in decomposing t"),
+            DecompositionParameters::new(ep.b, ep.t_1)?,
             &proof.g,
-            DecompositionParameters::new(ep.b, ep.t_2)
-                .expect("Decomposition error in decomposing g"),
+            DecompositionParameters::new(ep.b, ep.t_2)?,
         );
 
         if proof.u1 != commitment_u1 {
@@ -210,11 +211,8 @@ impl<'a> LabradorVerifier<'a> {
         }
 
         // 9. line 20: u_2 ?= \sum(\sum(D_ijk * h_ij^(k)))
-        let commitment_u2 = outer_commitments.compute_u2(
-            &proof.h,
-            DecompositionParameters::new(ep.b, ep.t_1)
-                .expect("Decomposition error in decomposing h"),
-        );
+        let commitment_u2 =
+            outer_commitments.compute_u2(&proof.h, DecompositionParameters::new(ep.b, ep.t_1)?);
 
         if proof.u2 != commitment_u2 {
             return Err(VerifierError::OuterCommitError {
@@ -285,9 +283,9 @@ impl<'a> LabradorVerifier<'a> {
         &sum_a_primes_g2 + &sum_h_ii == b_primes2
     }
 
-    fn check_b_0_aggr(
+    fn check_b_0_aggr<S: Sponge>(
         &self,
-        proof: &LabradorTranscript<ShakeSponge>,
+        proof: &LabradorTranscript<S>,
         ep: &EnvironmentParameters,
         psi: &[Vec<Zq>],
         omega: &[Vec<Zq>],
@@ -332,7 +330,7 @@ mod tests {
 
         // create a new prover
         let mut prover = LabradorProver::new(&pp, &witness_1, &st);
-        let proof = prover.prove(&ep_1).unwrap();
+        let proof: LabradorTranscript<ShakeSponge> = prover.prove(&ep_1).unwrap();
 
         // create a new verifier
         let mut verifier = LabradorVerifier::new(&pp, &st);

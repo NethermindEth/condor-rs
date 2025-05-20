@@ -6,12 +6,16 @@ use sha3::{
 use crate::ring::{rq::Rq, zq::Zq};
 use crate::transcript::Sponge;
 
-#[derive(Default)]
 pub struct ShakeSponge {
     hasher: Shake256,
 }
 
 impl Sponge for ShakeSponge {
+    fn default() -> Self {
+        Self {
+            hasher: Shake256::default(),
+        }
+    }
     fn absorb_zq(&mut self, input: &[Zq]) {
         // Convert Rq ector to u8
         let mut u8_version_input: Vec<u8> = Vec::new();

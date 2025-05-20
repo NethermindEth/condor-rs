@@ -1,6 +1,7 @@
 use crate::ring::{rq::Rq, zq::Zq};
 
 pub trait Sponge {
+    fn default() -> Self;
     fn absorb_zq(&mut self, input: &[Zq]);
     fn absorb_rq(&mut self, input: &[Rq]);
     fn squeeze_zq(&mut self, output_length: usize) -> Vec<Zq>;

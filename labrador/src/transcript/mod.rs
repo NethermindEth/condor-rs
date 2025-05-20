@@ -1,62 +1,91 @@
 pub mod sponges;
-
 use crate::{
     core::jl::Projection,
-    ring::{rq::Rq, rq_vector::RqVector, zq::Zq},
+    ring::{rq::Rq, rq_matrix::RqMatrix, rq_vector::RqVector, zq::Zq},
 };
 pub use sponges::Sponge;
 
 pub struct LabradorTranscript<S: Sponge> {
     sponge: S,
-    security_parameter: usize,
-    rank: usize,
-    multiplicity: usize,
     pub u1: RqVector,
     pub vector_p: Vec<Zq>,
     pub b_ct_aggr: RqVector,
     pub u2: RqVector,
+    pub z: RqVector,
+    pub t: RqMatrix,
+    pub g: RqMatrix,
+    pub h: RqMatrix,
 }
 
 impl<S: Sponge> LabradorTranscript<S> {
-    pub fn new(sponge: S, security_parameter: usize, rank: usize, multiplicity: usize) -> Self {
+    pub fn new(sponge: S) -> Self {
         Self {
             sponge,
-            security_parameter,
-            rank,
-            multiplicity,
             u1: RqVector::new(Vec::new()),
             vector_p: Vec::new(),
             b_ct_aggr: RqVector::new(Vec::new()),
             u2: RqVector::new(Vec::new()),
+            z: RqVector::new(Vec::new()),
+            t: RqMatrix::new(vec![RqVector::new(Vec::new())]),
+            g: RqMatrix::new(vec![RqVector::new(Vec::new())]),
+            h: RqMatrix::new(vec![RqVector::new(Vec::new())]),
         }
     }
 
-    pub fn absorb_u1(&mut self, u1: RqVector) {
-        self.sponge.absorb_rq(u1.get_elements());
+    pub fn set_u1(&mut self, u1: RqVector) {
+        self.absorb_u1(&u1);
         self.u1 = u1;
     }
 
-    pub fn absorb_vector_p(&mut self, p: Vec<Zq>) {
-        self.sponge.absorb_zq(&p);
+    pub fn absorb_u1(&mut self, u1: &RqVector) {
+        self.sponge.absorb_rq(u1.get_elements());
+    }
+
+    pub fn set_vector_p(&mut self, p: Vec<Zq>) {
+        self.absorb_vector_p(&p);
         self.vector_p = p;
     }
 
-    pub fn absorb_vector_b_ct_aggr(&mut self, input: RqVector) {
-        self.sponge.absorb_rq(input.get_elements());
+    pub fn absorb_vector_p(&mut self, p: &[Zq]) {
+        self.sponge.absorb_zq(p);
+    }
+
+    pub fn set_vector_b_ct_aggr(&mut self, input: RqVector) {
+        self.absorb_vector_b_ct_aggr(&input);
         self.b_ct_aggr = input;
     }
 
-    pub fn absorb_u2(&mut self, u2: RqVector) {
-        self.sponge.absorb_rq(u2.get_elements());
+    pub fn absorb_vector_b_ct_aggr(&mut self, input: &RqVector) {
+        self.sponge.absorb_rq(input.get_elements());
+    }
+
+    pub fn set_u2(&mut self, u2: RqVector) {
+        self.absorb_u2(&u2);
         self.u2 = u2;
     }
 
-    pub fn generate_projections(&mut self) -> Projection {
-        // r vectors, each of length 256 * nD
-        let row_size = 2 * self.security_parameter;
-        let col_size = self.rank * Rq::DEGREE;
+    pub fn absorb_u2(&mut self, u2: &RqVector) {
+        self.sponge.absorb_rq(u2.get_elements());
+    }
 
-        let matrices = (0..self.multiplicity)
+    pub fn set_recursive_part(&mut self, z: RqVector, t: RqMatrix, g: RqMatrix, h: RqMatrix) {
+        self.z = z;
+        self.t = t;
+        self.g = g;
+        self.h = h;
+    }
+
+    pub fn generate_projections(
+        &mut self,
+        security_parameter: usize,
+        rank: usize,
+        multiplicity: usize,
+    ) -> Projection {
+        // r vectors, each of length 256 * nD
+        let row_size = 2 * security_parameter;
+        let col_size = rank * Rq::DEGREE;
+
+        let matrices = (0..multiplicity)
             .map(|_| {
                 let linear_projection_randomness = self.sponge.squeeze_zq(row_size * col_size);
                 linear_projection_randomness
@@ -78,7 +107,7 @@ impl<S: Sponge> LabradorTranscript<S> {
                     .collect()
             })
             .collect();
-        Projection::new(matrices, self.security_parameter)
+        Projection::new(matrices, security_parameter)
     }
 
     pub fn generate_vector_psi(
@@ -93,12 +122,16 @@ impl<S: Sponge> LabradorTranscript<S> {
             .collect()
     }
 
-    pub fn generate_vector_omega(&mut self, number_of_vectors: usize) -> Vec<Vec<Zq>> {
+    pub fn generate_vector_omega(
+        &mut self,
+        number_of_vectors: usize,
+        security_parameter: usize,
+    ) -> Vec<Vec<Zq>> {
         let elements = self
             .sponge
-            .squeeze_zq(number_of_vectors * 2 * self.security_parameter);
+            .squeeze_zq(number_of_vectors * 2 * security_parameter);
         elements
-            .chunks_exact(2 * self.security_parameter)
+            .chunks_exact(2 * security_parameter)
             .map(|chunk| chunk.into())
             .collect()
     }
@@ -107,13 +140,13 @@ impl<S: Sponge> LabradorTranscript<S> {
         RqVector::new(self.sponge.squeeze_rq(vector_length))
     }
 
-    pub fn generate_challenges(&mut self, op_norm: f64) -> RqVector {
+    pub fn generate_challenges(&mut self, op_norm: f64, multiplicity: usize) -> RqVector {
         let mut result = Vec::new();
         loop {
             let candidate = self.sample_challenge();
             if candidate.operator_norm() < op_norm {
                 result.push(candidate);
-                if result.len() >= self.multiplicity {
+                if result.len() >= multiplicity {
                     return RqVector::new(result);
                 }
             }
@@ -152,13 +185,8 @@ mod tests_generate_pi {
     #[test]
     fn test_projection_matrix_has_correct_size() {
         let (security_parameter, rank, multiplicity) = (128, 20, 9);
-        let mut transcript = LabradorTranscript::new(
-            ShakeSponge::default(),
-            security_parameter,
-            rank,
-            multiplicity,
-        );
-        let projections = transcript.generate_projections();
+        let mut transcript = LabradorTranscript::new(ShakeSponge::default());
+        let projections = transcript.generate_projections(security_parameter, rank, multiplicity);
         assert_eq!(projections.get_projection_matrices().len(), multiplicity); // number_of_project_matrices
         assert_eq!(
             projections.get_projection_matrices()[0].len(),
@@ -175,13 +203,8 @@ mod tests_generate_pi {
     #[allow(clippy::as_conversions)]
     fn test_projection_matrix_is_random() {
         let (security_parameter, rank, multiplicity) = (128, 1000, 1);
-        let mut transcript = LabradorTranscript::new(
-            ShakeSponge::default(),
-            security_parameter,
-            rank,
-            multiplicity,
-        );
-        let projections = transcript.generate_projections();
+        let mut transcript = LabradorTranscript::new(ShakeSponge::default());
+        let projections = transcript.generate_projections(security_parameter, rank, multiplicity);
 
         for projection_matrix in projections.get_projection_matrices() {
             let mut counts = [0.0, 0.0, 0.0]; // -1, 0, 1
@@ -220,13 +243,8 @@ mod test_generate_psi {
 
     #[test]
     fn test_generate_vector_psi_has_correct_size() {
-        let (security_parameter, rank, multiplicity, k_range, l_range) = (128, 20, 9, 20, 12);
-        let mut transcript = LabradorTranscript::new(
-            ShakeSponge::default(),
-            security_parameter,
-            rank,
-            multiplicity,
-        );
+        let (k_range, l_range) = (20, 12);
+        let mut transcript = LabradorTranscript::new(ShakeSponge::default());
         let result = transcript.generate_vector_psi(k_range, l_range);
         assert_eq!(result.len(), k_range); // number_of_project_matrices
         assert_eq!(result[0].len(), l_range);
@@ -242,14 +260,9 @@ mod test_generate_omega {
 
     #[test]
     fn test_generate_vector_omega_has_correct_size() {
-        let (security_parameter, rank, multiplicity, k_range) = (128, 20, 9, 20);
-        let mut transcript = LabradorTranscript::new(
-            ShakeSponge::default(),
-            security_parameter,
-            rank,
-            multiplicity,
-        );
-        let result = transcript.generate_vector_omega(k_range);
+        let (security_parameter, k_range) = (128, 20);
+        let mut transcript = LabradorTranscript::new(ShakeSponge::default());
+        let result = transcript.generate_vector_omega(k_range, security_parameter);
         assert_eq!(result.len(), k_range); // number_of_project_matrices
         assert_eq!(result[0].len(), 256);
     }
@@ -264,13 +277,8 @@ mod test_generate_rq {
 
     #[test]
     fn test_generate_rq_has_correct_size() {
-        let (security_parameter, rank, multiplicity, k_range) = (128, 20, 9, 20);
-        let mut transcript = LabradorTranscript::new(
-            ShakeSponge::default(),
-            security_parameter,
-            rank,
-            multiplicity,
-        );
+        let k_range = 20;
+        let mut transcript = LabradorTranscript::new(ShakeSponge::default());
         let result = transcript.generate_rq_vector(k_range);
         assert_eq!(result.get_elements().len(), k_range); // number_of_project_matrices
     }
@@ -285,14 +293,9 @@ mod test_generate_challenges {
 
     #[test]
     fn test_generate_challenges_has_correct_size() {
-        let (security_parameter, rank, multiplicity) = (128, 20, 9);
-        let mut transcript = LabradorTranscript::new(
-            ShakeSponge::default(),
-            security_parameter,
-            rank,
-            multiplicity,
-        );
-        let result = transcript.generate_challenges(15.0);
+        let multiplicity = 9;
+        let mut transcript = LabradorTranscript::new(ShakeSponge::default());
+        let result = transcript.generate_challenges(15.0, multiplicity);
         assert_eq!(result.get_elements().len(), multiplicity); // number_of_project_matrices
     }
 
@@ -303,15 +306,10 @@ mod test_generate_challenges {
     #[test]
     fn test_challenge_set() {
         let op_norm = 15.0;
-        let (security_parameter, rank, multiplicity) = (128, 20, 9);
-        let mut transcript = LabradorTranscript::new(
-            ShakeSponge::default(),
-            security_parameter,
-            rank,
-            multiplicity,
-        );
+        let multiplicity = 9;
+        let mut transcript = LabradorTranscript::new(ShakeSponge::default());
 
-        let challenge_set = transcript.generate_challenges(15.0);
+        let challenge_set = transcript.generate_challenges(15.0, multiplicity);
 
         for i in 0..multiplicity {
             // l2 norm 71 is from paper page 6, Challenge Space.

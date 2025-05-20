@@ -3,11 +3,13 @@ use crate::commitments::common_instances::AjtaiInstances;
 use crate::commitments::outer_commitments;
 use crate::commitments::outer_commitments::DecompositionParameters;
 use crate::commitments::outer_commitments::OuterCommitment;
+use crate::commitments::CommitError;
 use crate::core::garbage_polynomials::GarbagePolynomials;
 use crate::ring::rq_matrix::RqMatrix;
 use crate::ring::zq::Zq;
 use crate::ring::zq::ZqVector;
-use crate::transcript::{LabradorTranscript, Sponge};
+use crate::transcript::LabradorTranscript;
+use crate::transcript::Sponge;
 use crate::{
     core::{aggregate, env_params::EnvironmentParameters, statement::Statement},
     ring::rq_vector::RqVector,
@@ -17,13 +19,17 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum ProverError {
+    /// Indicates that the L2 norm (squared) of the witness exceeded the allowed threshold.
+    #[error("invalid witness size: norm_squared {norm_squared}, allowed {allowed}")]
+    WitnessL2NormViolated { norm_squared: Zq, allowed: Zq },
+    #[error("Invalid Projection of index {index}. Expected {expected}, got {computed}")]
     ProjectionError {
         index: usize,
         expected: Zq,
         computed: Zq,
     },
     #[error("commitment failure")]
-    CommitmentError(#[from] ajtai_commitment::CommitError),
+    CommitError(#[from] ajtai_commitment::CommitError),
     #[error("decomposition failure")]
     DecompositionError(#[from] outer_commitments::DecompositionError),
 }
@@ -56,7 +62,7 @@ impl Witness {
     }
 }
 
-pub struct LabradorProver<'a, S: Sponge> {
+pub struct LabradorProver<'a> {
     pub pp: &'a AjtaiInstances,
     pub witness: &'a Witness,
     pub st: &'a Statement,
@@ -67,28 +73,26 @@ impl<'a> LabradorProver<'a> {
         Self { pp, witness, st }
     }
 
-    fn compute_vector_ti(&self) -> RqMatrix {
-        RqMatrix::new(
-            self.witness
-                .s
-                .iter()
-                .map(|s_i| {
-                    self.pp
-                        .commitment_scheme_a
-                        .commit(s_i)
-                        .expect("Commitment error in committing to s_i")
-                })
-                .collect(),
-        )
+    fn compute_vector_ti(&self) -> Result<RqMatrix, CommitError> {
+        // collect all commitments, propagating any CommitError with `?`
+        let commitments = self
+            .witness
+            .s
+            .iter()
+            .cloned()
+            .map(|s_i| self.pp.commitment_scheme_a.commit(&s_i))
+            .collect::<Result<Vec<_>, CommitError>>()?;
+
+        Ok(RqMatrix::new(commitments))
     }
 
     /// all prove steps are from page 17
-    pub fn prove(
+    pub fn prove<S: Sponge>(
         &mut self,
         ep: &EnvironmentParameters,
-    ) -> Result<LabradorTranscript<ShakeSponge>, ProverError> {
+    ) -> Result<LabradorTranscript<S>, ProverError> {
         // Generate random challenges used between prover and verifier
-        let mut transcript = LabradorTranscript::new(ShakeSponge::default());
+        let mut transcript = LabradorTranscript::new(S::default());
         // Compute garbage polynomials g and h
         let mut garbage_polynomials = GarbagePolynomials::new(&self.witness.s);
         // Compute outer commitments u1 and u2
@@ -97,30 +101,23 @@ impl<'a> LabradorProver<'a> {
         // Step 1: Outer commitments u_1 starts: --------------------------------------------
 
         // Ajtai Commitments t_i = A * s_i
-        let t_i = self.compute_vector_ti();
+        let t_i = self.compute_vector_ti()?;
         // g_ij = <s_i, s_j>
         garbage_polynomials.compute_g();
         // calculate outer commitment u_1 = \sum(B_ik * t_i^(k)) + \sum(C_ijk * g_ij^(k))
         let commitment_u1 = outer_commitments.compute_u1(
             &t_i,
-            DecompositionParameters::new(ep.b, ep.t_1)
-                .expect("Decomposition error in decomposing t"),
+            DecompositionParameters::new(ep.b, ep.t_1)?,
             &garbage_polynomials.g,
-            DecompositionParameters::new(ep.b, ep.t_2)
-                .expect("Decomposition error in decomposing g"),
+            DecompositionParameters::new(ep.b, ep.t_2)?,
         );
         transcript.set_u1(commitment_u1);
         // Step 1: Outer commitments u_1 ends: ----------------------------------------------
 
         // Step 2: JL projection starts: ----------------------------------------------------
-        let vector_of_projection_matrices = transcript.generate_vector_of_projection_matrices(
-            ep.security_parameter,
-            ep.rank,
-            ep.multiplicity,
-        );
-        let jl_projection_instance =
-            jl::Projection::new(vector_of_projection_matrices, ep.security_parameter);
-        let vector_p = jl_projection_instance.compute_batch_projection(&self.witness.s);
+        let projections =
+            transcript.generate_projections(ep.security_parameter, ep.rank, ep.multiplicity);
+        let vector_p = projections.compute_batch_projection(&self.witness.s);
         transcript.set_vector_p(vector_p);
         // Notice that this check is resource-intensive due to the multiplication of two ZqVector<256> instances,
         // followed by the removal of high-degree terms. It might not be a necessary check.
@@ -128,9 +125,8 @@ impl<'a> LabradorProver<'a> {
         Self::check_projection(
             self,
             &transcript.vector_p,
-            jl_projection_instance.get_random_linear_map_vector(),
-        )
-        .expect("Projection check failed");
+            projections.get_projection_matrices(),
+        )?;
         // Step 2: JL projection ends: ------------------------------------------------------
 
         // Step 3: Aggregation starts: --------------------------------------------------------------
@@ -142,7 +138,7 @@ impl<'a> LabradorProver<'a> {
         let a_ct_aggr = aggregate::calculate_aggr_ct_a(&vector_psi, &self.st.a_ct, ep);
         let phi_ct_aggr = aggregate::calculate_aggr_ct_phi(
             &self.st.phi_ct,
-            jl_projection_instance.get_random_linear_map_vector(),
+            projections.get_projection_matrices(),
             &vector_psi,
             &vector_omega,
             ep,
@@ -168,8 +164,7 @@ impl<'a> LabradorProver<'a> {
         garbage_polynomials.compute_h(&phi_i);
         let commitment_u2 = outer_commitments.compute_u2(
             &garbage_polynomials.h,
-            DecompositionParameters::new(ep.b, ep.t_1)
-                .expect("Decomposition error in decomposing h"),
+            DecompositionParameters::new(ep.b, ep.t_1)?,
         );
         transcript.set_u2(commitment_u2);
 
@@ -237,6 +232,6 @@ mod tests {
 
         // create a new prover
         let mut prover = LabradorProver::new(&pp, &witness_1, &st);
-        let _ = prover.prove(&ep_1).unwrap();
+        let _: LabradorTranscript<ShakeSponge> = prover.prove(&ep_1).unwrap();
     }
 }
