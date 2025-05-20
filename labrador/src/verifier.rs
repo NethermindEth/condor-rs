@@ -5,7 +5,6 @@ use thiserror::Error;
 use crate::commitments::common_instances::AjtaiInstances;
 use crate::commitments::outer_commitments::{self, DecompositionParameters, OuterCommitment};
 use crate::core::{aggregate, env_params::EnvironmentParameters, statement::Statement};
-use crate::prover::Proof;
 use crate::ring::rq::Rq;
 use crate::ring::rq_matrix::RqMatrix;
 use crate::ring::rq_vector::RqVector;
@@ -51,40 +50,38 @@ pub enum VerifierError {
 pub struct LabradorVerifier<'a, S: Sponge> {
     pub pp: &'a AjtaiInstances,
     pub st: &'a Statement,
-    pub transcript: LabradorTranscript<S>,
 }
 
-impl<'a, S: Sponge> LabradorVerifier<'a, S> {
-    pub fn new(
-        pp: &'a AjtaiInstances,
-        st: &'a Statement,
-        transcript: LabradorTranscript<S>,
-    ) -> Self {
-        Self { pp, st, transcript }
+impl<'a> LabradorVerifier<'a> {
+    pub fn new(pp: &'a AjtaiInstances, st: &'a Statement) -> Self {
+        Self { pp, st }
     }
 
     /// All check conditions are from page 18
     pub fn verify(
         &mut self,
-        proof: &Proof,
+        proof: &LabradorTranscript<ShakeSponge>,
         ep: &EnvironmentParameters,
     ) -> Result<bool, VerifierError> {
-        self.transcript.absorb_u1(proof.u_1.clone());
-        let projections = self.transcript.generate_projections();
-        self.transcript.absorb_vector_p(proof.p.clone());
+        let mut transcript = LabradorTranscript::new(ShakeSponge::default());
+
+        transcript.absorb_u1(&proof.u1);
+        let pi = transcript.generate_vector_of_projection_matrices(
+            ep.security_parameter,
+            ep.rank,
+            ep.multiplicity,
+        );
+        transcript.absorb_vector_p(&proof.vector_p);
         let size_of_psi = usize::div_ceil(ep.security_parameter, ep.log_q);
         let size_of_omega = size_of_psi;
-        let psi = self
-            .transcript
-            .generate_vector_psi(size_of_psi, ep.constraint_l);
-        let omega = self.transcript.generate_vector_omega(size_of_omega);
-        self.transcript
-            .absorb_vector_b_ct_aggr(proof.b_ct_aggr.clone());
-        let vector_alpha = self.transcript.generate_rq_vector(ep.constraint_k);
+        let psi = transcript.generate_vector_psi(size_of_psi, ep.constraint_l);
+        let omega = transcript.generate_vector_omega(size_of_omega, ep.security_parameter);
+        transcript.absorb_vector_b_ct_aggr(&proof.b_ct_aggr);
+        let vector_alpha = transcript.generate_rq_vector(ep.constraint_k);
         let size_of_beta = size_of_psi;
-        let vector_beta = self.transcript.generate_rq_vector(size_of_beta);
-        self.transcript.absorb_u2(proof.u_2.clone());
-        let challenges = self.transcript.generate_challenges(ep.operator_norm);
+        let vector_beta = transcript.generate_rq_vector(size_of_beta);
+        transcript.absorb_u2(&proof.u2);
+        let challenges = transcript.generate_challenges(ep.operator_norm, ep.multiplicity);
 
         // check b_0^{''(k)} ?= <omega^(k),p> + \sum(psi_l^(k) * b_0^{'(l)})
         Self::check_b_0_aggr(self, proof, ep, &psi, &omega)?;
@@ -94,19 +91,19 @@ impl<'a, S: Sponge> LabradorVerifier<'a, S> {
         // decompose z into z = z^(0) + z^(1) * b, only two parts.
         let z_ij = RqVector::decompose(&proof.z, ep.b, 2);
         let t_ij: Vec<Vec<RqVector>> = proof
-            .t_i
+            .t
             .get_elements()
             .iter()
             .map(|i| RqVector::decompose(i, ep.b, ep.t_1))
             .collect();
         let g_ij: Vec<Vec<RqVector>> = proof
-            .g_ij
+            .g
             .get_elements()
             .iter()
             .map(|i| RqVector::decompose(i, ep.b, ep.t_2))
             .collect();
         let h_ij: Vec<Vec<RqVector>> = proof
-            .h_ij
+            .h
             .get_elements()
             .iter()
             .map(|i| RqVector::decompose(i, ep.b, ep.t_1))
@@ -129,7 +126,7 @@ impl<'a, S: Sponge> LabradorVerifier<'a, S> {
         // 4. line 15: check Az ?= c_1 * t_1 + ... + c_r * t_r
 
         let az = self.pp.commitment_scheme_a.matrix() * &proof.z;
-        let ct_sum = aggregate::calculate_z(proof.t_i.get_elements(), &challenges);
+        let ct_sum = aggregate::calculate_z(proof.t.get_elements(), &challenges);
         if az != ct_sum {
             return Err(VerifierError::AzError {
                 computed: az,
@@ -140,7 +137,7 @@ impl<'a, S: Sponge> LabradorVerifier<'a, S> {
         // 5. lne 16: check <z, z> ?= \sum(g_ij * c_i * c_j)
 
         let z_inner = proof.z.inner_product_poly_vector(&proof.z);
-        let sum_gij_cij = Self::calculate_gh_ci_cj(&proof.g_ij, &challenges, ep.multiplicity);
+        let sum_gij_cij = Self::calculate_gh_ci_cj(&proof.g, &challenges, ep.multiplicity);
 
         if z_inner != sum_gij_cij {
             return Err(VerifierError::ZInnerError {
@@ -165,7 +162,7 @@ impl<'a, S: Sponge> LabradorVerifier<'a, S> {
             ep,
         );
         let sum_phi_z_c = Self::calculate_phi_z_c(&phi_i, &challenges, &proof.z);
-        let sum_hij_cij = Self::calculate_gh_ci_cj(&proof.h_ij, &challenges, ep.multiplicity);
+        let sum_hij_cij = Self::calculate_gh_ci_cj(&proof.h, &challenges, ep.multiplicity);
 
         // Left side multiple by 2 because of when we calculate h_ij, we didn't apply the division (divided by 2)
         if &sum_phi_z_c * &Zq::TWO != sum_hij_cij {
@@ -193,29 +190,24 @@ impl<'a, S: Sponge> LabradorVerifier<'a, S> {
             ep,
         );
 
-        if !Self::check_relation(
-            &RqMatrix::new(a_primes),
-            &b_primes,
-            &proof.g_ij,
-            &proof.h_ij,
-        ) {
+        if !Self::check_relation(&RqMatrix::new(a_primes), &b_primes, &proof.g, &proof.h) {
             return Err(VerifierError::RelationCheckFailed);
         }
 
         // 8. line 19: u_1 ?= \sum(\sum(B_ik * t_i^(k))) + \sum(\sum(C_ijk * g_ij^(k)))
 
-        let u_1 = &proof.u_1;
+        let u_1 = &proof.u1;
         let mut outer_commitments = OuterCommitment::new(self.pp);
         let commitment_u1 = outer_commitments.compute_u1(
-            &proof.t_i,
+            &proof.t,
             DecompositionParameters::new(ep.b, ep.t_1)
                 .expect("Decomposition error in decomposing t"),
-            &proof.g_ij,
+            &proof.g,
             DecompositionParameters::new(ep.b, ep.t_2)
                 .expect("Decomposition error in decomposing g"),
         );
 
-        if proof.u_1 != commitment_u1 {
+        if proof.u1 != commitment_u1 {
             return Err(VerifierError::OuterCommitError {
                 computed: u_1.clone(),
                 expected: commitment_u1,
@@ -224,15 +216,15 @@ impl<'a, S: Sponge> LabradorVerifier<'a, S> {
 
         // 9. line 20: u_2 ?= \sum(\sum(D_ijk * h_ij^(k)))
         let commitment_u2 = outer_commitments.compute_u2(
-            &proof.h_ij,
+            &proof.h,
             DecompositionParameters::new(ep.b, ep.t_1)
                 .expect("Decomposition error in decomposing h"),
         );
 
-        if proof.u_2 != commitment_u2 {
+        if proof.u2 != commitment_u2 {
             return Err(VerifierError::OuterCommitError {
                 computed: commitment_u2,
-                expected: proof.u_2.clone(),
+                expected: proof.u2.clone(),
             });
         }
 
@@ -300,7 +292,7 @@ impl<'a, S: Sponge> LabradorVerifier<'a, S> {
 
     fn check_b_0_aggr(
         &self,
-        proof: &Proof,
+        proof: &LabradorTranscript<ShakeSponge>,
         ep: &EnvironmentParameters,
         psi: &[Vec<Zq>],
         omega: &[Vec<Zq>],
@@ -311,7 +303,7 @@ impl<'a, S: Sponge> LabradorVerifier<'a, S> {
                 .map(|l| psi[k][l] * self.st.b_0_ct[l])
                 .sum();
 
-            let inner_omega_p = omega[k].inner_product(&proof.p);
+            let inner_omega_p = omega[k].inner_product(&proof.vector_p);
             b_0 += inner_omega_p;
             if b_0 != b_0_poly {
                 return Err(VerifierError::B0Mismatch {
@@ -344,24 +336,11 @@ mod tests {
         let pp = AjtaiInstances::new(&ep_1);
 
         // create a new prover
-        let transcript = LabradorTranscript::new(
-            ShakeSponge::default(),
-            ep_1.security_parameter,
-            ep_1.rank,
-            ep_1.multiplicity,
-        );
-
-        let mut prover = LabradorProver::new(&pp, &witness_1, &st, transcript);
+        let mut prover = LabradorProver::new(&pp, &witness_1, &st);
         let proof = prover.prove(&ep_1).unwrap();
 
         // create a new verifier
-        let transcript = LabradorTranscript::new(
-            ShakeSponge::default(),
-            ep_1.security_parameter,
-            ep_1.rank,
-            ep_1.multiplicity,
-        );
-        let mut verifier = LabradorVerifier::new(&pp, &st, transcript);
+        let mut verifier = LabradorVerifier::new(&pp, &st);
         let result = verifier.verify(&proof, &ep_1);
         assert!(result.unwrap());
     }

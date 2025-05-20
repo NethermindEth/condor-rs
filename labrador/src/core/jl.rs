@@ -81,15 +81,15 @@ mod tests {
         let trials: f64 = 1000.0;
         let mut success_count: f64 = 0.0;
         for _ in 0..1000 {
-            let mut transcript = LabradorTranscript::new(
-                ShakeSponge::default(),
+            let mut transcript = LabradorTranscript::new(ShakeSponge::default());
+            // This gives randomness to the transcript, to generate random projection matrices.
+            transcript.set_u1(RqVector::random(&mut rng(), 1));
+            let projection_matrix = transcript.generate_vector_of_projection_matrices(
                 security_parameter,
                 rank,
                 multiplicity,
             );
-            // This gives randomness to the transcript, to generate random projection matrices.
-            transcript.absorb_u1(RqVector::random(&mut rng(), 1));
-            let projections = transcript.generate_projections();
+            let projection = Projection::new(projection_matrix, security_parameter);
 
             let witness = RqVector::random(&mut rand::rng(), rank);
             let result = projections.compute_projection(0, &witness);
@@ -128,16 +128,16 @@ mod tests {
         let mut norm_sum = Zq::ZERO;
         // Run the test multiple times to simulate the probability
         for _ in 0..trials {
-            let mut transcript = LabradorTranscript::new(
-                ShakeSponge::default(),
+            let mut transcript = LabradorTranscript::new(ShakeSponge::default());
+            // This gives randomness to the transcript, to generate random projection matrices.
+            transcript.set_u1(RqVector::random(&mut rng(), 1));
+            let projection_matrix = transcript.generate_vector_of_projection_matrices(
                 security_parameter,
                 rank,
                 multiplicity,
             );
-            // This gives randomness to the transcript, to generate random projection matrices.
-            transcript.absorb_u1(RqVector::random(&mut rng(), 1));
-            let projections = transcript.generate_projections();
-            let result = projections.compute_projection(0, &witness);
+            let result = Projection::new(projection_matrix, security_parameter)
+                .compute_projection(0, &witness);
             norm_sum += Projection::norm_squared(&result);
         }
 
@@ -164,14 +164,13 @@ mod tests {
     fn test_lower_bound() {
         let (security_parameter, rank, multiplicity) = (128, 5, 1);
 
-        let mut transcript = LabradorTranscript::new(
-            ShakeSponge::default(),
+        let mut transcript = LabradorTranscript::new(ShakeSponge::default());
+        transcript.set_u1(RqVector::random(&mut rng(), 1));
+        let projection_matrix = transcript.generate_vector_of_projection_matrices(
             security_parameter,
             rank,
             multiplicity,
         );
-        transcript.absorb_u1(RqVector::random(&mut rng(), 1));
-        let projections = transcript.generate_projections();
         let witness = RqVector::random_ternary(&mut rng(), rank);
 
         let beta = witness.compute_norm_squared();

@@ -32,18 +32,6 @@ pub enum ProverError {
     DecompositionError(#[from] outer_commitments::DecompositionError),
 }
 
-// Proof contains the parameters will be sent to verifier
-// All parameters are from tr, line 2 on page 18
-pub struct Proof {
-    pub u_1: RqVector,
-    pub p: Vec<Zq>,
-    pub b_ct_aggr: RqVector,
-    pub u_2: RqVector,
-    pub z: RqVector,
-    pub t_i: RqMatrix,
-    pub g_ij: RqMatrix,
-    pub h_ij: RqMatrix,
-}
 pub struct Witness {
     pub s: Vec<RqVector>,
 }
@@ -61,26 +49,20 @@ pub struct LabradorProver<'a, S: Sponge> {
     pub pp: &'a AjtaiInstances,
     pub witness: &'a Witness,
     pub st: &'a Statement,
-    pub transcript: LabradorTranscript<S>,
 }
 
-impl<'a, S: Sponge> LabradorProver<'a, S> {
-    pub fn new(
-        pp: &'a AjtaiInstances,
-        witness: &'a Witness,
-        st: &'a Statement,
-        transcript: LabradorTranscript<S>,
-    ) -> Self {
-        Self {
-            pp,
-            witness,
-            st,
-            transcript,
-        }
+impl<'a> LabradorProver<'a> {
+    pub fn new(pp: &'a AjtaiInstances, witness: &'a Witness, st: &'a Statement) -> Self {
+        Self { pp, witness, st }
     }
 
     /// all prove steps are from page 17
-    pub fn prove(&mut self, ep: &EnvironmentParameters) -> Result<Proof, ProverError> {
+    pub fn prove(
+        &mut self,
+        ep: &EnvironmentParameters,
+    ) -> Result<LabradorTranscript<ShakeSponge>, ProverError> {
+        // generate random challenges used between prover and verifier.
+        let mut transcript = LabradorTranscript::new(ShakeSponge::default());
         // check the L2 norm of the witness
         // not sure whether this should be handled during the proving or managed by the witness generator.
         Self::check_witness_l2norm(self, ep)?;
@@ -113,18 +95,21 @@ impl<'a, S: Sponge> LabradorProver<'a, S> {
             DecompositionParameters::new(ep.b, ep.t_2)
                 .expect("Decomposition error in decomposing g"),
         );
-        self.transcript.absorb_u1(commitment_u1);
+        transcript.set_u1(commitment_u1);
         // Step 1: Outer commitments u_1 ends: ----------------------------------------------
 
         // Step 2: JL projection starts: ----------------------------------------------------
 
         // JL projection p_j + check p_j = ct(sum(<\sigma_{-1}(pi_i^(j)), s_i>))
-        let vector_of_projection_matrices =
-            self.transcript.generate_vector_of_projection_matrices();
+        let vector_of_projection_matrices = transcript.generate_vector_of_projection_matrices(
+            ep.security_parameter,
+            ep.rank,
+            ep.multiplicity,
+        );
         let jl_projection =
             jl::Projection::new(vector_of_projection_matrices, ep.security_parameter);
         let vector_p = jl_projection.compute_batch_projection(&self.witness.s);
-        self.transcript.absorb_vector_p(vector_p);
+        transcript.set_vector_p(vector_p);
         // Projections::new(pi, &self.witness.s);
 
         // Notice that this check is resource-intensive due to the multiplication of two ZqVector<256> instances,
@@ -132,7 +117,7 @@ impl<'a, S: Sponge> LabradorProver<'a, S> {
         // Omid's Note: This can be removed later. However, we need to ensure a correct projection matrix with correct upper-bound.
         Self::check_projection(
             self,
-            &self.transcript.vector_p,
+            &transcript.vector_p,
             jl_projection.get_random_linear_map_vector(),
         )
         .expect("Projection check failed");
@@ -142,10 +127,8 @@ impl<'a, S: Sponge> LabradorProver<'a, S> {
 
         let size_of_psi = usize::div_ceil(ep.security_parameter, ep.log_q);
         let size_of_omega = size_of_psi;
-        let vector_psi = self
-            .transcript
-            .generate_vector_psi(size_of_psi, ep.constraint_l);
-        let vector_omega = self.transcript.generate_vector_omega(size_of_omega);
+        let vector_psi = transcript.generate_vector_psi(size_of_psi, ep.constraint_l);
+        let vector_omega = transcript.generate_vector_omega(size_of_omega, ep.security_parameter);
         // first aggregation
         let (a_ct_aggt, phi_ct_aggr, b_ct_aggr) = aggregate::AggregationOne::new(
             self.witness,
@@ -155,16 +138,16 @@ impl<'a, S: Sponge> LabradorProver<'a, S> {
             &vector_psi,
             &vector_omega,
         );
-        self.transcript.absorb_vector_b_ct_aggr(b_ct_aggr);
+        transcript.set_vector_b_ct_aggr(b_ct_aggr);
 
         // second aggregation
         let size_of_beta = size_of_psi;
-        let alpha_vector = self.transcript.generate_rq_vector(ep.constraint_k);
-        let beta_vector = self.transcript.generate_rq_vector(size_of_beta);
+        let alpha_vector = transcript.generate_rq_vector(ep.constraint_k);
+        let beta_vector = transcript.generate_rq_vector(size_of_beta);
         let aggr_2 = aggregate::AggregationTwo::new(
             &a_ct_aggt,
             &phi_ct_aggr,
-            &self.transcript.b_ct_aggr,
+            &transcript.b_ct_aggr,
             self.st,
             ep,
             &alpha_vector,
@@ -181,24 +164,16 @@ impl<'a, S: Sponge> LabradorProver<'a, S> {
             DecompositionParameters::new(ep.b, ep.t_1)
                 .expect("Decomposition error in decomposing h"),
         );
-        self.transcript.absorb_u2(commitment_u2);
+        transcript.set_u2(commitment_u2);
 
         // calculate z = c_1*s_1 + ... + c_r*s_r
-        let challenges = self.transcript.generate_challenges(ep.operator_norm);
+        let challenges = transcript.generate_challenges(ep.operator_norm, ep.multiplicity);
         let z = aggregate::calculate_z(&self.witness.s, &challenges);
+        transcript.set_recursive_part(z, t_i, garbage_polynomials.g, garbage_polynomials.h);
 
         // Step 4: Calculate h_ij, u_2, and z ends: -----------------------------------------
 
-        Ok(Proof {
-            u_1: self.transcript.u1.clone(),
-            p: self.transcript.vector_p.clone(),
-            b_ct_aggr: self.transcript.b_ct_aggr.clone(),
-            u_2: self.transcript.u2.clone(),
-            z,
-            t_i,
-            g_ij: garbage_polynomials.g,
-            h_ij: garbage_polynomials.h,
-        })
+        Ok(transcript)
     }
 
     /// check p_j? = ct(sum(<σ−1(pi_i^(j)), s_i>))
@@ -265,16 +240,9 @@ mod tests {
         let st: Statement = Statement::new(&witness_1, &ep_1);
         // generate the common reference string matrices A, B, C, D
         let pp = AjtaiInstances::new(&ep_1);
-        // generate random challenges used between prover and verifier.
-        let transcript = LabradorTranscript::new(
-            ShakeSponge::default(),
-            ep_1.security_parameter,
-            ep_1.rank,
-            ep_1.multiplicity,
-        );
 
         // create a new prover
-        let mut prover = LabradorProver::new(&pp, &witness_1, &st, transcript);
-        let _proof = prover.prove(&ep_1).unwrap();
+        let mut prover = LabradorProver::new(&pp, &witness_1, &st);
+        let _ = prover.prove(&ep_1).unwrap();
     }
 }
