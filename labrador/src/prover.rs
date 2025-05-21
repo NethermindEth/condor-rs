@@ -4,6 +4,7 @@ use crate::commitments::outer_commitments;
 use crate::commitments::outer_commitments::DecompositionParameters;
 use crate::commitments::outer_commitments::OuterCommitment;
 use crate::commitments::CommitError;
+use crate::core::aggregate;
 use crate::core::aggregate::FunctionsAggregation;
 use crate::core::aggregate::ZeroConstantFunctionsAggregation;
 use crate::core::garbage_polynomials::GarbagePolynomials;
@@ -88,15 +89,6 @@ impl<'a> LabradorProver<'a> {
         Ok(RqMatrix::new(commitments))
     }
 
-    fn compute_z(&self, challenges: &RqVector, rank: usize) -> RqVector {
-        self.witness
-            .s
-            .iter()
-            .zip(challenges.iter())
-            .map(|(s_i, c_i)| s_i * c_i)
-            .fold(RqVector::zero(rank), |acc, x| &acc + &x)
-    }
-
     /// all prove steps are from page 17
     pub fn prove<S: Sponge>(
         &mut self,
@@ -109,7 +101,10 @@ impl<'a> LabradorProver<'a> {
         // Compute outer commitments u1 and u2
         let mut outer_commitments = OuterCommitment::new(self.pp);
         // Aggregation instances
-        let mut constant_aggregator = ZeroConstantFunctionsAggregation::new(ep);
+        let mut constant_aggregator = ZeroConstantFunctionsAggregation::new(
+            ep,
+            usize::div_ceil(ep.security_parameter, ep.log_q),
+        );
         let funcs_aggregator = FunctionsAggregation::new(ep);
 
         // Step 1: Outer commitments u_1 starts: --------------------------------------------
@@ -149,19 +144,14 @@ impl<'a> LabradorProver<'a> {
         let vector_psi = transcript.generate_vector_psi(size_of_psi, ep.constraint_l);
         let vector_omega = transcript.generate_vector_omega(size_of_omega, ep.security_parameter);
         // first aggregation
-        let a_ct_aggr =
-            constant_aggregator.calculate_agg_a_double_prime(&vector_psi, &self.st.a_ct);
-        let phi_ct_aggr = constant_aggregator.calculate_agg_phi_double_prime(
+        constant_aggregator.calculate_agg_a_double_prime(&vector_psi, &self.st.a_ct);
+        constant_aggregator.calculate_agg_phi_double_prime(
             &self.st.phi_ct,
             projections.get_projection_matrices(),
             &vector_psi,
             &vector_omega,
         );
-        let b_ct_aggr = constant_aggregator.calculate_agg_b_double_prime(
-            &a_ct_aggr,
-            &phi_ct_aggr,
-            &self.witness.s,
-        );
+        let b_ct_aggr = constant_aggregator.calculate_agg_b_double_prime(&self.witness.s);
         transcript.set_vector_b_ct_aggr(b_ct_aggr);
 
         // second aggregation
@@ -170,7 +160,7 @@ impl<'a> LabradorProver<'a> {
         let beta_vector = transcript.generate_rq_vector(size_of_beta);
         let phi_i = funcs_aggregator.calculate_aggr_phi(
             &self.st.phi_constraint,
-            &phi_ct_aggr,
+            constant_aggregator.get_phi_double_prime(),
             &alpha_vector,
             &beta_vector,
         );
@@ -186,7 +176,8 @@ impl<'a> LabradorProver<'a> {
 
         // calculate z = c_1*s_1 + ... + c_r*s_r
         let challenges = transcript.generate_challenges(ep.operator_norm, ep.multiplicity);
-        let z = self.compute_z(&challenges, ep.rank);
+        let z = aggregate::compute_linear_combination(&self.witness.s, challenges.get_elements());
+
         transcript.set_recursive_part(z, t_i, garbage_polynomials.g, garbage_polynomials.h);
 
         // Step 4: Calculate h_ij, u_2, and z ends: -----------------------------------------

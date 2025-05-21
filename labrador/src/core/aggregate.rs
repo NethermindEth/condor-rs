@@ -1,17 +1,53 @@
+use std::borrow::Borrow;
+use std::ops::{Add, Mul};
+
 use crate::core::env_params::EnvironmentParameters;
 use crate::ring::rq::Rq;
 use crate::ring::rq_matrix::RqMatrix;
 use crate::ring::rq_vector::RqVector;
 use crate::ring::zq::Zq;
 
+pub fn compute_linear_combination<E, B, C>(elements: &[E], challenges: &[C]) -> B
+where
+    E: Borrow<B>,
+    for<'a> &'a B: Mul<&'a C, Output = B>,
+    for<'a> &'a B: Add<&'a B, Output = B>,
+{
+    debug_assert_eq!(
+        elements.len(),
+        challenges.len(),
+        "vectors must be the same length"
+    );
+    debug_assert!(!elements.is_empty(), "`elements` must not be empty");
+
+    let mut zipped_iter = elements.iter().zip(challenges.iter());
+    // Must do the following as the init value in fold requires size of B
+    let (e0, c0) = zipped_iter.next().unwrap();
+    let init = e0.borrow() * c0;
+
+    zipped_iter.fold(init, |acc, (elem, c)| &acc + &(elem.borrow() * c))
+}
+
 /// This struct serves as aggregation of functions with constant value 0.
 pub struct ZeroConstantFunctionsAggregation<'a> {
     ep: &'a EnvironmentParameters,
+    a_double_prime: Vec<RqMatrix>,
+    phi_double_prime: Vec<Vec<RqVector>>,
 }
 
 impl<'a> ZeroConstantFunctionsAggregation<'a> {
-    pub fn new(parameters: &'a EnvironmentParameters) -> Self {
-        Self { ep: parameters }
+    pub fn new(parameters: &'a EnvironmentParameters, k_range: usize) -> Self {
+        Self {
+            ep: parameters,
+            a_double_prime: vec![
+                RqMatrix::zero(parameters.multiplicity, parameters.multiplicity);
+                k_range
+            ],
+            phi_double_prime: vec![
+                vec![RqVector::zero(parameters.rank); parameters.multiplicity];
+                k_range
+            ],
+        }
     }
 
     /// Calculate a_double_primes from a_prime, a_{i,j}^{''k} = \sum_{l=1}^{L}\psi_l^{k}a_{ij}^{'(l)}
@@ -20,36 +56,22 @@ impl<'a> ZeroConstantFunctionsAggregation<'a> {
     /// @param: a_prime: a_{ij}^{'(l)}, each a_{ij} is a ring element (PolyRing)
     ///
     /// @return: a_{ij}^{''(k)}, return a vector length k of matrix a_{ij}^{''}
-    pub fn calculate_agg_a_double_prime(
-        &mut self,
-        vector_psi: &[Vec<Zq>],
-        a_prime: &[RqMatrix],
-    ) -> Vec<RqMatrix> {
-        let a_double_prime: Vec<Vec<RqVector>> = (0..vector_psi.len())
-            .map(|k| {
-                (0..self.ep.multiplicity)
-                    .map(|i| {
-                        (0..self.ep.multiplicity)
-                            .map(|j| {
-                                // calculate a_{ij}^{'(l)} * \psi_l^k
-                                (0..self.ep.constraint_l)
-                                    .map(|l: usize| {
-                                        &a_prime[l].get_elements()[i].get_elements()[j]
-                                            * &vector_psi[k][l]
-                                    })
-                                    .fold(
-                                        // sum over all l
-                                        Rq::zero(),
-                                        |acc, val| &acc + &val,
-                                    )
-                            })
-                            .collect::<RqVector>()
-                    })
-                    .collect::<Vec<RqVector>>()
-            })
-            .collect();
+    pub fn calculate_agg_a_double_prime(&mut self, vector_psi: &[Vec<Zq>], a_prime: &[RqMatrix]) {
+        let mut a_prime_l_vector: Vec<&Rq> = Vec::new();
+        for i in 0..self.ep.multiplicity {
+            for j in 0..self.ep.multiplicity {
+                a_prime_l_vector.clear(); // Re-use a_prime_l to prevent repetetive heap allocations
+                a_prime_l_vector = a_prime.iter().map(|matrix| matrix.get_cell(i, j)).collect();
 
-        a_double_prime.into_iter().map(RqMatrix::new).collect()
+                for (k, matrix) in self.a_double_prime.iter_mut().enumerate() {
+                    matrix.set_sell(
+                        i,
+                        j,
+                        compute_linear_combination(&a_prime_l_vector, &vector_psi[k]),
+                    );
+                }
+            }
+        }
     }
 
     /// calculate \phi_{i}^{''(k)} = \sum_{l=1}^{L}\psi_l^{k}\phi_{i}^{'(l)} + \sum(\omega_j^{k} * \sigma_{-1} * pi_i^{j})
@@ -67,51 +89,34 @@ impl<'a> ZeroConstantFunctionsAggregation<'a> {
         pi: &[Vec<Vec<Zq>>],
         vector_psi: &[Vec<Zq>],
         vector_omega: &[Vec<Zq>],
-    ) -> Vec<Vec<RqVector>> {
-        let phi_double_prime: Vec<Vec<RqVector>> = (0..self.ep.kappa)
-            .map(|k| {
-                (0..self.ep.multiplicity)
-                    .map(|i| {
-                        // \sum_{l=1}^{L}\psi_l^{k}\phi_{i}^{'(l)}
-                        let left_side = (0..self.ep.constraint_l)
-                            .map(|l| {
-                                phi_prime[l][i]
-                                    .iter()
-                                    .map(|phi| phi * &vector_psi[k][l])
-                                    .collect::<RqVector>()
-                            })
-                            .fold(RqVector::new(vec![Rq::zero(); self.ep.rank]), |acc, val| {
-                                acc.iter().zip(val.iter()).map(|(a, b)| a + b).collect()
-                            });
+    ) {
+        let mut phi_prime_l_vector: Vec<&RqVector> = Vec::new();
+        for i in 0..self.ep.multiplicity {
+            phi_prime_l_vector.clear();
+            phi_prime_l_vector = phi_prime.iter().map(|elems| &elems[i]).collect();
+            for (k, phi_k) in self.phi_double_prime.iter_mut().enumerate() {
+                phi_k[i] = compute_linear_combination(&phi_prime_l_vector, &vector_psi[k]);
+            }
+        }
 
-                        // Calculate the right side: \sum(\omega_j^{k} * \sigma_{-1} * pi_i^{j})
-                        // Because the length of pi is n*d, so we need to split it into n parts, each part has d elements to do the conjugate automorphism.
-                        let right_side = (0..(2 * self.ep.security_parameter))
-                            .map(|j| {
-                                let omega_j = vector_omega[k][j];
-                                (0..self.ep.rank)
-                                    .map(|chunk_index| {
-                                        let start = chunk_index * Rq::DEGREE;
-                                        let end = start + Rq::DEGREE;
-
-                                        let pi_poly =
-                                            Rq::new(pi[i][j][start..end].try_into().unwrap());
-                                        let pi_poly_conjugate = pi_poly.conjugate_automorphism();
-                                        &pi_poly_conjugate * &omega_j
-                                    })
-                                    .collect::<RqVector>()
-                            })
-                            .fold(RqVector::new(vec![Rq::zero(); self.ep.rank]), |acc, val| {
-                                acc.iter().zip(val.iter()).map(|(a, b)| a + b).collect()
-                            });
-
-                        &left_side + &right_side
-                    })
-                    .collect::<Vec<RqVector>>()
-            })
-            .collect::<Vec<Vec<RqVector>>>();
-
-        phi_double_prime
+        let mut conjugated_pi_j: Vec<RqVector> = Vec::new();
+        for (i, pi_i) in pi.iter().enumerate() {
+            conjugated_pi_j.clear();
+            // conjugated_pi_j =
+            conjugated_pi_j = pi_i
+                .iter()
+                .map(|zq_vector| {
+                    zq_vector
+                        .chunks_exact(Rq::DEGREE)
+                        .map(|coeffs| Rq::new(coeffs.try_into().unwrap()).conjugate_automorphism())
+                        .collect::<RqVector>()
+                })
+                .collect();
+            for (k, phi_k) in self.phi_double_prime.iter_mut().enumerate() {
+                phi_k[i] =
+                    &phi_k[i] + &compute_linear_combination(&conjugated_pi_j, &vector_omega[k]);
+            }
+        }
     }
 
     /// calculate b^{''(k)} = \sum_{i,j=1}^{r} a_{ij}^{''(k)} * <s_i, s_j> + \sum_{i=1}^{r} <\phi_{i}^{''(k)} * s_i>
@@ -121,19 +126,14 @@ impl<'a> ZeroConstantFunctionsAggregation<'a> {
     /// @param: witness: s_i
     ///
     /// @return: b^{''(k)}
-    pub fn calculate_agg_b_double_prime(
-        &mut self,
-        a_double_prime: &[RqMatrix],
-        phi_ct_aggr: &[Vec<RqVector>],
-        witness: &[RqVector],
-    ) -> RqVector {
+    pub fn calculate_agg_b_double_prime(&mut self, witness: &[RqVector]) -> RqVector {
         (0..self.ep.kappa)
             .map(|k| {
                 (0..self.ep.multiplicity)
                     .map(|i| {
                         &(0..self.ep.multiplicity).map(|j| {
                     // calculate a_{ij}^{''(k)} * <s_i, s_j>
-                    &a_double_prime[k].get_elements()[i].get_elements()[j]
+                    &self.a_double_prime[k].get_elements()[i].get_elements()[j]
                         * &witness[i].inner_product_poly_vector(&witness[j])
                 })
                 .fold(
@@ -142,11 +142,19 @@ impl<'a> ZeroConstantFunctionsAggregation<'a> {
                     |acc, val| &acc + &val,
                 )
                 // add \phi_{i}^{''(k)} * s[i]
-                + &phi_ct_aggr[k][i].inner_product_poly_vector(&witness[i])
+                + &self.phi_double_prime[k][i].inner_product_poly_vector(&witness[i])
                     }) // sum over all i,j
                     .fold(Rq::zero(), |acc, val| &acc + &val)
             })
             .collect()
+    }
+
+    pub fn get_alpha_double_prime(&self) -> &[RqMatrix] {
+        &self.a_double_prime
+    }
+
+    pub fn get_phi_double_prime(&self) -> &[Vec<RqVector>] {
+        &self.phi_double_prime
     }
 }
 
@@ -282,23 +290,6 @@ impl<'a> FunctionsAggregation<'a> {
 
         &left_side + &right_side
     }
-}
-
-/// calculate z = c_1*s_1 + ... + c_r*s_r
-/// or calculate Az = c_1*t_1 + ... + c_r*t_r
-///
-/// @param: x: witness s_i or Ajtai commitments t_i
-/// @param: random_c: c_i from challenge set
-///
-/// return z
-pub fn calculate_z(x: &[RqVector], random_c: &RqVector) -> RqVector {
-    x.iter()
-        .zip(random_c.iter())
-        .map(|(s_row, c_element)| s_row * c_element)
-        .fold(
-            RqVector::new(vec![Rq::zero(); x[0].get_elements().len()]),
-            |acc, x| &acc + &x,
-        )
 }
 
 // #[cfg(test)]

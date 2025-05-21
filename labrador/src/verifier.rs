@@ -4,7 +4,7 @@ use thiserror::Error;
 
 use crate::commitments::common_instances::AjtaiInstances;
 use crate::commitments::outer_commitments::{self, DecompositionParameters, OuterCommitment};
-use crate::core::aggregate::{FunctionsAggregation, ZeroConstantFunctionsAggregation};
+use crate::core::aggregate::{self, FunctionsAggregation, ZeroConstantFunctionsAggregation};
 use crate::core::{env_params::EnvironmentParameters, statement::Statement};
 use crate::ring::rq::Rq;
 use crate::ring::rq_matrix::RqMatrix;
@@ -58,13 +58,6 @@ impl<'a> LabradorVerifier<'a> {
         Self { pp, st }
     }
 
-    fn compute_z(t_i: &[RqVector], challenges: &RqVector, rank: usize) -> RqVector {
-        t_i.iter()
-            .zip(challenges.iter())
-            .map(|(s_i, c_i)| s_i * c_i)
-            .fold(RqVector::zero(rank), |acc, x| &acc + &x)
-    }
-
     /// All check conditions are from page 18
     pub fn verify<S: Sponge>(
         &mut self,
@@ -72,7 +65,10 @@ impl<'a> LabradorVerifier<'a> {
         ep: &EnvironmentParameters,
     ) -> Result<bool, VerifierError> {
         let mut transcript = LabradorTranscript::new(S::default());
-        let mut constant_aggregation = ZeroConstantFunctionsAggregation::new(ep);
+        let mut constant_aggregation = ZeroConstantFunctionsAggregation::new(
+            ep,
+            usize::div_ceil(ep.security_parameter, ep.log_q),
+        );
         let funcs_aggregator = FunctionsAggregation::new(ep);
 
         transcript.absorb_u1(&proof.u1);
@@ -132,7 +128,10 @@ impl<'a> LabradorVerifier<'a> {
 
         // 4. line 15: check Az ?= c_1 * t_1 + ... + c_r * t_r
         let az = self.pp.commitment_scheme_a.matrix() * &proof.z;
-        let ct_sum = Self::compute_z(proof.t.get_elements(), &challenges, ep.rank);
+        let ct_sum = aggregate::compute_linear_combination(
+            proof.t.get_elements(),
+            challenges.get_elements(),
+        );
         if az != ct_sum {
             return Err(VerifierError::AzError {
                 computed: az,
@@ -153,7 +152,7 @@ impl<'a> LabradorVerifier<'a> {
         }
 
         // 6. line 17: check \sum(<\phi_i, z>c_i) ?= \sum(h_ij * c_i * c_j)
-        let phi_ct_aggr = constant_aggregation.calculate_agg_phi_double_prime(
+        constant_aggregation.calculate_agg_phi_double_prime(
             &self.st.phi_ct,
             projections.get_projection_matrices(),
             &psi,
@@ -161,7 +160,7 @@ impl<'a> LabradorVerifier<'a> {
         );
         let phi_i = funcs_aggregator.calculate_aggr_phi(
             &self.st.phi_constraint,
-            &phi_ct_aggr,
+            constant_aggregation.get_phi_double_prime(),
             &vector_alpha,
             &vector_beta,
         );
@@ -178,10 +177,10 @@ impl<'a> LabradorVerifier<'a> {
 
         // 7. line 18: check \sum(a_ij * g_ij) + \sum(h_ii) - b ?= 0
 
-        let a_ct_aggr = constant_aggregation.calculate_agg_a_double_prime(&psi, &self.st.a_ct);
+        constant_aggregation.calculate_agg_a_double_prime(&psi, &self.st.a_ct);
         let a_primes = funcs_aggregator.calculate_aggr_a(
             &self.st.a_constraint,
-            &a_ct_aggr,
+            constant_aggregation.get_alpha_double_prime(),
             &vector_alpha,
             &vector_beta,
         );

@@ -28,6 +28,10 @@ impl RqMatrix {
         self.elements[0].get_length()
     }
 
+    pub fn get_cell(&self, row: usize, col: usize) -> &Rq {
+        &self.elements[row].get_elements()[col]
+    }
+
     pub fn set_sell(&mut self, row: usize, col: usize, value: Rq) {
         self.elements[row].set(col, value);
     }
