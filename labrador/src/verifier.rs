@@ -69,7 +69,7 @@ impl<'a> LabradorVerifier<'a> {
             ep,
             usize::div_ceil(ep.security_parameter, ep.log_q),
         );
-        let funcs_aggregator = FunctionsAggregation::new(ep);
+        let mut funcs_aggregator = FunctionsAggregation::new(ep);
 
         transcript.absorb_u1(&proof.u1);
         let projections =
@@ -158,13 +158,14 @@ impl<'a> LabradorVerifier<'a> {
             &psi,
             &omega,
         );
-        let phi_i = funcs_aggregator.calculate_aggr_phi(
+        funcs_aggregator.calculate_aggr_phi(
             &self.st.phi_constraint,
             constant_aggregation.get_phi_double_prime(),
             &vector_alpha,
             &vector_beta,
         );
-        let sum_phi_z_c = Self::calculate_phi_z_c(&phi_i, &challenges, &proof.z);
+        let sum_phi_z_c =
+            Self::calculate_phi_z_c(funcs_aggregator.get_appr_phi(), &challenges, &proof.z);
         let sum_hij_cij = Self::calculate_gh_ci_cj(&proof.h, &challenges, ep.multiplicity);
 
         // Left side multiple by 2 because of when we calculate h_ij, we didn't apply the division (divided by 2)
@@ -178,21 +179,26 @@ impl<'a> LabradorVerifier<'a> {
         // 7. line 18: check \sum(a_ij * g_ij) + \sum(h_ii) - b ?= 0
 
         constant_aggregation.calculate_agg_a_double_prime(&psi, &self.st.a_ct);
-        let a_primes = funcs_aggregator.calculate_aggr_a(
+        funcs_aggregator.calculate_agg_a(
             &self.st.a_constraint,
             constant_aggregation.get_alpha_double_prime(),
             &vector_alpha,
             &vector_beta,
         );
 
-        let b_primes = funcs_aggregator.calculate_aggr_b(
+        funcs_aggregator.calculate_aggr_b(
             &self.st.b_constraint,
             &proof.b_ct_aggr,
             &vector_alpha,
             &vector_beta,
         );
 
-        if !Self::check_relation(&RqMatrix::new(a_primes), &b_primes, &proof.g, &proof.h) {
+        if !Self::check_relation(
+            funcs_aggregator.get_agg_a(),
+            funcs_aggregator.get_aggr_b(),
+            &proof.g,
+            &proof.h,
+        ) {
             return Err(VerifierError::RelationCheckFailed);
         }
 

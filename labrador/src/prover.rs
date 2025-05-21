@@ -105,7 +105,7 @@ impl<'a> LabradorProver<'a> {
             ep,
             usize::div_ceil(ep.security_parameter, ep.log_q),
         );
-        let funcs_aggregator = FunctionsAggregation::new(ep);
+        let mut funcs_aggregator = FunctionsAggregation::new(ep);
 
         // Step 1: Outer commitments u_1 starts: --------------------------------------------
 
@@ -158,7 +158,7 @@ impl<'a> LabradorProver<'a> {
         let size_of_beta = size_of_psi;
         let alpha_vector = transcript.generate_rq_vector(ep.constraint_k);
         let beta_vector = transcript.generate_rq_vector(size_of_beta);
-        let phi_i = funcs_aggregator.calculate_aggr_phi(
+        funcs_aggregator.calculate_aggr_phi(
             &self.st.phi_constraint,
             constant_aggregator.get_phi_double_prime(),
             &alpha_vector,
@@ -167,7 +167,7 @@ impl<'a> LabradorProver<'a> {
         // Aggregation ends: ----------------------------------------------------------------
 
         // Step 4: Calculate h_ij, u_2, and z starts: ---------------------------------------
-        garbage_polynomials.compute_h(&phi_i);
+        garbage_polynomials.compute_h(funcs_aggregator.get_appr_phi());
         let commitment_u2 = outer_commitments.compute_u2(
             &garbage_polynomials.h,
             DecompositionParameters::new(ep.b, ep.t_1)?,

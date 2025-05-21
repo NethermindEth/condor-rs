@@ -60,7 +60,7 @@ impl<'a> ZeroConstantFunctionsAggregation<'a> {
         let mut a_prime_l_vector: Vec<&Rq> = Vec::new();
         for i in 0..self.ep.multiplicity {
             for j in 0..self.ep.multiplicity {
-                a_prime_l_vector.clear(); // Re-use a_prime_l to prevent repetetive heap allocations
+                a_prime_l_vector.clear(); // Re-use a_prime_l to prevent repetitive heap allocations
                 a_prime_l_vector = a_prime.iter().map(|matrix| matrix.get_cell(i, j)).collect();
 
                 for (k, matrix) in self.a_double_prime.iter_mut().enumerate() {
@@ -160,11 +160,19 @@ impl<'a> ZeroConstantFunctionsAggregation<'a> {
 
 pub struct FunctionsAggregation<'a> {
     ep: &'a EnvironmentParameters,
+    aggregated_a: RqMatrix,
+    aggregated_phi: Vec<RqVector>,
+    aggregated_b: Rq,
 }
 
 impl<'a> FunctionsAggregation<'a> {
     pub fn new(parameters: &'a EnvironmentParameters) -> Self {
-        Self { ep: parameters }
+        Self {
+            ep: parameters,
+            aggregated_a: RqMatrix::zero(parameters.multiplicity, parameters.multiplicity),
+            aggregated_phi: vec![RqVector::zero(parameters.rank); parameters.multiplicity],
+            aggregated_b: Rq::zero(),
+        }
     }
 
     /// calculate a_i = \sum(alpha_k * a_{ij}) + \sum(beta_k * a_{ij}^{''(k)})
@@ -177,40 +185,37 @@ impl<'a> FunctionsAggregation<'a> {
     /// @param: ep: struct SizeParams
     ///
     /// @return: a_i
-    pub fn calculate_aggr_a(
-        &self,
+    pub fn calculate_agg_a(
+        &mut self,
         a_constraint: &[RqMatrix],
         a_double_prime: &[RqMatrix],
         vector_alpha: &RqVector,
         vector_beta: &RqVector,
-    ) -> Vec<RqVector> {
-        let a_i: Vec<RqVector> = (0..self.ep.multiplicity)
-            .map(|i| {
-                (0..self.ep.multiplicity)
-                    .map(|j| {
-                        // calculate \sum(alpha_k * a_{ij}), k is constraint_k
-                        let left_side = (0..self.ep.constraint_k)
-                            .map(|k| {
-                                &a_constraint[k].get_elements()[i].get_elements()[j]
-                                    * &vector_alpha.get_elements()[k]
-                            })
-                            .fold(Rq::zero(), |acc, val| &acc + &val);
-
-                        // calculate \sum(beta_k * a_{ij}^{''(k)}), k is size k
-                        let right_side = (0..self.ep.kappa)
-                            .map(|k| {
-                                &a_double_prime[k].get_elements()[i].get_elements()[j]
-                                    * &vector_beta.get_elements()[k]
-                            })
-                            .fold(Rq::zero(), |acc, val| &acc + &val);
-
-                        &left_side + &right_side
-                    })
-                    .collect::<RqVector>()
-            })
-            .collect::<Vec<RqVector>>();
-
-        a_i
+    ) {
+        let mut a_constraint_k: Vec<&Rq> = Vec::new();
+        let mut a_double_prime_k: Vec<&Rq> = Vec::new();
+        for i in 0..self.ep.multiplicity {
+            for j in 0..self.ep.multiplicity {
+                a_constraint_k.clear();
+                a_constraint_k = a_constraint
+                    .iter()
+                    .map(|matrix| matrix.get_cell(i, j))
+                    .collect();
+                a_double_prime_k.clear();
+                a_double_prime_k = a_double_prime
+                    .iter()
+                    .map(|matrix| matrix.get_cell(i, j))
+                    .collect();
+                self.aggregated_a.set_sell(
+                    i,
+                    j,
+                    &compute_linear_combination::<&Rq, Rq, Rq>(
+                        &a_constraint_k,
+                        vector_alpha.get_elements(),
+                    ) + &compute_linear_combination(&a_double_prime_k, vector_beta.get_elements()),
+                );
+            }
+        }
     }
 
     /// calculate phi_i = \sum(alpha_k * \phi_{i}^{k}) + \sum(beta_k * \phi_{i}^{''(k)})
@@ -224,43 +229,26 @@ impl<'a> FunctionsAggregation<'a> {
     ///
     /// return: phi_i
     pub fn calculate_aggr_phi(
-        &self,
+        &mut self,
         phi_constraint: &[Vec<RqVector>],
-        phi_ct_aggr: &[Vec<RqVector>],
-        random_alpha: &RqVector,
-        random_beta: &RqVector,
-    ) -> Vec<RqVector> {
-        let phi_i: Vec<RqVector> = (0..self.ep.multiplicity)
-            .map(|i| {
-                // calculate \sum(alpha_k * \phi_{i}^{k})
-                let left_side: RqVector = (0..self.ep.constraint_k)
-                    .map(|k| {
-                        phi_constraint[k][i]
-                            .iter()
-                            .map(|phi| phi * &random_alpha.get_elements()[k])
-                            .collect::<RqVector>()
-                    })
-                    .fold(RqVector::new(vec![Rq::zero(); self.ep.rank]), |acc, val| {
-                        acc.iter().zip(val.iter()).map(|(a, b)| a + b).collect()
-                    });
+        phi_double_prime: &[Vec<RqVector>],
+        vector_alpha: &RqVector,
+        vector_beta: &RqVector,
+    ) {
+        let mut phi_constraint_k: Vec<&RqVector> = Vec::new();
+        let mut phi_double_prime_k: Vec<&RqVector> = Vec::new();
 
-                // calculate \sum(beta_k * \phi_{i}^{''(k)})
-                let right_side: RqVector = (0..self.ep.kappa)
-                    .map(|k| {
-                        phi_ct_aggr[k][i]
-                            .iter()
-                            .map(|phi| phi * &random_beta.get_elements()[k])
-                            .collect::<RqVector>()
-                    })
-                    .fold(RqVector::new(vec![Rq::zero(); self.ep.rank]), |acc, val| {
-                        acc.iter().zip(val.iter()).map(|(a, b)| a + b).collect()
-                    });
-
-                &left_side + &right_side
-            })
-            .collect::<Vec<RqVector>>();
-
-        phi_i
+        for i in 0..self.ep.multiplicity {
+            phi_constraint_k.clear();
+            phi_constraint_k = phi_constraint.iter().map(|element| &element[i]).collect();
+            phi_double_prime_k.clear();
+            phi_double_prime_k = phi_double_prime.iter().map(|element| &element[i]).collect();
+            self.aggregated_phi[i] =
+                &compute_linear_combination::<&RqVector, RqVector, Rq>(
+                    &phi_constraint_k,
+                    vector_alpha.get_elements(),
+                ) + &compute_linear_combination(&phi_double_prime_k, vector_beta.get_elements());
+        }
     }
 
     /// calculate b_i = \sum(alpha_k * b^{k}) + \sum(beta_k * b^{''(k})
@@ -274,21 +262,30 @@ impl<'a> FunctionsAggregation<'a> {
     ///
     /// @return: b_i
     pub fn calculate_aggr_b(
-        &self,
+        &mut self,
         b_constraint: &RqVector,
-        b_ct_aggr: &RqVector,
-        random_alpha: &RqVector,
-        random_beta: &RqVector,
-    ) -> Rq {
-        let left_side = (0..self.ep.constraint_k)
-            .map(|k| &b_constraint.get_elements()[k] * &random_alpha.get_elements()[k])
-            .fold(Rq::zero(), |acc, val| &acc + &val);
+        b_double_prime: &RqVector,
+        vector_alpha: &RqVector,
+        vector_beta: &RqVector,
+    ) {
+        self.aggregated_b =
+            &compute_linear_combination(b_constraint.get_elements(), vector_alpha.get_elements())
+                + &compute_linear_combination(
+                    b_double_prime.get_elements(),
+                    vector_beta.get_elements(),
+                )
+    }
 
-        let right_side = (0..self.ep.kappa)
-            .map(|k| &b_ct_aggr.get_elements()[k] * &random_beta.get_elements()[k])
-            .fold(Rq::zero(), |acc, val| &acc + &val);
+    pub fn get_agg_a(&self) -> &RqMatrix {
+        &self.aggregated_a
+    }
 
-        &left_side + &right_side
+    pub fn get_appr_phi(&self) -> &[RqVector] {
+        &self.aggregated_phi
+    }
+
+    pub fn get_aggr_b(&self) -> &Rq {
+        &self.aggregated_b
     }
 }
 
