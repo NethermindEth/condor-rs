@@ -161,6 +161,14 @@ impl Mul<&Zq> for &RqVector {
     }
 }
 
+impl Mul<Zq> for &RqVector {
+    type Output = RqVector;
+    // A poly vector multiple by a PolyRing
+    fn mul(self, other: Zq) -> RqVector {
+        self.iter().map(|s| s * other).collect()
+    }
+}
+
 // Dot product between two vectors
 impl Mul for &RqVector {
     type Output = Rq;

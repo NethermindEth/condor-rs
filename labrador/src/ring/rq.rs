@@ -63,15 +63,6 @@ impl Rq {
             .fold(Zq::ZERO, |acc, x| acc + x)
     }
 
-    /// Scalar multiplication
-    pub fn scalar_mul(&self, s: Zq) -> Self {
-        let mut result = [Zq::ZERO; Self::DEGREE];
-        for (i, &coeff) in self.coeffs.iter().enumerate() {
-            result[i] = s * (coeff);
-        }
-        Rq::new(result)
-    }
-
     /// Evaluate the polynomial at a specific point
     pub fn eval(&self, x: Zq) -> Zq {
         let mut result = Zq::ZERO;
@@ -254,6 +245,18 @@ impl From<Vec<Zq>> for Rq {
             }
         }
         Rq::new(temp)
+    }
+}
+
+impl Mul<Zq> for &Rq {
+    type Output = Rq;
+    /// Scalar multiplication of a polynomial
+    fn mul(self, other: Zq) -> Rq {
+        let mut copied_coeffs = self.coeffs;
+        for elem in copied_coeffs.iter_mut() {
+            *elem *= other;
+        }
+        Rq::new(copied_coeffs)
     }
 }
 
@@ -552,7 +555,7 @@ mod tests {
     #[test]
     fn test_scalar_mul() {
         let poly: Rq = vec![Zq::ONE, Zq::new(2), Zq::new(3), Zq::new(4)].into();
-        let result = poly.scalar_mul(Zq::new(2));
+        let result = &poly * Zq::new(2);
         assert_eq!(
             result.coeffs,
             helper::padded(&[Zq::new(2), Zq::new(4), Zq::new(6), Zq::new(8)])
@@ -787,7 +790,7 @@ mod tests {
 
         // Test reconstruction with all 3 parts
         let reconstructed =
-            &(&parts[0] + &parts[1].scalar_mul(Zq::new(4))) + &parts[2].scalar_mul(Zq::new(16)); // 4²
+            &(&parts[0] + &(&(&parts[1] * Zq::new(4)) + &(&parts[2] * Zq::new(16)))); // 4²
 
         // Verify reconstruction coefficient by coefficient
         for i in 0..4 {
@@ -852,7 +855,7 @@ mod tests {
         let parts = poly.decompose(Zq::new(3), 2);
 
         // Verify reconstruction
-        let reconstructed = &parts[0] + &parts[1].scalar_mul(Zq::new(3));
+        let reconstructed = &parts[0] + &(&parts[1] * Zq::new(3));
 
         for i in 0..3 {
             assert_eq!(
@@ -912,7 +915,7 @@ mod tests {
             }
 
             // Verify reconstruction
-            let reconstructed = &parts[0] + &parts[1].scalar_mul(Zq::new(*base));
+            let reconstructed = &parts[0] + &(&parts[1] * Zq::new(*base));
             assert_eq!(reconstructed, poly, "Base {}: Reconstruction failed", base);
         }
     }

@@ -169,9 +169,9 @@ impl<'a> LabradorVerifier<'a> {
         let sum_hij_cij = Self::calculate_gh_ci_cj(&proof.h, &challenges, ep.multiplicity);
 
         // Left side multiple by 2 because of when we calculate h_ij, we didn't apply the division (divided by 2)
-        if &sum_phi_z_c * &Zq::TWO != sum_hij_cij {
+        if &sum_phi_z_c * Zq::TWO != sum_hij_cij {
             return Err(VerifierError::PhiError {
-                computed: &sum_phi_z_c * &Zq::TWO,
+                computed: &sum_phi_z_c * Zq::TWO,
                 expected: sum_hij_cij,
             });
         }
@@ -287,8 +287,8 @@ impl<'a> LabradorVerifier<'a> {
 
         let sum_h_ii = (0..r).fold(Rq::zero(), |acc, i| &acc + h.get_cell_symmetric(i, i));
 
-        let b_primes2 = b_primes * &Zq::TWO;
-        let sum_a_primes_g2 = &sum_a_primes_g * &Zq::TWO;
+        let b_primes2 = b_primes * Zq::TWO;
+        let sum_a_primes_g2 = &sum_a_primes_g * Zq::TWO;
 
         &sum_a_primes_g2 + &sum_h_ii == b_primes2
     }
