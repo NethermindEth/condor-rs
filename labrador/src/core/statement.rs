@@ -97,7 +97,7 @@ pub fn calculate_b_constraint(
     // calculate \sum(a_{ij}^{k}<s_i, s_j>)
     let left_side = (0..size_s).map(|i| {
         (0..size_s).map(|j: usize| {
-            a_constraint.get_cell_symmetric(i, j)
+            a_constraint.get_cell(i, j)
                 * &s[i].inner_product_poly_vector(&s[j])
         })
         .fold(Rq::zero(), |acc, val| &acc + &val )

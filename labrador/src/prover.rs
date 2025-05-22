@@ -86,7 +86,7 @@ impl<'a> LabradorProver<'a> {
             .map(|s_i| self.pp.commitment_scheme_a.commit(&s_i))
             .collect::<Result<Vec<_>, CommitError>>()?;
 
-        Ok(RqMatrix::new(commitments))
+        Ok(RqMatrix::new(commitments, false))
     }
 
     /// all prove steps are from page 17

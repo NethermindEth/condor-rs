@@ -8,21 +8,26 @@ use super::{rq::Rq, zq::Zq};
 #[derive(Debug, Clone)]
 pub struct RqMatrix {
     elements: Vec<RqVector>,
+    is_symmetric: bool,
 }
 
 impl RqMatrix {
     /// Constructor for the Matrix of polynomials in Rq
-    pub const fn new(elements: Vec<RqVector>) -> Self {
-        RqMatrix { elements }
+    pub fn new(elements: Vec<RqVector>, is_symmetric: bool) -> Self {
+        RqMatrix {
+            elements,
+            is_symmetric,
+        }
     }
 
     pub fn zero(row_len: usize, col_len: usize) -> Self {
-        RqMatrix::new(vec![RqVector::zero(col_len); row_len])
+        RqMatrix::new(vec![RqVector::zero(col_len); row_len], false)
     }
 
-    pub fn zero_symmetric(size: usize) -> Self {
+    pub fn symmetric_zero(size: usize) -> Self {
         Self {
             elements: (0..size).map(|row| RqVector::zero(row + 1)).collect(),
+            is_symmetric: true,
         }
     }
 
@@ -31,11 +36,16 @@ impl RqMatrix {
     }
 
     pub fn get_col_len(&self) -> usize {
-        self.elements[0].get_length()
+        let last_row = self.get_row_len() - 1;
+        self.elements[last_row].get_length()
     }
 
     pub fn get_cell(&self, row: usize, col: usize) -> &Rq {
-        &self.elements[row].get_elements()[col]
+        if !self.is_symmetric || row >= col {
+            &self.elements[row].get_elements()[col]
+        } else {
+            &self.elements[col].get_elements()[row]
+        }
     }
 
     pub fn set_sell(&mut self, row: usize, col: usize, value: Rq) {
@@ -48,6 +58,7 @@ impl RqMatrix {
             elements: (0..row_len)
                 .map(|_| RqVector::random(rng, col_len))
                 .collect(),
+            is_symmetric: false,
         }
     }
 
@@ -57,14 +68,7 @@ impl RqMatrix {
             elements: (0..row_len)
                 .map(|row| RqVector::random(rng, row + 1))
                 .collect(),
-        }
-    }
-
-    pub fn get_cell_symmetric(&self, row: usize, col: usize) -> &Rq {
-        if row >= col {
-            &self.elements[row].get_elements()[col]
-        } else {
-            &self.elements[col].get_elements()[row]
+            is_symmetric: true,
         }
     }
 
@@ -74,10 +78,11 @@ impl RqMatrix {
             elements: (0..row_len)
                 .map(|_| RqVector::random_ternary(rng, col_len))
                 .collect(),
+            is_symmetric: false,
         }
     }
 
-    pub fn get_elements(&self) -> &Vec<RqVector> {
+    pub fn get_elements(&self) -> &[RqVector] {
         &self.elements
     }
 
@@ -98,7 +103,7 @@ impl FromIterator<RqVector> for RqMatrix {
         for item in iter {
             elements.push(item);
         }
-        RqMatrix::new(elements)
+        RqMatrix::new(elements, false)
     }
 }
 
@@ -157,7 +162,7 @@ mod tests {
         let poly2: Rq = vec![Zq::new(u32::MAX - 4), Zq::new(u32::MAX - 4)].into();
         let poly3: Rq = vec![Zq::ONE, Zq::ZERO].into();
         let poly4: Rq = vec![Zq::ZERO, Zq::new(4)].into();
-        let matrix_1: RqMatrix = RqMatrix::new(vec![RqVector::from(vec![poly1, poly2])]);
+        let matrix_1: RqMatrix = RqMatrix::new(vec![RqVector::from(vec![poly1, poly2])], false);
         let vec_1: RqVector = RqVector::from(vec![poly3, poly4]);
 
         let result_1 = matrix_1.mul(&vec_1);
@@ -172,10 +177,13 @@ mod tests {
         let poly8: Rq = vec![Zq::new(u32::MAX - 3), Zq::new(4)].into();
         let poly9: Rq = vec![Zq::MAX, Zq::new(u32::MAX - 1)].into();
         let poly10: Rq = vec![Zq::new(u32::MAX - 2), Zq::new(u32::MAX - 2)].into();
-        let matrix_2: RqMatrix = RqMatrix::new(vec![
-            RqVector::from(vec![poly5, poly6]),
-            RqVector::from(vec![poly7, poly8]),
-        ]);
+        let matrix_2: RqMatrix = RqMatrix::new(
+            vec![
+                RqVector::from(vec![poly5, poly6]),
+                RqVector::from(vec![poly7, poly8]),
+            ],
+            false,
+        );
         let vec_2: RqVector = RqVector::from(vec![poly9, poly10]);
 
         let result_2 = matrix_2.mul(&vec_2);

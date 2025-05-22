@@ -10,8 +10,8 @@ impl<'a> GarbagePolynomials<'a> {
     pub fn new(witness_vector: &'a [RqVector]) -> Self {
         Self {
             witness_vector,
-            g: RqMatrix::new(Vec::new()),
-            h: RqMatrix::new(Vec::new()),
+            g: RqMatrix::new(Vec::new(), true),
+            h: RqMatrix::new(Vec::new(), true),
         }
     }
 
@@ -27,7 +27,7 @@ impl<'a> GarbagePolynomials<'a> {
             }
             g_i.push(RqVector::new(g_ij));
         }
-        self.g = RqMatrix::new(g_i);
+        self.g = RqMatrix::new(g_i, true);
     }
 
     /// Calculate the h_{ij} = <φ_i, s_j> + <φ_j, s_i> garbage polynomials
@@ -49,7 +49,7 @@ impl<'a> GarbagePolynomials<'a> {
             }
             h_i.push(RqVector::new(h_ij));
         }
-        self.h = RqMatrix::new(h_i);
+        self.h = RqMatrix::new(h_i, true);
     }
 }
 
@@ -227,18 +227,9 @@ mod tests {
 
         let expected_g_22 = witnesses[2].inner_product_poly_vector(&witnesses[2]);
 
-        assert_eq!(
-            *garbage_polynomial.g.get_cell_symmetric(0, 1),
-            expected_g_01
-        );
-        assert_eq!(
-            *garbage_polynomial.g.get_cell_symmetric(1, 0),
-            expected_g_10
-        );
-        assert_eq!(
-            *garbage_polynomial.g.get_cell_symmetric(2, 2),
-            expected_g_22
-        );
+        assert_eq!(*garbage_polynomial.g.get_cell(0, 1), expected_g_01);
+        assert_eq!(*garbage_polynomial.g.get_cell(1, 0), expected_g_10);
+        assert_eq!(*garbage_polynomial.g.get_cell(2, 2), expected_g_22);
     }
 
     #[test]
@@ -270,13 +261,10 @@ mod tests {
         let expected_h_01 = &phi_0_s_1 + &phi_1_s_0;
 
         assert_eq!(
-            garbage_polynomial.h.get_cell_symmetric(0, 1),
-            garbage_polynomial.h.get_cell_symmetric(1, 0)
+            garbage_polynomial.h.get_cell(0, 1),
+            garbage_polynomial.h.get_cell(1, 0)
         );
-        assert_eq!(
-            expected_h_01,
-            *garbage_polynomial.h.get_cell_symmetric(0, 1)
-        );
+        assert_eq!(expected_h_01, *garbage_polynomial.h.get_cell(0, 1));
     }
 
     // #[test]

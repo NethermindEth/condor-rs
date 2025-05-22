@@ -240,7 +240,7 @@ impl<'a> LabradorVerifier<'a> {
             .map(|i| {
                 (0..r)
                     .map(|j| {
-                        &(x_ij.get_cell_symmetric(i, j) * &random_c.get_elements()[i])
+                        &(x_ij.get_cell(i, j) * &random_c.get_elements()[i])
                             * &random_c.get_elements()[j]
                     })
                     .fold(Rq::zero(), |acc, x| &acc + &x)
@@ -280,12 +280,11 @@ impl<'a> LabradorVerifier<'a> {
         // walk only over the stored half: i ≤ j
         for i in 0..r {
             for j in 0..r {
-                sum_a_primes_g = &sum_a_primes_g
-                    + &(a_primes.get_cell_symmetric(i, j) * g.get_cell_symmetric(i, j));
+                sum_a_primes_g = &sum_a_primes_g + &(a_primes.get_cell(i, j) * g.get_cell(i, j));
             }
         }
 
-        let sum_h_ii = (0..r).fold(Rq::zero(), |acc, i| &acc + h.get_cell_symmetric(i, i));
+        let sum_h_ii = (0..r).fold(Rq::zero(), |acc, i| &acc + h.get_cell(i, i));
 
         let b_primes2 = b_primes * Zq::TWO;
         let sum_a_primes_g2 = &sum_a_primes_g * Zq::TWO;

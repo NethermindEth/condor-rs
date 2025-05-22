@@ -39,7 +39,7 @@ impl<'a> ZeroConstantFunctionsAggregation<'a> {
     pub fn new(parameters: &'a EnvironmentParameters, k_range: usize) -> Self {
         Self {
             ep: parameters,
-            a_double_prime: vec![RqMatrix::zero_symmetric(parameters.multiplicity); k_range],
+            a_double_prime: vec![RqMatrix::symmetric_zero(parameters.multiplicity); k_range],
             phi_double_prime: vec![
                 vec![RqVector::zero(parameters.rank); parameters.multiplicity];
                 k_range
@@ -58,10 +58,7 @@ impl<'a> ZeroConstantFunctionsAggregation<'a> {
         for i in 0..self.ep.multiplicity {
             for j in 0..i + 1 {
                 a_prime_l_vector.clear(); // Re-use a_prime_l to prevent repetitive heap allocations
-                a_prime_l_vector = a_prime
-                    .iter()
-                    .map(|matrix| matrix.get_cell_symmetric(i, j))
-                    .collect();
+                a_prime_l_vector = a_prime.iter().map(|matrix| matrix.get_cell(i, j)).collect();
 
                 for (k, matrix) in self.a_double_prime.iter_mut().enumerate() {
                     matrix.set_sell(
@@ -133,7 +130,7 @@ impl<'a> ZeroConstantFunctionsAggregation<'a> {
                     .map(|i| {
                         &(0..self.ep.multiplicity).map(|j| {
                     // calculate a_{ij}^{''(k)} * <s_i, s_j>
-                    self.a_double_prime[k].get_cell_symmetric(i, j)
+                    self.a_double_prime[k].get_cell(i, j)
                         * &witness[i].inner_product_poly_vector(&witness[j])
                 })
                 .fold(
@@ -169,7 +166,7 @@ impl<'a> FunctionsAggregation<'a> {
     pub fn new(parameters: &'a EnvironmentParameters) -> Self {
         Self {
             ep: parameters,
-            aggregated_a: RqMatrix::zero_symmetric(parameters.multiplicity),
+            aggregated_a: RqMatrix::symmetric_zero(parameters.multiplicity),
             aggregated_phi: vec![RqVector::zero(parameters.rank); parameters.multiplicity],
             aggregated_b: Rq::zero(),
         }
@@ -199,12 +196,12 @@ impl<'a> FunctionsAggregation<'a> {
                 a_constraint_k.clear();
                 a_constraint_k = a_constraint
                     .iter()
-                    .map(|matrix| matrix.get_cell_symmetric(i, j))
+                    .map(|matrix| matrix.get_cell(i, j))
                     .collect();
                 a_double_prime_k.clear();
                 a_double_prime_k = a_double_prime
                     .iter()
-                    .map(|matrix| matrix.get_cell_symmetric(i, j))
+                    .map(|matrix| matrix.get_cell(i, j))
                     .collect();
                 self.aggregated_a.set_sell(
                     i,

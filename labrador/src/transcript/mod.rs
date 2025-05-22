@@ -26,9 +26,9 @@ impl<S: Sponge> LabradorTranscript<S> {
             b_ct_aggr: RqVector::new(Vec::new()),
             u2: RqVector::new(Vec::new()),
             z: RqVector::new(Vec::new()),
-            t: RqMatrix::new(vec![RqVector::new(Vec::new())]),
-            g: RqMatrix::new(vec![RqVector::new(Vec::new())]),
-            h: RqMatrix::new(vec![RqVector::new(Vec::new())]),
+            t: RqMatrix::new(vec![RqVector::new(Vec::new())], false),
+            g: RqMatrix::new(vec![RqVector::new(Vec::new())], true),
+            h: RqMatrix::new(vec![RqVector::new(Vec::new())], true),
         }
     }
 
