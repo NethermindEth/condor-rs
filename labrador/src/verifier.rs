@@ -281,7 +281,7 @@ impl<'a> LabradorVerifier<'a> {
         for i in 0..r {
             for j in 0..r {
                 sum_a_primes_g = &sum_a_primes_g
-                    + &(&a_primes.get_elements()[i].get_elements()[j] * g.get_cell_symmetric(i, j));
+                    + &(a_primes.get_cell_symmetric(i, j) * g.get_cell_symmetric(i, j));
             }
         }
 

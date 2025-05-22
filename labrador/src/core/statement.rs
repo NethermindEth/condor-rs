@@ -26,7 +26,7 @@ impl Statement {
     pub fn new(witness: &Witness, ep: &EnvironmentParameters) -> Self {
         // generate random a_constraint with size: constraint_k * r * n
         let a_constraint: Vec<RqMatrix> = (0..ep.constraint_k)
-            .map(|_| RqMatrix::random(&mut rand::rng(), ep.multiplicity, ep.multiplicity))
+            .map(|_| RqMatrix::symmetric_random(&mut rand::rng(), ep.multiplicity))
             .collect();
 
         // generate random phi_constraint with size: constraint_k * r * n
@@ -45,7 +45,7 @@ impl Statement {
 
         // generate example a_ct with size: constraint_l * r * n
         let a_ct: Vec<RqMatrix> = (0..ep.constraint_l)
-            .map(|_| RqMatrix::random(&mut rand::rng(), ep.multiplicity, ep.multiplicity))
+            .map(|_| RqMatrix::symmetric_random(&mut rand::rng(), ep.multiplicity))
             .collect();
 
         // generate random phi_ct with size: constraint_k * r * n
@@ -96,8 +96,8 @@ pub fn calculate_b_constraint(
     let size_s = s.len();
     // calculate \sum(a_{ij}^{k}<s_i, s_j>)
     let left_side = (0..size_s).map(|i| {
-        (0..size_s).map(|j| {
-            &a_constraint.get_elements()[i].get_elements()[j]
+        (0..size_s).map(|j: usize| {
+            a_constraint.get_cell_symmetric(i, j)
                 * &s[i].inner_product_poly_vector(&s[j])
         })
         .fold(Rq::zero(), |acc, val| &acc + &val )

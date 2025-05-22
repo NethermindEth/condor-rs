@@ -20,6 +20,12 @@ impl RqMatrix {
         RqMatrix::new(vec![RqVector::zero(col_len); row_len])
     }
 
+    pub fn zero_symmetric(size: usize) -> Self {
+        Self {
+            elements: (0..size).map(|row| RqVector::zero(row + 1)).collect(),
+        }
+    }
+
     pub fn get_row_len(&self) -> usize {
         self.elements.len()
     }
@@ -41,6 +47,15 @@ impl RqMatrix {
         Self {
             elements: (0..row_len)
                 .map(|_| RqVector::random(rng, col_len))
+                .collect(),
+        }
+    }
+
+    /// Create a random symmetric matrix of polynomials
+    pub fn symmetric_random<R: Rng + CryptoRng>(rng: &mut R, row_len: usize) -> Self {
+        Self {
+            elements: (0..row_len)
+                .map(|row| RqVector::random(rng, row + 1))
                 .collect(),
         }
     }
