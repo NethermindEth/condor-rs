@@ -101,10 +101,7 @@ impl<'a> LabradorProver<'a> {
         // Compute outer commitments u1 and u2
         let mut outer_commitments = OuterCommitment::new(self.pp);
         // Aggregation instances
-        let mut constant_aggregator = ZeroConstantFunctionsAggregation::new(
-            ep,
-            usize::div_ceil(ep.security_parameter, ep.log_q),
-        );
+        let mut constant_aggregator = ZeroConstantFunctionsAggregation::new(ep);
         let mut funcs_aggregator = FunctionsAggregation::new(ep);
 
         // Step 1: Outer commitments u_1 starts: --------------------------------------------
@@ -139,10 +136,9 @@ impl<'a> LabradorProver<'a> {
         // Step 2: JL projection ends: ------------------------------------------------------
 
         // Step 3: Aggregation starts: --------------------------------------------------------------
-        let size_of_psi = usize::div_ceil(ep.security_parameter, ep.log_q);
-        let size_of_omega = size_of_psi;
-        let vector_psi = transcript.generate_vector_psi(size_of_psi, ep.constraint_l);
-        let vector_omega = transcript.generate_vector_omega(size_of_omega, ep.security_parameter);
+        let vector_psi = transcript.generate_vector_psi(ep.const_agg_length, ep.constraint_l);
+        let vector_omega =
+            transcript.generate_vector_omega(ep.const_agg_length, ep.security_parameter);
         // first aggregation
         constant_aggregator.calculate_agg_a_double_prime(&vector_psi, &self.st.a_ct);
         constant_aggregator.calculate_agg_phi_double_prime(
@@ -155,9 +151,8 @@ impl<'a> LabradorProver<'a> {
         transcript.set_vector_b_ct_aggr(b_ct_aggr);
 
         // second aggregation
-        let size_of_beta = size_of_psi;
         let alpha_vector = transcript.generate_rq_vector(ep.constraint_k);
-        let beta_vector = transcript.generate_rq_vector(size_of_beta);
+        let beta_vector = transcript.generate_rq_vector(ep.const_agg_length);
         funcs_aggregator.calculate_aggr_phi(
             &self.st.phi_constraint,
             constant_aggregator.get_phi_double_prime(),

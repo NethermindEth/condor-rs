@@ -32,7 +32,8 @@ pub struct EnvironmentParameters {
 
     /// Function Families Sizes
     pub constraint_k: usize, // Number of constraints of the form f
-    pub constraint_l: usize, // Number of constraints of the form f'
+    pub constraint_l: usize,     // Number of constraints of the form f'
+    pub const_agg_length: usize, // Number of functions in the first aggregation step
 
     /// Other Parameters
     pub log_q: usize, // Size of log(q) in bits, where q is the modulo
@@ -73,6 +74,7 @@ impl EnvironmentParameters {
             Self::compute_gamma1(base_b1, parts_t1, multiplicity, kappa, base_b2, parts_t2);
         let gamma_2 = Self::compute_gamma2(base_b1, parts_t1, multiplicity);
         let beta_prime = Self::compute_beta_prime(base_b, gamma, gamma_1, gamma_2);
+        let log_q = (modulo_q as f64).log2() as usize;
         EnvironmentParameters {
             security_parameter,
             rank,
@@ -92,7 +94,8 @@ impl EnvironmentParameters {
             kappa_2,
             constraint_k,
             constraint_l,
-            log_q: (modulo_q as f64).log2() as usize, // Size of log(q) in bits, where q is the modulo
+            const_agg_length: usize::div_ceil(security_parameter, log_q),
+            log_q, // Size of log(q) in bits, where q is the modulo
             operator_norm,
         }
     }

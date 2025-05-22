@@ -65,10 +65,7 @@ impl<'a> LabradorVerifier<'a> {
         ep: &EnvironmentParameters,
     ) -> Result<bool, VerifierError> {
         let mut transcript = LabradorTranscript::new(S::default());
-        let mut constant_aggregation = ZeroConstantFunctionsAggregation::new(
-            ep,
-            usize::div_ceil(ep.security_parameter, ep.log_q),
-        );
+        let mut constant_aggregation = ZeroConstantFunctionsAggregation::new(ep);
         let mut funcs_aggregator = FunctionsAggregation::new(ep);
 
         transcript.absorb_u1(&proof.u1);

@@ -36,13 +36,16 @@ pub struct ZeroConstantFunctionsAggregation<'a> {
 }
 
 impl<'a> ZeroConstantFunctionsAggregation<'a> {
-    pub fn new(parameters: &'a EnvironmentParameters, k_range: usize) -> Self {
+    pub fn new(parameters: &'a EnvironmentParameters) -> Self {
         Self {
             ep: parameters,
-            a_double_prime: vec![RqMatrix::symmetric_zero(parameters.multiplicity); k_range],
+            a_double_prime: vec![
+                RqMatrix::symmetric_zero(parameters.multiplicity);
+                parameters.const_agg_length
+            ],
             phi_double_prime: vec![
                 vec![RqVector::zero(parameters.rank); parameters.multiplicity];
-                k_range
+                parameters.const_agg_length
             ],
         }
     }
