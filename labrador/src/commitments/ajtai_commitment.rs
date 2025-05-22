@@ -209,7 +209,7 @@ mod tests {
         assert!(AjtaiScheme::new(
             Zq::ONE,
             Zq::ZERO,
-            RqMatrix::new(vec![RqVector::new(vec![Rq::zero()])])
+            RqMatrix::new(vec![RqVector::new(vec![Rq::zero()])], false)
         )
         .is_err());
         let _ = test_utils::setup_scheme(); // Will panic if setup fails

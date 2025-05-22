@@ -3,13 +3,18 @@ use crate::commitments::common_instances::AjtaiInstances;
 use crate::commitments::outer_commitments;
 use crate::commitments::outer_commitments::DecompositionParameters;
 use crate::commitments::outer_commitments::OuterCommitment;
+use crate::commitments::CommitError;
+use crate::core::aggregate;
+use crate::core::aggregate::FunctionsAggregation;
+use crate::core::aggregate::ZeroConstantFunctionsAggregation;
 use crate::core::garbage_polynomials::GarbagePolynomials;
 use crate::ring::rq_matrix::RqMatrix;
 use crate::ring::zq::Zq;
 use crate::ring::zq::ZqVector;
-use crate::transcript::{LabradorTranscript, Sponge};
+use crate::transcript::LabradorTranscript;
+use crate::transcript::Sponge;
 use crate::{
-    core::{aggregate, env_params::EnvironmentParameters, statement::Statement},
+    core::{env_params::EnvironmentParameters, statement::Statement},
     ring::rq_vector::RqVector,
 };
 use rand::rng;
@@ -27,162 +32,157 @@ pub enum ProverError {
         computed: Zq,
     },
     #[error("commitment failure")]
-    CommitmentError(#[from] ajtai_commitment::CommitError),
+    CommitError(#[from] ajtai_commitment::CommitError),
     #[error("decomposition failure")]
     DecompositionError(#[from] outer_commitments::DecompositionError),
 }
 
-// Proof contains the parameters will be sent to verifier
-// All parameters are from tr, line 2 on page 18
-pub struct Proof {
-    pub u_1: RqVector,
-    pub p: Vec<Zq>,
-    pub b_ct_aggr: RqVector,
-    pub u_2: RqVector,
-    pub z: RqVector,
-    pub t_i: Vec<RqVector>,
-    pub g_ij: RqMatrix,
-    pub h_ij: RqMatrix,
-}
 pub struct Witness {
     pub s: Vec<RqVector>,
 }
 
 impl Witness {
     pub fn new(ep: &EnvironmentParameters) -> Self {
-        let s = (0..ep.r)
-            .map(|_| RqVector::random_ternary(&mut rng(), ep.n))
-            .collect();
-        Self { s }
-    }
-}
-
-pub struct LabradorProver<'a, S: Sponge> {
-    pub pp: &'a AjtaiInstances,
-    pub witness: &'a Witness,
-    pub st: &'a Statement,
-    pub transcript: LabradorTranscript<S>,
-}
-
-impl<'a, S: Sponge> LabradorProver<'a, S> {
-    pub fn new(
-        pp: &'a AjtaiInstances,
-        witness: &'a Witness,
-        st: &'a Statement,
-        transcript: LabradorTranscript<S>,
-    ) -> Self {
-        Self {
-            pp,
-            witness,
-            st,
-            transcript,
+        loop {
+            let s: Vec<RqVector> = (0..ep.multiplicity)
+                .map(|_| RqVector::random_ternary(&mut rng(), ep.rank))
+                .collect();
+            if Self::validate_l2_norm(&s, ep) {
+                return Self { s };
+            }
         }
     }
 
-    /// all prove steps are from page 17
-    pub fn prove(&mut self, ep: &EnvironmentParameters) -> Result<Proof, ProverError> {
-        // check the L2 norm of the witness
-        // not sure whether this should be handled during the proving or managed by the witness generator.
-        Self::check_witness_l2norm(self, ep)?;
-        // Step 1: Outer commitments u_1 starts: --------------------------------------------
+    fn validate_l2_norm(candidate: &[RqVector], ep: &EnvironmentParameters) -> bool {
+        let beta2 = ep.beta * ep.beta;
+        for polys in candidate {
+            let witness_l2norm_squared = RqVector::compute_norm_squared(polys);
+            if witness_l2norm_squared > beta2 {
+                return false;
+            }
+        }
+        true
+    }
+}
 
-        // Ajtai Commitments t_i = A * s_i
-        let t_i: Vec<RqVector> = self
+pub struct LabradorProver<'a> {
+    pub pp: &'a AjtaiInstances,
+    pub witness: &'a Witness,
+    pub st: &'a Statement,
+}
+
+impl<'a> LabradorProver<'a> {
+    pub fn new(pp: &'a AjtaiInstances, witness: &'a Witness, st: &'a Statement) -> Self {
+        Self { pp, witness, st }
+    }
+
+    fn compute_vector_ti(&self) -> Result<RqMatrix, CommitError> {
+        // collect all commitments, propagating any CommitError with `?`
+        let commitments = self
             .witness
             .s
             .iter()
-            .map(|s_i| self.pp.commitment_scheme_a.commit(s_i))
-            .collect::<Result<_, _>>()?;
+            .cloned()
+            .map(|s_i| self.pp.commitment_scheme_a.commit(&s_i))
+            .collect::<Result<Vec<_>, CommitError>>()?;
 
-        // This replaces the following code
-        let mut garbage_polynomials = GarbagePolynomials::new(self.witness.s.clone());
+        Ok(RqMatrix::new(commitments, false))
+    }
+
+    /// all prove steps are from page 17
+    pub fn prove<S: Sponge>(
+        &mut self,
+        ep: &EnvironmentParameters,
+    ) -> Result<LabradorTranscript<S>, ProverError> {
+        // Generate random challenges used between prover and verifier
+        let mut transcript = LabradorTranscript::new(S::default());
+        // Compute garbage polynomials g and h
+        let mut garbage_polynomials = GarbagePolynomials::new(&self.witness.s);
+        // Compute outer commitments u1 and u2
+        let mut outer_commitments = OuterCommitment::new(self.pp);
+        // Aggregation instances
+        let mut constant_aggregator = ZeroConstantFunctionsAggregation::new(ep);
+        let mut funcs_aggregator = FunctionsAggregation::new(ep);
+
+        // Step 1: Outer commitments u_1 starts: --------------------------------------------
+
+        // Ajtai Commitments t_i = A * s_i
+        let t_i = self.compute_vector_ti()?;
+        // g_ij = <s_i, s_j>
         garbage_polynomials.compute_g();
         // calculate outer commitment u_1 = \sum(B_ik * t_i^(k)) + \sum(C_ijk * g_ij^(k))
-        let mut outer_commitments = OuterCommitment::new(self.pp);
-        outer_commitments.compute_u1(
-            RqMatrix::new(t_i.clone()),
+        let commitment_u1 = outer_commitments.compute_u1(
+            &t_i,
             DecompositionParameters::new(ep.b, ep.t_1)?,
-            garbage_polynomials.g.clone(),
+            &garbage_polynomials.g,
             DecompositionParameters::new(ep.b, ep.t_2)?,
         );
-        self.transcript.absorb_u1(outer_commitments.u_1.clone());
+        transcript.set_u1(commitment_u1);
         // Step 1: Outer commitments u_1 ends: ----------------------------------------------
 
         // Step 2: JL projection starts: ----------------------------------------------------
-
-        // JL projection p_j + check p_j = ct(sum(<\sigma_{-1}(pi_i^(j)), s_i>))
-        let projections = self.transcript.generate_projections();
+        let projections =
+            transcript.generate_projections(ep.security_parameter, ep.rank, ep.multiplicity);
         let vector_p = projections.compute_batch_projection(&self.witness.s);
-        self.transcript.absorb_vector_p(vector_p);
-        // Projections::new(pi, &self.witness.s);
-
+        transcript.set_vector_p(vector_p);
         // Notice that this check is resource-intensive due to the multiplication of two ZqVector<256> instances,
         // followed by the removal of high-degree terms. It might not be a necessary check.
         // Omid's Note: This can be removed later. However, we need to ensure a correct projection matrix with correct upper-bound.
         Self::check_projection(
             self,
-            &self.transcript.vector_p,
+            &transcript.vector_p,
             projections.get_projection_matrices(),
         )?;
         // Step 2: JL projection ends: ------------------------------------------------------
 
         // Step 3: Aggregation starts: --------------------------------------------------------------
-
-        let size_of_psi = usize::div_ceil(ep.lambda, ep.log_q);
-        let size_of_omega = size_of_psi;
-        let vector_psi = self
-            .transcript
-            .generate_vector_psi(size_of_psi, ep.constraint_l);
-        let vector_omega = self.transcript.generate_vector_omega(size_of_omega);
+        let vector_psi = transcript.generate_vector_psi(ep.const_agg_length, ep.constraint_l);
+        let vector_omega =
+            transcript.generate_vector_omega(ep.const_agg_length, ep.security_parameter);
         // first aggregation
-        let aggr_1 = aggregate::AggregationOne::new(
-            self.witness,
-            self.st,
-            ep,
+        constant_aggregator.calculate_agg_a_double_prime(&vector_psi, &self.st.a_ct);
+        constant_aggregator.calculate_agg_phi_double_prime(
+            &self.st.phi_ct,
             projections.get_projection_matrices(),
             &vector_psi,
             &vector_omega,
         );
-        self.transcript
-            .absorb_vector_b_ct_aggr(aggr_1.b_ct_aggr.clone());
+        let b_ct_aggr = constant_aggregator.calculate_agg_b_double_prime(&self.witness.s);
+        transcript.set_vector_b_ct_aggr(b_ct_aggr);
 
         // second aggregation
-        let size_of_beta = size_of_psi;
-        let alpha_vector = self.transcript.generate_rq_vector(ep.constraint_k);
-        let beta_vector = self.transcript.generate_rq_vector(size_of_beta);
-        let aggr_2 =
-            aggregate::AggregationTwo::new(&aggr_1, self.st, ep, &alpha_vector, &beta_vector);
+        let alpha_vector = transcript.generate_rq_vector(ep.constraint_k);
+        let beta_vector = transcript.generate_rq_vector(ep.const_agg_length);
+        funcs_aggregator.calculate_aggr_phi(
+            &self.st.phi_constraint,
+            constant_aggregator.get_phi_double_prime(),
+            &alpha_vector,
+            &beta_vector,
+        );
         // Aggregation ends: ----------------------------------------------------------------
 
         // Step 4: Calculate h_ij, u_2, and z starts: ---------------------------------------
-
-        let phi_i = aggr_2.phi_i;
-        garbage_polynomials.compute_h(&phi_i);
-        outer_commitments.compute_u2(
-            garbage_polynomials.h.clone(),
+        garbage_polynomials.compute_h(funcs_aggregator.get_appr_phi());
+        let commitment_u2 = outer_commitments.compute_u2(
+            &garbage_polynomials.h,
             DecompositionParameters::new(ep.b, ep.t_1)?,
         );
-        self.transcript.absorb_u2(outer_commitments.u_2);
+        transcript.set_u2(commitment_u2);
 
         // calculate z = c_1*s_1 + ... + c_r*s_r
-        let challenges = self.transcript.generate_challenges(ep.operator_norm);
-        let z = aggregate::calculate_z(&self.witness.s, &challenges);
+        let challenges = transcript.generate_challenges(ep.operator_norm, ep.multiplicity);
+        let z = aggregate::compute_linear_combination(&self.witness.s, challenges.get_elements());
+
+        transcript.set_recursive_part(z, t_i, garbage_polynomials.g, garbage_polynomials.h);
 
         // Step 4: Calculate h_ij, u_2, and z ends: -----------------------------------------
 
-        Ok(Proof {
-            u_1: self.transcript.u1.clone(),
-            p: self.transcript.vector_p.clone(),
-            b_ct_aggr: self.transcript.b_ct_aggr.clone(),
-            u_2: self.transcript.u2.clone(),
-            z,
-            t_i,
-            g_ij: garbage_polynomials.g,
-            h_ij: garbage_polynomials.h,
-        })
+        Ok(transcript)
     }
 
-    /// check p_j? = ct(sum(<σ−1(pi_i^(j)), s_i>))
+    // The following is not part of the prover.
+    // Todo: Add jl projection constraints to the statement.
+    // /// check p_j? = ct(sum(<σ−1(pi_i^(j)), s_i>))
     fn check_projection(&self, p: &[Zq], pi: &[Vec<Vec<Zq>>]) -> Result<bool, ProverError> {
         let s_coeffs: Vec<Vec<Zq>> = self
             .witness
@@ -214,21 +214,6 @@ impl<'a, S: Sponge> LabradorProver<'a, S> {
 
         Ok(true)
     }
-
-    /// check the L2 norm of the witness, || s_i || <= beta
-    fn check_witness_l2norm(&self, ep: &EnvironmentParameters) -> Result<(), ProverError> {
-        let beta2 = ep.beta * ep.beta;
-        for polys in &self.witness.s {
-            let witness_l2norm_squared = RqVector::compute_norm_squared(polys);
-            if witness_l2norm_squared > beta2 {
-                return Err(ProverError::WitnessL2NormViolated {
-                    norm_squared: witness_l2norm_squared,
-                    allowed: beta2,
-                });
-            }
-        }
-        Ok(())
-    }
 }
 
 #[cfg(test)]
@@ -246,12 +231,9 @@ mod tests {
         let st: Statement = Statement::new(&witness_1, &ep_1);
         // generate the common reference string matrices A, B, C, D
         let pp = AjtaiInstances::new(&ep_1);
-        // generate random challenges used between prover and verifier.
-        let transcript =
-            LabradorTranscript::new(ShakeSponge::default(), ep_1.lambda, ep_1.n, ep_1.r);
 
         // create a new prover
-        let mut prover = LabradorProver::new(&pp, &witness_1, &st, transcript);
-        let _proof = prover.prove(&ep_1).unwrap();
+        let mut prover = LabradorProver::new(&pp, &witness_1, &st);
+        let _: LabradorTranscript<ShakeSponge> = prover.prove(&ep_1).unwrap();
     }
 }

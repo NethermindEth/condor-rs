@@ -1,17 +1,17 @@
 use crate::ring::{rq_matrix::RqMatrix, rq_vector::RqVector};
 
-pub struct GarbagePolynomials {
-    witness_vector: Vec<RqVector>,
+pub struct GarbagePolynomials<'a> {
+    witness_vector: &'a [RqVector],
     pub g: RqMatrix,
     pub h: RqMatrix,
 }
 
-impl GarbagePolynomials {
-    pub fn new(witness_vector: Vec<RqVector>) -> Self {
+impl<'a> GarbagePolynomials<'a> {
+    pub fn new(witness_vector: &'a [RqVector]) -> Self {
         Self {
             witness_vector,
-            g: RqMatrix::new(Vec::new()),
-            h: RqMatrix::new(Vec::new()),
+            g: RqMatrix::new(Vec::new(), true),
+            h: RqMatrix::new(Vec::new(), true),
         }
     }
 
@@ -27,7 +27,7 @@ impl GarbagePolynomials {
             }
             g_i.push(RqVector::new(g_ij));
         }
-        self.g = RqMatrix::new(g_i);
+        self.g = RqMatrix::new(g_i, true);
     }
 
     /// Calculate the h_{ij} = <φ_i, s_j> + <φ_j, s_i> garbage polynomials
@@ -45,11 +45,11 @@ impl GarbagePolynomials {
                 // Only calculate for j ≤ i (upper triangular)
                 let inner_phi_i_s_j = phi[i].inner_product_poly_vector(&self.witness_vector[j]);
                 let inner_phi_j_s_i = phi[j].inner_product_poly_vector(&self.witness_vector[i]);
-                h_ij.push(inner_phi_i_s_j + inner_phi_j_s_i);
+                h_ij.push(&inner_phi_i_s_j + &inner_phi_j_s_i);
             }
             h_i.push(RqVector::new(h_ij));
         }
-        self.h = RqMatrix::new(h_i);
+        self.h = RqMatrix::new(h_i, true);
     }
 }
 
@@ -200,7 +200,7 @@ mod tests {
     fn test_g_matrix_size() {
         let multiplicity = 3;
         let (witnesses, _) = create_test_witnesses(multiplicity);
-        let mut garbage_polynomial = GarbagePolynomials::new(witnesses.clone());
+        let mut garbage_polynomial = GarbagePolynomials::new(&witnesses);
         garbage_polynomial.compute_g();
 
         assert_eq!(garbage_polynomial.g.get_row_len(), 3);
@@ -217,7 +217,7 @@ mod tests {
     fn test_g_calculation() {
         let (witnesses, _) = create_test_witnesses(3);
 
-        let mut garbage_polynomial = GarbagePolynomials::new(witnesses.clone());
+        let mut garbage_polynomial = GarbagePolynomials::new(&witnesses);
         garbage_polynomial.compute_g();
 
         // Verify a few specific values
@@ -227,16 +227,16 @@ mod tests {
 
         let expected_g_22 = witnesses[2].inner_product_poly_vector(&witnesses[2]);
 
-        assert_eq!(garbage_polynomial.g.get_cell_symmetric(0, 1), expected_g_01);
-        assert_eq!(garbage_polynomial.g.get_cell_symmetric(1, 0), expected_g_10);
-        assert_eq!(garbage_polynomial.g.get_cell_symmetric(2, 2), expected_g_22);
+        assert_eq!(*garbage_polynomial.g.get_cell(0, 1), expected_g_01);
+        assert_eq!(*garbage_polynomial.g.get_cell(1, 0), expected_g_10);
+        assert_eq!(*garbage_polynomial.g.get_cell(2, 2), expected_g_22);
     }
 
     #[test]
     fn test_h_matrix_size() {
         let multiplicity = 3;
         let (witnesses, phi) = create_test_witnesses(multiplicity);
-        let mut garbage_polynomial = GarbagePolynomials::new(witnesses.clone());
+        let mut garbage_polynomial = GarbagePolynomials::new(&witnesses);
         garbage_polynomial.compute_h(&phi);
 
         assert_eq!(garbage_polynomial.h.get_row_len(), 3);
@@ -252,19 +252,19 @@ mod tests {
     #[test]
     fn test_h_calculation() {
         let (witnesses, phi) = create_test_witnesses(3);
-        let mut garbage_polynomial = GarbagePolynomials::new(witnesses.clone());
+        let mut garbage_polynomial = GarbagePolynomials::new(&witnesses);
         garbage_polynomial.compute_h(&phi);
 
         // Verify a specific value
         let phi_0_s_1 = phi[0].inner_product_poly_vector(&witnesses[1]);
         let phi_1_s_0 = phi[1].inner_product_poly_vector(&witnesses[0]);
-        let expected_h_01 = phi_0_s_1 + phi_1_s_0;
+        let expected_h_01 = &phi_0_s_1 + &phi_1_s_0;
 
         assert_eq!(
-            garbage_polynomial.h.get_cell_symmetric(0, 1),
-            garbage_polynomial.h.get_cell_symmetric(1, 0)
+            garbage_polynomial.h.get_cell(0, 1),
+            garbage_polynomial.h.get_cell(1, 0)
         );
-        assert_eq!(expected_h_01, garbage_polynomial.h.get_cell_symmetric(0, 1));
+        assert_eq!(expected_h_01, *garbage_polynomial.h.get_cell(0, 1));
     }
 
     // #[test]

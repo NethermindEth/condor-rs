@@ -23,6 +23,14 @@ impl RqVector {
         }
     }
 
+    pub fn set(&mut self, index: usize, value: Rq) {
+        self.elements[index] = value;
+    }
+
+    pub fn into_inner(self) -> Vec<Rq> {
+        self.elements
+    }
+
     pub fn get_length(&self) -> usize {
         self.elements.len()
     }
@@ -60,8 +68,8 @@ impl RqVector {
     pub fn inner_product_poly_vector(&self, other: &RqVector) -> Rq {
         self.iter()
             .zip(other.iter())
-            .map(|(a, b)| a.multiplication(b))
-            .fold(Rq::zero(), |acc, val| acc + val)
+            .map(|(a, b)| a * b)
+            .fold(Rq::zero(), |acc, val| &acc + &val)
     }
 
     /// Get the underlying vector as slice
@@ -145,6 +153,22 @@ impl Mul<&Rq> for &RqVector {
     }
 }
 
+impl Mul<&Zq> for &RqVector {
+    type Output = RqVector;
+    // A poly vector multiple by a PolyRing
+    fn mul(self, other: &Zq) -> RqVector {
+        self.iter().map(|s| s * other).collect()
+    }
+}
+
+impl Mul<Zq> for &RqVector {
+    type Output = RqVector;
+    // A poly vector multiple by a PolyRing
+    fn mul(self, other: Zq) -> RqVector {
+        self.iter().map(|s| s * other).collect()
+    }
+}
+
 // Dot product between two vectors
 impl Mul for &RqVector {
     type Output = Rq;
@@ -154,7 +178,7 @@ impl Mul for &RqVector {
             .iter()
             .zip(rhs.elements.iter())
             .map(|(a, b)| a * b)
-            .fold(Rq::zero(), |acc, x| acc + x)
+            .fold(Rq::zero(), |acc, x| &acc + &x)
     }
 }
 
