@@ -50,8 +50,8 @@ pub struct Witness {
 
 impl Witness {
     pub fn new(ep: &EnvironmentParameters) -> Self {
-        let s = (0..ep.r)
-            .map(|_| RqVector::random_ternary(&mut rng(), ep.n))
+        let s = (0..ep.multiplicity)
+            .map(|_| RqVector::random_ternary(&mut rng(), ep.rank))
             .collect();
         Self { s }
     }
@@ -128,7 +128,7 @@ impl<'a, S: Sponge> LabradorProver<'a, S> {
 
         // Step 3: Aggregation starts: --------------------------------------------------------------
 
-        let size_of_psi = usize::div_ceil(ep.lambda, ep.log_q);
+        let size_of_psi = usize::div_ceil(ep.security_parameter, ep.log_q);
         let size_of_omega = size_of_psi;
         let vector_psi = self
             .transcript
@@ -247,8 +247,12 @@ mod tests {
         // generate the common reference string matrices A, B, C, D
         let pp = AjtaiInstances::new(&ep_1);
         // generate random challenges used between prover and verifier.
-        let transcript =
-            LabradorTranscript::new(ShakeSponge::default(), ep_1.lambda, ep_1.n, ep_1.r);
+        let transcript = LabradorTranscript::new(
+            ShakeSponge::default(),
+            ep_1.security_parameter,
+            ep_1.rank,
+            ep_1.multiplicity,
+        );
 
         // create a new prover
         let mut prover = LabradorProver::new(&pp, &witness_1, &st, transcript);
