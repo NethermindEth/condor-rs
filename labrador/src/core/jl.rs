@@ -1,17 +1,18 @@
+use crate::ring::rq_matrix::RqMatrix;
 use crate::ring::rq_vector::RqVector;
-use crate::ring::zq::Zq;
+use crate::ring::zq::{Zq, ZqVector};
 
 // LaBRADOR: Compact Proofs for R1CS from Module-SIS | Page 5 | Proving smallness section
 const UPPER_BOUND_FACTOR: Zq = Zq::new(128);
 const LOWER_BOUND_FACTOR: Zq = Zq::new(30);
 
 pub struct Projection {
-    random_linear_map_vector: Vec<Vec<Vec<Zq>>>,
+    random_linear_map_vector: Vec<RqMatrix>,
     security_level: usize,
 }
 
 impl Projection {
-    pub fn new(random_linear_map_vector: Vec<Vec<Vec<Zq>>>, security_level: usize) -> Self {
+    pub fn new(random_linear_map_vector: Vec<RqMatrix>, security_level: usize) -> Self {
         Self {
             random_linear_map_vector,
             security_level,
@@ -21,8 +22,13 @@ impl Projection {
     fn compute_projection(&self, index: usize, witness: &RqVector) -> Vec<Zq> {
         let mut projection = vec![Zq::ZERO; 2 * self.security_level];
         let coefficients = witness.concatenate_coefficients();
-        for (i, item) in projection.iter_mut().enumerate() {
-            *item = self.random_linear_map_vector[index][i]
+        for (i, pi_ij) in self.random_linear_map_vector[index]
+            .get_elements()
+            .iter()
+            .enumerate()
+        {
+            projection[i] = pi_ij
+                .concatenate_coefficients()
                 .iter()
                 .zip(coefficients.iter())
                 .map(|(m, s)| *m * *s)
@@ -34,15 +40,31 @@ impl Projection {
     pub fn compute_batch_projection(&self, witness_vector: &[RqVector]) -> Vec<Zq> {
         let mut result = vec![Zq::ZERO; 2 * self.security_level];
         for (index_i, witness) in witness_vector.iter().enumerate() {
-            for (index_j, element) in result.iter_mut().enumerate() {
-                *element += self.compute_projection(index_i, witness)[index_j];
-            }
+            result = result.add(&self.compute_projection(index_i, witness));
         }
         result
     }
 
-    pub fn get_projection_matrices(&self) -> &[Vec<Vec<Zq>>] {
+    pub fn get_projection_matrices(&self) -> &[RqMatrix] {
         &self.random_linear_map_vector
+    }
+
+    pub fn get_conjugated_projection_matrices(&self) -> Vec<RqMatrix> {
+        self.random_linear_map_vector
+            .iter()
+            .map(|pi_i| {
+                pi_i.get_elements()
+                    .iter()
+                    .map(|pi_ij| {
+                        pi_ij
+                            .get_elements()
+                            .iter()
+                            .map(|polynomial| polynomial.conjugate_automorphism())
+                            .collect()
+                    })
+                    .collect()
+            })
+            .collect()
     }
 
     fn norm_squared(projection: &[Zq]) -> Zq {

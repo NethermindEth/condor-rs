@@ -73,6 +73,12 @@ impl Rq {
         result
     }
 
+    pub fn add_coefficients(&self) -> Zq {
+        self.get_coefficients()
+            .iter()
+            .fold(Zq::ZERO, |acc, coeff| acc + *coeff)
+    }
+
     /// Check if Polynomial == 0
     pub fn is_zero(&self) -> bool {
         self.coeffs.iter().all(|&coeff| coeff == Zq::ZERO)

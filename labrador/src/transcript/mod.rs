@@ -91,7 +91,7 @@ impl<S: Sponge> LabradorTranscript<S> {
                 linear_projection_randomness
                     .chunks_exact(col_size)
                     .map(|chunk| {
-                        chunk
+                        let coeffs = chunk
                             .iter()
                             .map(|elem| {
                                 if elem.get_value() < 2_u32.pow(30) {
@@ -102,7 +102,8 @@ impl<S: Sponge> LabradorTranscript<S> {
                                     Zq::ZERO
                                 }
                             })
-                            .collect()
+                            .collect();
+                        RqVector::new_from_zq_vector(coeffs)
                     })
                     .collect()
             })
@@ -189,13 +190,10 @@ mod tests_generate_pi {
         let projections = transcript.generate_projections(security_parameter, rank, multiplicity);
         assert_eq!(projections.get_projection_matrices().len(), multiplicity); // number_of_project_matrices
         assert_eq!(
-            projections.get_projection_matrices()[0].len(),
+            projections.get_projection_matrices()[0].get_row_len(),
             2 * security_parameter
         );
-        assert_eq!(
-            projections.get_projection_matrices()[0][0].len(),
-            rank * Rq::DEGREE
-        );
+        assert_eq!(projections.get_projection_matrices()[0].get_col_len(), rank);
     }
 
     // Test the distribution of values in the random matrix
@@ -208,9 +206,9 @@ mod tests_generate_pi {
 
         for projection_matrix in projections.get_projection_matrices() {
             let mut counts = [0.0, 0.0, 0.0]; // -1, 0, 1
-            for row in projection_matrix {
-                for cell in row {
-                    match *cell {
+            for row in projection_matrix.get_elements() {
+                for cell in row.concatenate_coefficients() {
+                    match cell {
                         Zq::ZERO => counts[1] += 1.0,
                         Zq::ONE => counts[2] += 1.0,
                         Zq::MAX => counts[0] += 1.0,

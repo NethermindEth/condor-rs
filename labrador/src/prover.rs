@@ -10,7 +10,6 @@ use crate::core::aggregate::ZeroConstantFunctionsAggregation;
 use crate::core::garbage_polynomials::GarbagePolynomials;
 use crate::ring::rq_matrix::RqMatrix;
 use crate::ring::zq::Zq;
-use crate::ring::zq::ZqVector;
 use crate::transcript::LabradorTranscript;
 use crate::transcript::Sponge;
 use crate::{
@@ -125,14 +124,6 @@ impl<'a> LabradorProver<'a> {
             transcript.generate_projections(ep.security_parameter, ep.rank, ep.multiplicity);
         let vector_p = projections.compute_batch_projection(&self.witness.s);
         transcript.set_vector_p(vector_p);
-        // Notice that this check is resource-intensive due to the multiplication of two ZqVector<256> instances,
-        // followed by the removal of high-degree terms. It might not be a necessary check.
-        // Omid's Note: This can be removed later. However, we need to ensure a correct projection matrix with correct upper-bound.
-        Self::check_projection(
-            self,
-            &transcript.vector_p,
-            projections.get_projection_matrices(),
-        )?;
         // Step 2: JL projection ends: ------------------------------------------------------
 
         // Step 3: Aggregation starts: --------------------------------------------------------------
@@ -143,7 +134,7 @@ impl<'a> LabradorProver<'a> {
         constant_aggregator.calculate_agg_a_double_prime(&vector_psi, &self.st.a_ct);
         constant_aggregator.calculate_agg_phi_double_prime(
             &self.st.phi_ct,
-            projections.get_projection_matrices(),
+            &projections.get_conjugated_projection_matrices(),
             &vector_psi,
             &vector_omega,
         );
@@ -183,37 +174,37 @@ impl<'a> LabradorProver<'a> {
     // The following is not part of the prover.
     // Todo: Add jl projection constraints to the statement.
     // /// check p_j? = ct(sum(<σ−1(pi_i^(j)), s_i>))
-    fn check_projection(&self, p: &[Zq], pi: &[Vec<Vec<Zq>>]) -> Result<bool, ProverError> {
-        let s_coeffs: Vec<Vec<Zq>> = self
-            .witness
-            .s
-            .iter()
-            .map(|s_i| {
-                s_i.iter()
-                    .flat_map(|s_i_p| *s_i_p.get_coefficients())
-                    .collect()
-            })
-            .collect();
+    // fn check_projection(&self, p: &[Zq], pi: &[Vec<Vec<Zq>>]) -> Result<bool, ProverError> {
+    //     let s_coeffs: Vec<Vec<Zq>> = self
+    //         .witness
+    //         .s
+    //         .iter()
+    //         .map(|s_i| {
+    //             s_i.iter()
+    //                 .flat_map(|s_i_p| *s_i_p.get_coefficients())
+    //                 .collect()
+    //         })
+    //         .collect();
 
-        for (j, &p_j) in p.iter().enumerate() {
-            let mut poly = vec![Zq::ZERO; p.len()];
-            for (i, s_i) in s_coeffs.iter().enumerate() {
-                let pi_ele = &pi[i][j];
-                let pi_ele_ca = pi_ele.conjugate_automorphism();
-                poly = poly.add(&(pi_ele_ca.multiply(s_i)));
-            }
+    //     for (j, &p_j) in p.iter().enumerate() {
+    //         let mut poly = vec![Zq::ZERO; p.len()];
+    //         for (i, s_i) in s_coeffs.iter().enumerate() {
+    //             let pi_ele = &pi[i][j];
+    //             let pi_ele_ca = pi_ele.conjugate_automorphism();
+    //             poly = poly.add(&(pi_ele_ca.multiply(s_i)));
+    //         }
 
-            if poly[0] != p_j {
-                return Err(ProverError::ProjectionError {
-                    index: j,
-                    expected: p_j,
-                    computed: poly[0],
-                });
-            }
-        }
+    //         if poly[0] != p_j {
+    //             return Err(ProverError::ProjectionError {
+    //                 index: j,
+    //                 expected: p_j,
+    //                 computed: poly[0],
+    //             });
+    //         }
+    //     }
 
-        Ok(true)
-    }
+    //     Ok(true)
+    // }
 }
 
 #[cfg(test)]

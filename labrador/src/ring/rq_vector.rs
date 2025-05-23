@@ -16,6 +16,16 @@ impl RqVector {
         Self { elements }
     }
 
+    pub fn new_from_zq_vector(elements: Vec<Zq>) -> Self {
+        let mut result = Vec::new();
+        debug_assert!(elements.len() % Rq::DEGREE == 0);
+        elements.chunks_exact(Rq::DEGREE).for_each(|chunk| {
+            result.push(Rq::new(chunk.try_into().unwrap()));
+        });
+
+        RqVector { elements: result }
+    }
+
     /// Create a zero vector
     pub fn zero(length: usize) -> Self {
         Self {
@@ -172,7 +182,6 @@ impl Mul<Zq> for &RqVector {
 // Dot product between two vectors
 impl Mul for &RqVector {
     type Output = Rq;
-
     fn mul(self, rhs: Self) -> Self::Output {
         self.elements
             .iter()

@@ -86,7 +86,7 @@ impl<'a> ZeroConstantFunctionsAggregation<'a> {
     pub fn calculate_agg_phi_double_prime(
         &mut self,
         phi_prime: &[Vec<RqVector>],
-        pi: &[Vec<Vec<Zq>>],
+        conjugated_pi: &[RqMatrix],
         vector_psi: &[Vec<Zq>],
         vector_omega: &[Vec<Zq>],
     ) {
@@ -99,22 +99,10 @@ impl<'a> ZeroConstantFunctionsAggregation<'a> {
             }
         }
 
-        let mut conjugated_pi_j: Vec<RqVector> = Vec::new();
-        for (i, pi_i) in pi.iter().enumerate() {
-            conjugated_pi_j.clear();
-            // conjugated_pi_j =
-            conjugated_pi_j = pi_i
-                .iter()
-                .map(|zq_vector| {
-                    zq_vector
-                        .chunks_exact(Rq::DEGREE)
-                        .map(|coeffs| Rq::new(coeffs.try_into().unwrap()).conjugate_automorphism())
-                        .collect::<RqVector>()
-                })
-                .collect();
+        for (i, pi_i) in conjugated_pi.iter().enumerate() {
             for (k, phi_k) in self.phi_double_prime.iter_mut().enumerate() {
                 phi_k[i] =
-                    &phi_k[i] + &compute_linear_combination(&conjugated_pi_j, &vector_omega[k]);
+                    &phi_k[i] + &compute_linear_combination(pi_i.get_elements(), &vector_omega[k]);
             }
         }
     }
