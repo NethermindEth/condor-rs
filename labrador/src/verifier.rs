@@ -151,7 +151,7 @@ impl<'a> LabradorVerifier<'a> {
         // 6. line 17: check \sum(<\phi_i, z>c_i) ?= \sum(h_ij * c_i * c_j)
         constant_aggregation.calculate_agg_phi_double_prime(
             &self.st.phi_ct,
-            projections.get_projection_matrices(),
+            &projections.get_conjugated_projection_matrices(),
             &psi,
             &omega,
         );
