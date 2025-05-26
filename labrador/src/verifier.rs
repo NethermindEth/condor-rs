@@ -4,12 +4,13 @@ use thiserror::Error;
 
 use crate::commitments::common_instances::AjtaiInstances;
 use crate::commitments::outer_commitments::{self, DecompositionParameters, OuterCommitment};
-use crate::core::aggregate::{self, FunctionsAggregation, ZeroConstantFunctionsAggregation};
+use crate::core::aggregate::{FunctionsAggregation, ZeroConstantFunctionsAggregation};
+use crate::core::inner_product;
 use crate::core::{env_params::EnvironmentParameters, statement::Statement};
 use crate::ring::rq::Rq;
 use crate::ring::rq_matrix::RqMatrix;
 use crate::ring::rq_vector::RqVector;
-use crate::ring::zq::{Zq, ZqVector};
+use crate::ring::zq::Zq;
 use crate::transcript::{LabradorTranscript, Sponge};
 
 #[derive(Debug, Error)]
@@ -125,7 +126,7 @@ impl<'a> LabradorVerifier<'a> {
 
         // 4. line 15: check Az ?= c_1 * t_1 + ... + c_r * t_r
         let az = self.pp.commitment_scheme_a.matrix() * &proof.z;
-        let ct_sum = aggregate::compute_linear_combination(
+        let ct_sum = inner_product::compute_linear_combination(
             proof.t.get_elements(),
             challenges.get_elements(),
         );
@@ -138,7 +139,10 @@ impl<'a> LabradorVerifier<'a> {
 
         // 5. lne 16: check <z, z> ?= \sum(g_ij * c_i * c_j)
 
-        let z_inner = proof.z.inner_product_poly_vector(&proof.z);
+        let z_inner = inner_product::compute_linear_combination(
+            proof.z.get_elements(),
+            proof.z.get_elements(),
+        );
         let sum_gij_cij = Self::calculate_gh_ci_cj(&proof.g, &challenges, ep.multiplicity);
 
         if z_inner != sum_gij_cij {
@@ -166,9 +170,9 @@ impl<'a> LabradorVerifier<'a> {
         let sum_hij_cij = Self::calculate_gh_ci_cj(&proof.h, &challenges, ep.multiplicity);
 
         // Left side multiple by 2 because of when we calculate h_ij, we didn't apply the division (divided by 2)
-        if &sum_phi_z_c * Zq::TWO != sum_hij_cij {
+        if &sum_phi_z_c * &Zq::TWO != sum_hij_cij {
             return Err(VerifierError::PhiError {
-                computed: &sum_phi_z_c * Zq::TWO,
+                computed: &sum_phi_z_c * &Zq::TWO,
                 expected: sum_hij_cij,
             });
         }
@@ -248,8 +252,11 @@ impl<'a> LabradorVerifier<'a> {
     /// calculate the left hand side of line 17, \sum(<\phi_z, z> * c_i)
     fn calculate_phi_z_c(phi: &[RqVector], c: &RqVector, z: &RqVector) -> Rq {
         phi.iter()
-            .zip(c.iter())
-            .map(|(phi_i, c_i)| &(phi_i.inner_product_poly_vector(z)) * c_i)
+            .zip(c.get_elements())
+            .map(|(phi_i, c_i)| {
+                &(inner_product::compute_linear_combination(phi_i.get_elements(), z.get_elements()))
+                    * c_i
+            })
             .fold(Rq::zero(), |acc, x| &acc + &x)
     }
 
@@ -283,8 +290,8 @@ impl<'a> LabradorVerifier<'a> {
 
         let sum_h_ii = (0..r).fold(Rq::zero(), |acc, i| &acc + h.get_cell(i, i));
 
-        let b_primes2 = b_primes * Zq::TWO;
-        let sum_a_primes_g2 = &sum_a_primes_g * Zq::TWO;
+        let b_primes2 = b_primes * &Zq::TWO;
+        let sum_a_primes_g2 = &sum_a_primes_g * &Zq::TWO;
 
         &sum_a_primes_g2 + &sum_h_ii == b_primes2
     }
@@ -302,7 +309,8 @@ impl<'a> LabradorVerifier<'a> {
                 .map(|l| psi[k][l] * self.st.b_0_ct[l])
                 .sum();
 
-            let inner_omega_p = omega[k].inner_product(&proof.vector_p);
+            let inner_omega_p =
+                inner_product::compute_linear_combination(&omega[k], &proof.vector_p);
             b_0 += inner_omega_p;
             if b_0 != b_0_poly {
                 return Err(VerifierError::B0Mismatch {

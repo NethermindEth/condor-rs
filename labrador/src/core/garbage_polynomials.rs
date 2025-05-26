@@ -1,5 +1,7 @@
 use crate::ring::{rq_matrix::RqMatrix, rq_vector::RqVector};
 
+use super::inner_product;
+
 pub struct GarbagePolynomials<'a> {
     witness_vector: &'a [RqVector],
     pub g: RqMatrix,
@@ -23,7 +25,10 @@ impl<'a> GarbagePolynomials<'a> {
             let mut g_ij = Vec::new();
             for j in 0..=i {
                 // Only calculate for j ≤ i (upper triangular)
-                g_ij.push(&self.witness_vector[i] * &self.witness_vector[j]);
+                g_ij.push(inner_product::compute_linear_combination(
+                    self.witness_vector[i].get_elements(),
+                    self.witness_vector[j].get_elements(),
+                ));
             }
             g_i.push(RqVector::new(g_ij));
         }
@@ -43,8 +48,14 @@ impl<'a> GarbagePolynomials<'a> {
             let mut h_ij = Vec::new();
             for j in 0..=i {
                 // Only calculate for j ≤ i (upper triangular)
-                let inner_phi_i_s_j = phi[i].inner_product_poly_vector(&self.witness_vector[j]);
-                let inner_phi_j_s_i = phi[j].inner_product_poly_vector(&self.witness_vector[i]);
+                let inner_phi_i_s_j = inner_product::compute_linear_combination(
+                    phi[i].get_elements(),
+                    self.witness_vector[j].get_elements(),
+                );
+                let inner_phi_j_s_i = inner_product::compute_linear_combination(
+                    phi[j].get_elements(),
+                    self.witness_vector[i].get_elements(),
+                );
                 h_ij.push(&inner_phi_i_s_j + &inner_phi_j_s_i);
             }
             h_i.push(RqVector::new(h_ij));
@@ -221,11 +232,20 @@ mod tests {
         garbage_polynomial.compute_g();
 
         // Verify a few specific values
-        let expected_g_01 = witnesses[0].inner_product_poly_vector(&witnesses[1]);
-        let expected_g_10 = witnesses[1].inner_product_poly_vector(&witnesses[0]);
+        let expected_g_01 = inner_product::compute_linear_combination(
+            witnesses[0].get_elements(),
+            witnesses[1].get_elements(),
+        );
+        let expected_g_10 = inner_product::compute_linear_combination(
+            witnesses[1].get_elements(),
+            witnesses[0].get_elements(),
+        );
         assert_eq!(expected_g_01, expected_g_10);
 
-        let expected_g_22 = witnesses[2].inner_product_poly_vector(&witnesses[2]);
+        let expected_g_22 = inner_product::compute_linear_combination(
+            witnesses[2].get_elements(),
+            witnesses[2].get_elements(),
+        );
 
         assert_eq!(*garbage_polynomial.g.get_cell(0, 1), expected_g_01);
         assert_eq!(*garbage_polynomial.g.get_cell(1, 0), expected_g_10);
@@ -256,8 +276,14 @@ mod tests {
         garbage_polynomial.compute_h(&phi);
 
         // Verify a specific value
-        let phi_0_s_1 = phi[0].inner_product_poly_vector(&witnesses[1]);
-        let phi_1_s_0 = phi[1].inner_product_poly_vector(&witnesses[0]);
+        let phi_0_s_1 = inner_product::compute_linear_combination(
+            phi[0].get_elements(),
+            witnesses[1].get_elements(),
+        );
+        let phi_1_s_0 = inner_product::compute_linear_combination(
+            phi[1].get_elements(),
+            witnesses[0].get_elements(),
+        );
         let expected_h_01 = &phi_0_s_1 + &phi_1_s_0;
 
         assert_eq!(

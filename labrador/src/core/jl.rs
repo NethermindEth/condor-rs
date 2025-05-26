@@ -1,6 +1,7 @@
+use crate::ring;
 use crate::ring::rq_matrix::RqMatrix;
 use crate::ring::rq_vector::RqVector;
-use crate::ring::zq::{Zq, ZqVector};
+use crate::ring::zq::Zq;
 
 // LaBRADOR: Compact Proofs for R1CS from Module-SIS | Page 5 | Proving smallness section
 const UPPER_BOUND_FACTOR: Zq = Zq::new(128);
@@ -40,7 +41,10 @@ impl Projection {
     pub fn compute_batch_projection(&self, witness_vector: &[RqVector]) -> Vec<Zq> {
         let mut result = vec![Zq::ZERO; 2 * self.security_level];
         for (index_i, witness) in witness_vector.iter().enumerate() {
-            result = result.add(&self.compute_projection(index_i, witness));
+            ring::zq::add_assign_two_zq_vectors(
+                &mut result,
+                self.compute_projection(index_i, witness),
+            );
         }
         result
     }

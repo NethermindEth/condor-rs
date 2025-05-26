@@ -1,32 +1,10 @@
-use std::borrow::Borrow;
-use std::ops::{Add, Mul};
-
 use crate::core::env_params::EnvironmentParameters;
 use crate::ring::rq::Rq;
 use crate::ring::rq_matrix::RqMatrix;
 use crate::ring::rq_vector::RqVector;
 use crate::ring::zq::Zq;
 
-pub fn compute_linear_combination<E, B, C>(elements: &[E], challenges: &[C]) -> B
-where
-    E: Borrow<B>,
-    for<'a> &'a B: Mul<&'a C, Output = B>,
-    for<'a> &'a B: Add<&'a B, Output = B>,
-{
-    debug_assert_eq!(
-        elements.len(),
-        challenges.len(),
-        "vectors must be the same length"
-    );
-    debug_assert!(!elements.is_empty(), "`elements` must not be empty");
-
-    let mut zipped_iter = elements.iter().zip(challenges.iter());
-    // Must do the following as the init value in fold requires size of B
-    let (e0, c0) = zipped_iter.next().unwrap();
-    let init = e0.borrow() * c0;
-
-    zipped_iter.fold(init, |acc, (elem, c)| &acc + &(elem.borrow() * c))
-}
+use super::inner_product;
 
 /// This struct serves as aggregation of functions with constant value 0.
 pub struct ZeroConstantFunctionsAggregation<'a> {
@@ -67,7 +45,10 @@ impl<'a> ZeroConstantFunctionsAggregation<'a> {
                     matrix.set_sell(
                         i,
                         j,
-                        compute_linear_combination(&a_prime_l_vector, &vector_psi[k]),
+                        inner_product::compute_linear_combination(
+                            &a_prime_l_vector,
+                            &vector_psi[k],
+                        ),
                     );
                 }
             }
@@ -95,14 +76,18 @@ impl<'a> ZeroConstantFunctionsAggregation<'a> {
             phi_prime_l_vector.clear();
             phi_prime_l_vector = phi_prime.iter().map(|elems| &elems[i]).collect();
             for (k, phi_k) in self.phi_double_prime.iter_mut().enumerate() {
-                phi_k[i] = compute_linear_combination(&phi_prime_l_vector, &vector_psi[k]);
+                phi_k[i] =
+                    inner_product::compute_linear_combination(&phi_prime_l_vector, &vector_psi[k]);
             }
         }
 
         for (i, pi_i) in conjugated_pi.iter().enumerate() {
             for (k, phi_k) in self.phi_double_prime.iter_mut().enumerate() {
-                phi_k[i] =
-                    &phi_k[i] + &compute_linear_combination(pi_i.get_elements(), &vector_omega[k]);
+                phi_k[i] = &phi_k[i]
+                    + &inner_product::compute_linear_combination(
+                        pi_i.get_elements(),
+                        &vector_omega[k],
+                    );
             }
         }
     }
@@ -122,7 +107,7 @@ impl<'a> ZeroConstantFunctionsAggregation<'a> {
                         &(0..self.ep.multiplicity).map(|j| {
                     // calculate a_{ij}^{''(k)} * <s_i, s_j>
                     self.a_double_prime[k].get_cell(i, j)
-                        * &witness[i].inner_product_poly_vector(&witness[j])
+                        * &inner_product::compute_linear_combination(witness[i].get_elements(), witness[j].get_elements())
                 })
                 .fold(
                     // sum over all i,j
@@ -130,7 +115,7 @@ impl<'a> ZeroConstantFunctionsAggregation<'a> {
                     |acc, val| &acc + &val,
                 )
                 // add \phi_{i}^{''(k)} * s[i]
-                + &self.phi_double_prime[k][i].inner_product_poly_vector(&witness[i])
+                + &inner_product::compute_linear_combination(self.phi_double_prime[k][i].get_elements(), witness[i].get_elements())
                     }) // sum over all i,j
                     .fold(Rq::zero(), |acc, val| &acc + &val)
             })
@@ -197,10 +182,13 @@ impl<'a> FunctionsAggregation<'a> {
                 self.aggregated_a.set_sell(
                     i,
                     j,
-                    &compute_linear_combination::<&Rq, Rq, Rq>(
+                    &inner_product::compute_linear_combination::<&Rq, Rq, Rq>(
                         &a_constraint_k,
                         vector_alpha.get_elements(),
-                    ) + &compute_linear_combination(&a_double_prime_k, vector_beta.get_elements()),
+                    ) + &inner_product::compute_linear_combination(
+                        &a_double_prime_k,
+                        vector_beta.get_elements(),
+                    ),
                 );
             }
         }
@@ -232,10 +220,13 @@ impl<'a> FunctionsAggregation<'a> {
             phi_double_prime_k.clear();
             phi_double_prime_k = phi_double_prime.iter().map(|element| &element[i]).collect();
             self.aggregated_phi[i] =
-                &compute_linear_combination::<&RqVector, RqVector, Rq>(
+                &inner_product::compute_linear_combination::<&RqVector, RqVector, Rq>(
                     &phi_constraint_k,
                     vector_alpha.get_elements(),
-                ) + &compute_linear_combination(&phi_double_prime_k, vector_beta.get_elements());
+                ) + &inner_product::compute_linear_combination(
+                    &phi_double_prime_k,
+                    vector_beta.get_elements(),
+                );
         }
     }
 
@@ -256,12 +247,13 @@ impl<'a> FunctionsAggregation<'a> {
         vector_alpha: &RqVector,
         vector_beta: &RqVector,
     ) {
-        self.aggregated_b =
-            &compute_linear_combination(b_constraint.get_elements(), vector_alpha.get_elements())
-                + &compute_linear_combination(
-                    b_double_prime.get_elements(),
-                    vector_beta.get_elements(),
-                )
+        self.aggregated_b = &inner_product::compute_linear_combination(
+            b_constraint.get_elements(),
+            vector_alpha.get_elements(),
+        ) + &inner_product::compute_linear_combination(
+            b_double_prime.get_elements(),
+            vector_beta.get_elements(),
+        )
     }
 
     pub fn get_agg_a(&self) -> &RqMatrix {

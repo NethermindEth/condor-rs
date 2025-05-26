@@ -311,18 +311,25 @@ mod test_generate_challenges {
 
         for i in 0..multiplicity {
             // l2 norm 71 is from paper page 6, Challenge Space.
+            use crate::core::inner_product::compute_linear_combination;
             assert_eq!(
-                challenge_set[i].inner_product(&challenge_set[i]),
+                compute_linear_combination(
+                    challenge_set.get_elements()[i].get_coefficients(),
+                    challenge_set.get_elements()[i].get_coefficients()
+                ),
                 Zq::new(71)
             );
-            assert!(challenge_set[i].operator_norm() <= op_norm);
-            dbg!(&challenge_set[i].operator_norm());
+            assert!(challenge_set.get_elements()[i].operator_norm() <= op_norm);
+            dbg!(&challenge_set.get_elements()[i].operator_norm());
         }
 
         for i in 0..multiplicity {
             for j in 0..multiplicity {
                 if i != j {
-                    assert_ne!(challenge_set[i], challenge_set[j]);
+                    assert_ne!(
+                        challenge_set.get_elements()[i],
+                        challenge_set.get_elements()[j]
+                    );
                 }
             }
         }

@@ -1,4 +1,4 @@
-use crate::ring::rq_vector::RqVector;
+use crate::{core::inner_product, ring::rq_vector::RqVector};
 use rand::{CryptoRng, Rng};
 use std::ops::Mul;
 
@@ -72,16 +72,6 @@ impl RqMatrix {
         }
     }
 
-    /// Create a random matrix of polynomials with ternary coefficients
-    pub fn random_ternary<R: Rng + CryptoRng>(rng: &mut R, row_len: usize, col_len: usize) -> Self {
-        Self {
-            elements: (0..row_len)
-                .map(|_| RqVector::random_ternary(rng, col_len))
-                .collect(),
-            is_symmetric: false,
-        }
-    }
-
     pub fn get_elements(&self) -> &[RqVector] {
         &self.elements
     }
@@ -90,7 +80,7 @@ impl RqMatrix {
         let mut decomposed_vec = Vec::new();
         for ring_vector in self.get_elements() {
             for ring in ring_vector.get_elements() {
-                decomposed_vec.extend(ring.decompose(base, num_parts).into_inner());
+                decomposed_vec.extend(ring.decompose(base, num_parts));
             }
         }
         RqVector::new(decomposed_vec)
@@ -115,25 +105,21 @@ impl Mul<&RqVector> for &RqMatrix {
         let mut result = RqVector::zero(self.elements.len());
 
         for (i, row) in self.elements.iter().enumerate() {
-            result[i] = row * rhs;
+            result.set(
+                i,
+                inner_product::compute_linear_combination(row.get_elements(), rhs.get_elements()),
+            );
         }
-
         result
-    }
-}
-
-// Implement matrix-vector multiplication for owned matrix by delegating to reference implementation
-impl Mul<&RqVector> for RqMatrix {
-    type Output = RqVector;
-
-    fn mul(self, rhs: &RqVector) -> Self::Output {
-        &self * rhs
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use rand::rng;
+
     use super::*;
+    use crate::ring::rq::tests::generate_rq_from_zq_vector;
     use crate::ring::rq::Rq;
     use crate::ring::zq::Zq;
 
@@ -145,38 +131,101 @@ mod tests {
     }
 
     #[test]
+    fn test_set_sell() {
+        let mut matrix = RqMatrix::zero(10, 18);
+        matrix.set_sell(4, 9, Rq::new([Zq::new(10); Rq::DEGREE]));
+        matrix.set_sell(8, 1, Rq::new([Zq::new(3); Rq::DEGREE]));
+
+        for (i, vector) in matrix.get_elements().iter().enumerate() {
+            for (j, poly) in vector.get_elements().iter().enumerate() {
+                if (i == 4) && (j == 9) {
+                    assert_eq!(poly, &Rq::new([Zq::new(10); Rq::DEGREE]))
+                } else if (i == 8) && (j == 1) {
+                    assert_eq!(poly, &Rq::new([Zq::new(3); Rq::DEGREE]))
+                } else {
+                    assert_eq!(poly, &Rq::zero())
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_symmetric_matrix() {
+        let symmetric_matrix = RqMatrix::symmetric_random(&mut rng(), 12);
+        assert_eq!(symmetric_matrix.get_row_len(), 12);
+        assert_eq!(symmetric_matrix.get_col_len(), 12);
+        for i in 0..symmetric_matrix.get_row_len() {
+            assert_eq!(symmetric_matrix.get_elements()[i].get_length(), i + 1);
+        }
+        for i in 0..symmetric_matrix.get_row_len() {
+            for j in 0..symmetric_matrix.get_col_len() {
+                assert_eq!(
+                    symmetric_matrix.get_cell(i, j),
+                    symmetric_matrix.get_cell(j, i)
+                )
+            }
+        }
+    }
+
+    #[test]
+    fn test_rq_matrix_from_iterator() {
+        let expected = vec![
+            RqVector::random(&mut rng(), 5),
+            RqVector::random(&mut rng(), 5),
+            RqVector::random(&mut rng(), 5),
+            RqVector::random(&mut rng(), 5),
+        ];
+        let polynomial_matrix = expected.clone().into_iter();
+        let result: RqMatrix = polynomial_matrix.collect();
+
+        assert_eq!(result.get_elements(), &expected);
+    }
+
+    #[test]
     fn test_zero_matrix() {
+        /// Check if Polynomial == 0
+        pub fn is_polynomial_zero(poly: &Rq) -> bool {
+            poly.get_coefficients()
+                .iter()
+                .all(|&coeff| coeff == Zq::ZERO)
+        }
+
         let matrix = RqMatrix::zero(10, 20);
         assert_eq!(matrix.get_row_len(), 10);
         assert_eq!(matrix.get_col_len(), 20);
         for row in matrix.get_elements() {
             for cell in row.get_elements() {
-                assert!(cell.is_zero());
+                assert!(is_polynomial_zero(cell));
             }
         }
     }
 
     #[test]
     fn test_rqmartrix_mul() {
-        let poly1: Rq = vec![Zq::new(8), Zq::new(6)].into();
-        let poly2: Rq = vec![Zq::new(u32::MAX - 4), Zq::new(u32::MAX - 4)].into();
-        let poly3: Rq = vec![Zq::ONE, Zq::ZERO].into();
-        let poly4: Rq = vec![Zq::ZERO, Zq::new(4)].into();
+        let poly1: Rq = generate_rq_from_zq_vector(vec![Zq::new(8), Zq::new(6)]);
+        let poly2: Rq =
+            generate_rq_from_zq_vector(vec![Zq::new(u32::MAX - 4), Zq::new(u32::MAX - 4)]);
+        let poly3: Rq = generate_rq_from_zq_vector(vec![Zq::ONE, Zq::ZERO]);
+        let poly4: Rq = generate_rq_from_zq_vector(vec![Zq::ZERO, Zq::new(4)]);
         let matrix_1: RqMatrix = RqMatrix::new(vec![RqVector::from(vec![poly1, poly2])], false);
         let vec_1: RqVector = RqVector::from(vec![poly3, poly4]);
 
         let result_1 = matrix_1.mul(&vec_1);
-        let expected_poly_1 =
-            vec![Zq::new(8), Zq::new(u32::MAX - 13), Zq::new(u32::MAX - 19)].into();
+        let expected_poly_1 = generate_rq_from_zq_vector(vec![
+            Zq::new(8),
+            Zq::new(u32::MAX - 13),
+            Zq::new(u32::MAX - 19),
+        ]);
         let expected_1 = RqVector::from(vec![expected_poly_1]);
         assert_eq!(result_1, expected_1);
 
-        let poly5: Rq = vec![Zq::new(u32::MAX - 6), Zq::new(7)].into();
-        let poly6: Rq = vec![Zq::new(u32::MAX - 2), Zq::ZERO].into();
-        let poly7: Rq = vec![Zq::new(8), Zq::new(u32::MAX - 1)].into();
-        let poly8: Rq = vec![Zq::new(u32::MAX - 3), Zq::new(4)].into();
-        let poly9: Rq = vec![Zq::MAX, Zq::new(u32::MAX - 1)].into();
-        let poly10: Rq = vec![Zq::new(u32::MAX - 2), Zq::new(u32::MAX - 2)].into();
+        let poly5: Rq = generate_rq_from_zq_vector(vec![Zq::new(u32::MAX - 6), Zq::new(7)]);
+        let poly6: Rq = generate_rq_from_zq_vector(vec![Zq::new(u32::MAX - 2), Zq::ZERO]);
+        let poly7: Rq = generate_rq_from_zq_vector(vec![Zq::new(8), Zq::new(u32::MAX - 1)]);
+        let poly8: Rq = generate_rq_from_zq_vector(vec![Zq::new(u32::MAX - 3), Zq::new(4)]);
+        let poly9: Rq = generate_rq_from_zq_vector(vec![Zq::MAX, Zq::new(u32::MAX - 1)]);
+        let poly10: Rq =
+            generate_rq_from_zq_vector(vec![Zq::new(u32::MAX - 2), Zq::new(u32::MAX - 2)]);
         let matrix_2: RqMatrix = RqMatrix::new(
             vec![
                 RqVector::from(vec![poly5, poly6]),
@@ -187,9 +236,13 @@ mod tests {
         let vec_2: RqVector = RqVector::from(vec![poly9, poly10]);
 
         let result_2 = matrix_2.mul(&vec_2);
-        let expected_poly_2_1 = vec![Zq::new(16), Zq::new(16), Zq::new(u32::MAX - 13)].into();
-        let expected_poly_2_2 =
-            vec![Zq::new(4), Zq::new(u32::MAX - 13), Zq::new(u32::MAX - 7)].into();
+        let expected_poly_2_1 =
+            generate_rq_from_zq_vector(vec![Zq::new(16), Zq::new(16), Zq::new(u32::MAX - 13)]);
+        let expected_poly_2_2 = generate_rq_from_zq_vector(vec![
+            Zq::new(4),
+            Zq::new(u32::MAX - 13),
+            Zq::new(u32::MAX - 7),
+        ]);
         let expected_2 = RqVector::from(vec![expected_poly_2_1, expected_poly_2_2]);
         assert_eq!(result_2, expected_2);
     }

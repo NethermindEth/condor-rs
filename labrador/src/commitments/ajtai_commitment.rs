@@ -231,7 +231,7 @@ mod tests {
 
         let mut bad_opening = witness.clone();
         let mut rng = rand::rng();
-        bad_opening[0] = Rq::random(&mut rng);
+        bad_opening.set(0, Rq::random(&mut rng));
         assert!(scheme.verify(&commitment, &bad_opening).is_err());
     }
 

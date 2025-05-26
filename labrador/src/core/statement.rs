@@ -5,6 +5,8 @@ use crate::ring::rq_matrix::RqMatrix;
 use crate::ring::rq_vector::RqVector;
 use crate::ring::zq::Zq;
 
+use super::inner_product;
+
 /// Statement is the input of the prover, which contains the constraints.
 /// All parameters are from line 1, st, in the verifier process, page 18 from the paper.
 pub struct Statement {
@@ -98,7 +100,7 @@ pub fn calculate_b_constraint(
     let left_side = (0..size_s).map(|i| {
         (0..size_s).map(|j: usize| {
             a_constraint.get_cell(i, j)
-                * &s[i].inner_product_poly_vector(&s[j])
+                * &inner_product::compute_linear_combination(s[i].get_elements(), s[j].get_elements())
         })
         .fold(Rq::zero(), |acc, val| &acc + &val )
     })
@@ -106,7 +108,7 @@ pub fn calculate_b_constraint(
 
     // calculate \sum(<phi_{i}^{k}, s_i>)
     let right_side = (0..size_s).fold(Rq::zero(), |acc, i| {
-        &acc + &phi_constraint[i].inner_product_poly_vector(&s[i])
+        &acc + &inner_product::compute_linear_combination(phi_constraint[i].get_elements(), s[i].get_elements())
     });
 
     &left_side + &right_side

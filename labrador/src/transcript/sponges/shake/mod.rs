@@ -112,8 +112,13 @@ impl Sponge for ShakeSponge {
 #[cfg(test)]
 mod test_sponge_correctness {
     use super::*;
-    use crate::ring::zq::ZqVector;
-    use rand::rng;
+    use crate::ring::zq::UniformZq;
+    use rand::{distr::uniform::UniformSampler, rng};
+
+    fn random_zq_vector(n: usize) -> Vec<Zq> {
+        let uniform = UniformZq::new_inclusive(Zq::ZERO, Zq::MAX).unwrap();
+        (0..n).map(|_| uniform.sample(&mut rng())).collect()
+    }
 
     #[test]
     fn test_zq_sponge_execution() {
@@ -130,7 +135,7 @@ mod test_sponge_correctness {
     #[test]
     fn test_rq_sponge_execution() {
         let mut sponge = ShakeSponge::default();
-        let input: Vec<Zq> = ZqVector::random(&mut rng(), 64);
+        let input: Vec<Zq> = random_zq_vector(64);
         sponge.absorb_zq(&input);
         let result = sponge.squeeze_rq(1);
         assert_eq!(result.len(), 1);
@@ -139,7 +144,7 @@ mod test_sponge_correctness {
     #[test]
     fn test_zq_squeeze_output_size() {
         let mut sponge = ShakeSponge::default();
-        let input: Vec<Zq> = ZqVector::random(&mut rng(), 64);
+        let input: Vec<Zq> = random_zq_vector(64);
         sponge.absorb_zq(&input);
         let result = sponge.squeeze_zq(1000);
         assert_eq!(result.len(), 1000);
@@ -159,7 +164,7 @@ mod test_sponge_correctness {
 
     #[test]
     fn test_absorb_zq_is_deterministic() {
-        let input: Vec<Zq> = ZqVector::random(&mut rng(), 64);
+        let input: Vec<Zq> = random_zq_vector(64);
         let mut s1 = ShakeSponge::default();
         let mut s2 = ShakeSponge::default();
         s1.absorb_zq(&input);
@@ -190,7 +195,7 @@ mod test_sponge_correctness {
     #[test]
     fn test_zq_successive_squeezes_is_unique() {
         let mut s = ShakeSponge::default();
-        let input: Vec<Zq> = ZqVector::random(&mut rng(), 32);
+        let input: Vec<Zq> = random_zq_vector(32);
         s.absorb_zq(&input);
         let o1 = s.squeeze_zq(8);
         let o2 = s.squeeze_zq(8);
@@ -212,7 +217,7 @@ mod test_sponge_correctness {
     #[test]
     fn test_zq_output_can_be_large() {
         let mut s = ShakeSponge::default();
-        let input: Vec<Zq> = ZqVector::random(&mut rng(), 16);
+        let input: Vec<Zq> = random_zq_vector(16);
         s.absorb_zq(&input);
         let out = s.squeeze_zq(1000);
         assert_eq!(out.len(), 1000);
@@ -244,8 +249,8 @@ mod test_sponge_correctness {
 
     #[test]
     fn test_different_inputs_diff_outputs() {
-        let input1: Vec<Zq> = ZqVector::random(&mut rng(), 64);
-        let input2: Vec<Zq> = ZqVector::random(&mut rng(), 64);
+        let input1: Vec<Zq> = random_zq_vector(64);
+        let input2: Vec<Zq> = random_zq_vector(64);
         let mut s1 = ShakeSponge::default();
         let mut s2 = ShakeSponge::default();
         s1.absorb_zq(&input1);

@@ -4,10 +4,10 @@ use crate::commitments::outer_commitments;
 use crate::commitments::outer_commitments::DecompositionParameters;
 use crate::commitments::outer_commitments::OuterCommitment;
 use crate::commitments::CommitError;
-use crate::core::aggregate;
 use crate::core::aggregate::FunctionsAggregation;
 use crate::core::aggregate::ZeroConstantFunctionsAggregation;
 use crate::core::garbage_polynomials::GarbagePolynomials;
+use crate::core::inner_product;
 use crate::ring::rq_matrix::RqMatrix;
 use crate::ring::zq::Zq;
 use crate::transcript::LabradorTranscript;
@@ -44,7 +44,7 @@ impl Witness {
     pub fn new(ep: &EnvironmentParameters) -> Self {
         loop {
             let s: Vec<RqVector> = (0..ep.multiplicity)
-                .map(|_| RqVector::random_ternary(&mut rng(), ep.rank))
+                .map(|_| RqVector::random(&mut rng(), ep.rank))
                 .collect();
             if Self::validate_l2_norm(&s, ep) {
                 return Self { s };
@@ -162,7 +162,8 @@ impl<'a> LabradorProver<'a> {
 
         // calculate z = c_1*s_1 + ... + c_r*s_r
         let challenges = transcript.generate_challenges(ep.operator_norm, ep.multiplicity);
-        let z = aggregate::compute_linear_combination(&self.witness.s, challenges.get_elements());
+        let z =
+            inner_product::compute_linear_combination(&self.witness.s, challenges.get_elements());
 
         transcript.set_recursive_part(z, t_i, garbage_polynomials.g, garbage_polynomials.h);
 

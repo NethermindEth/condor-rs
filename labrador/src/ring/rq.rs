@@ -19,14 +19,11 @@
 
 // We use the Zq ring
 use crate::ring::zq::Zq;
-use core::ops::{Add, Mul, Neg, Sub};
+use core::ops::{Add, Mul, Sub};
 use rand::distr::{Distribution, Uniform};
 use rand::{CryptoRng, Rng};
 use rustfft::num_complex::Complex;
 use rustfft::FftPlanner;
-use std::iter::Sum;
-
-use super::rq_vector::RqVector;
 
 /// This module provides implementations for various operations
 /// in the polynomial ring R = Z_q\[X\] / (X^d + 1).
@@ -49,44 +46,23 @@ impl Rq {
         }
     }
 
+    /// ```compile_fail
+    ///
+    /// let poly = Rq::zero(); // or any constructor you have
+    ///
+    /// // Move happens here …
+    /// let _coeffs = poly.into_coeffs();
+    ///
+    /// // …so using `poly` again must not compile:
+    /// let _still_here = poly; //^ ERROR use of moved value
+    /// ```
+    pub fn into_coeffs(self) -> [Zq; Self::DEGREE] {
+        self.coeffs
+    }
+
     /// Get the coefficients as a vector
     pub fn get_coefficients(&self) -> &[Zq; Self::DEGREE] {
         &self.coeffs
-    }
-
-    /// Dot product between coefficients
-    pub fn inner_product(&self, other: &Self) -> Zq {
-        self.coeffs
-            .iter()
-            .zip(other.coeffs.iter())
-            .map(|(&a, &b)| a * b)
-            .fold(Zq::ZERO, |acc, x| acc + x)
-    }
-
-    /// Evaluate the polynomial at a specific point
-    pub fn eval(&self, x: Zq) -> Zq {
-        let mut result = Zq::ZERO;
-        for coeff in self.coeffs.iter().rev() {
-            result = result * x + *coeff;
-        }
-
-        result
-    }
-
-    pub fn add_coefficients(&self) -> Zq {
-        self.get_coefficients()
-            .iter()
-            .fold(Zq::ZERO, |acc, coeff| acc + *coeff)
-    }
-
-    /// Check if Polynomial == 0
-    pub fn is_zero(&self) -> bool {
-        self.coeffs.iter().all(|&coeff| coeff == Zq::ZERO)
-    }
-
-    /// Check if two polynomials are equal
-    pub fn is_equal(&self, other: &Self) -> bool {
-        self.coeffs == other.coeffs
     }
 
     /// Generate random polynomial with a provided cryptographically secure RNG
@@ -118,7 +94,7 @@ impl Rq {
     /// Decomposes a polynomial into base-B representation:
     /// p = p⁽⁰⁾ + p⁽¹⁾·B + p⁽²⁾·B² + ... + p⁽ᵗ⁻¹⁾·B^(t-1)
     /// Where each p⁽ⁱ⁾ has small coefficients, using centered representatives
-    pub fn decompose(&self, base: Zq, num_parts: usize) -> RqVector {
+    pub fn decompose(&self, base: Zq, num_parts: usize) -> Vec<Rq> {
         debug_assert!(num_parts > 0, "num_parts must be positive");
         let mut parts = Vec::with_capacity(num_parts);
         let mut initial_coeffs = *self.get_coefficients();
@@ -135,63 +111,27 @@ impl Rq {
             parts.push(Self::new(low_coeffs));
         }
         parts.push(Self::new(initial_coeffs));
-        RqVector::new(parts)
-    }
-
-    /// Encode message into polynomial with small coefficients.
-    ///
-    /// # Arguments
-    /// * `message` - A slice of booleans representing a binary message
-    ///
-    /// # Returns
-    /// * `Some(Rq)` - A polynomial where each coefficient is 0 or 1 based on the message bits
-    /// * `None` - If the message length exceeds the polynomial degree D
-    ///
-    /// # Format
-    /// * Each boolean is encoded as a coefficient: false -> 0, true -> 1
-    /// * Message bits are mapped to coefficients in order (index 0 -> constant term)
-    /// * Remaining coefficients (if message is shorter than D) are set to 0
-    pub fn encode_message(message: &[bool]) -> Option<Self> {
-        if message.len() > Self::DEGREE {
-            return None;
-        }
-
-        let mut coeffs = [Zq::ZERO; Self::DEGREE];
-        for (i, &bit) in message.iter().enumerate() {
-            coeffs[i] = Zq::new(u32::from(bit));
-        }
-        Some(Rq::new(coeffs))
-    }
-
-    /// Iterator over coefficients
-    pub fn iter(&self) -> std::slice::Iter<'_, Zq> {
-        self.coeffs.iter()
-    }
-
-    /// Check if polynomial coefficients are within bounds
-    pub fn check_bounds(&self, bound: Zq) -> bool {
-        self.iter().all(|coeff| coeff <= &bound || coeff >= &-bound)
+        parts
     }
 
     /// Compute the conjugate automorphism \sigma_{-1} of vector based on B) Constraints..., Page 21.
     pub fn conjugate_automorphism(&self) -> Self {
         let q_minus_1 = Zq::MAX;
-        let mut new_coeffs = [Zq::ZERO; Self::DEGREE];
-        for (i, new_coeff) in new_coeffs.iter_mut().enumerate().take(Self::DEGREE) {
-            if i < self.get_coefficients().len() {
-                if i == 0 {
-                    *new_coeff = self.get_coefficients()[i];
-                } else {
-                    *new_coeff = self.get_coefficients()[i] * q_minus_1;
-                }
-            } else {
-                *new_coeff = Zq::ZERO;
-            }
+
+        let original_coefficients = self.get_coefficients();
+
+        let mut conjugated_coeffs = [Zq::ZERO; Rq::DEGREE];
+        conjugated_coeffs[0] = original_coefficients[0];
+
+        for (conj_coeff, original_coeff) in conjugated_coeffs
+            .iter_mut()
+            .skip(1)
+            .zip(original_coefficients.iter().rev())
+        {
+            *conj_coeff = original_coeff * q_minus_1;
         }
-        debug_assert_eq!(new_coeffs.len(), Self::DEGREE);
-        let mut reversed_coefficients = new_coeffs; // copy / move the array
-        reversed_coefficients[1..].reverse(); // reverse everything except index 0
-        Self::new(reversed_coefficients)
+
+        Self::new(conjugated_coeffs)
     }
 
     /// Compute the operator norm of a polynomial given its coefficients.
@@ -236,48 +176,6 @@ impl Rq {
     }
 }
 
-impl From<Vec<Zq>> for Rq {
-    fn from(vec: Vec<Zq>) -> Self {
-        let mut temp = [Zq::ZERO; Self::DEGREE];
-        // Process excess terms with sign adjustment
-        for i in (0..vec.len()).rev() {
-            let m = i / Self::DEGREE;
-            let r = i % Self::DEGREE;
-            let sign = if m % 2 == 0 { 1 } else { -1 };
-            if sign == 1 {
-                temp[r] += vec[i];
-            } else {
-                temp[r] -= vec[i];
-            }
-        }
-        Rq::new(temp)
-    }
-}
-
-impl Mul<Zq> for &Rq {
-    type Output = Rq;
-    /// Scalar multiplication of a polynomial
-    fn mul(self, other: Zq) -> Rq {
-        let mut copied_coeffs = self.coeffs;
-        for elem in copied_coeffs.iter_mut() {
-            *elem *= other;
-        }
-        Rq::new(copied_coeffs)
-    }
-}
-
-impl Mul<&Zq> for &Rq {
-    type Output = Rq;
-    /// Scalar multiplication of a polynomial
-    fn mul(self, other: &Zq) -> Rq {
-        let mut copied_coeffs = self.coeffs;
-        for elem in copied_coeffs.iter_mut() {
-            *elem *= *other;
-        }
-        Rq::new(copied_coeffs)
-    }
-}
-
 impl Add<&Rq> for &Rq {
     type Output = Rq;
     /// Add two polynomials
@@ -308,16 +206,6 @@ impl Sub<&Rq> for &Rq {
     }
 }
 
-impl Sum for Zq {
-    // Accumulate using the addition operator
-    fn sum<I>(iter: I) -> Self
-    where
-        I: Iterator<Item = Zq>,
-    {
-        iter.fold(Zq::ZERO, |acc, x| acc + x)
-    }
-}
-
 impl Mul<&Rq> for &Rq {
     type Output = Rq;
     /// Polynomial multiplication modulo x^D + 1
@@ -335,57 +223,43 @@ impl Mul<&Rq> for &Rq {
         }
         // Process excess terms with sign adjustment
         for i in (0..Rq::DEGREE).rev() {
-            let m = i / Rq::DEGREE;
-            let r = i % Rq::DEGREE;
-            let sign = if (m + 1) % 2 == 0 { 1 } else { -1 };
-            if sign == 1 {
-                result[r] += out_of_field[i];
-            } else {
-                result[r] -= out_of_field[i];
-            }
+            result[i] -= out_of_field[i];
         }
         Rq::new(result)
     }
 }
 
-// Implementing the Neg trait
-impl Neg for Rq {
-    type Output = Self;
-
-    /// Polynomial negation
-    fn neg(self) -> Self {
-        let mut result = [Zq::ZERO; Rq::DEGREE];
-        for (i, &coeff) in self.coeffs.iter().enumerate() {
-            result[i] = Zq::ZERO - coeff;
+impl Mul<&Zq> for &Rq {
+    type Output = Rq;
+    /// Scalar multiplication of a polynomial
+    fn mul(self, other: &Zq) -> Rq {
+        let mut copied_coeffs = self.coeffs;
+        for elem in copied_coeffs.iter_mut() {
+            *elem *= *other;
         }
-        Rq::new(result)
-    }
-}
-
-impl FromIterator<Zq> for Rq {
-    fn from_iter<T: IntoIterator<Item = Zq>>(iter: T) -> Self {
-        let coeffs_vec: Vec<Zq> = iter.into_iter().collect();
-        assert_eq!(
-            coeffs_vec.len(),
-            Self::DEGREE,
-            "Iterator must contain exactly {} elements to create Rq<{}>",
-            Self::DEGREE,
-            Self::DEGREE
-        );
-
-        // Convert the vector to an array
-        let mut coeffs = [Zq::default(); Self::DEGREE];
-        for (i, coeff) in coeffs_vec.into_iter().enumerate().take(Self::DEGREE) {
-            coeffs[i] = coeff;
-        }
-
-        Rq::new(coeffs)
+        Rq::new(copied_coeffs)
     }
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use super::*;
+
+    pub fn generate_rq_from_zq_vector(vec: Vec<Zq>) -> Rq {
+        let mut temp = [Zq::ZERO; Rq::DEGREE];
+        // Process excess terms with sign adjustment
+        for i in (0..vec.len()).rev() {
+            let m = i / Rq::DEGREE;
+            let r = i % Rq::DEGREE;
+            let sign = if m % 2 == 0 { 1 } else { -1 };
+            if sign == 1 {
+                temp[r] += vec[i];
+            } else {
+                temp[r] -= vec[i];
+            }
+        }
+        Rq::new(temp)
+    }
 
     mod helper {
         use super::*;
@@ -417,16 +291,31 @@ mod tests {
 
         // Direct conversion
         let coeffs2 = [Zq::ONE, Zq::new(2), Zq::new(3), Zq::new(4)];
-        let poly_from_vec_direct: Rq = coeffs.to_vec().into();
+        let poly_from_vec_direct: Rq = generate_rq_from_zq_vector(coeffs.to_vec());
         assert_eq!(poly_from_vec_direct.coeffs, helper::padded(&coeffs2));
+    }
+
+    #[test]
+    fn test_into_coeffs_returns_correct() {
+        let mut coeffs = [Zq::ZERO; Rq::DEGREE];
+        coeffs[0] = Zq::ONE;
+        coeffs[0] = Zq::new(20);
+        coeffs[0] = Zq::new(3121);
+        coeffs[0] = Zq::new(40);
+        let poly: Rq = generate_rq_from_zq_vector(coeffs.to_vec());
+
+        let result = Rq::into_coeffs(poly); // or whatever constructor you have
+        assert_eq!(result, coeffs);
     }
 
     // Test addition of polynomials
     #[test]
     fn test_add() {
         // Within bounds
-        let poly1: Rq = vec![Zq::ONE, Zq::new(2), Zq::new(3), Zq::new(4)].into();
-        let poly2: Rq = vec![Zq::new(4), Zq::new(3), Zq::new(2), Zq::ONE].into();
+        let poly1: Rq =
+            generate_rq_from_zq_vector(vec![Zq::ONE, Zq::new(2), Zq::new(3), Zq::new(4)]);
+        let poly2: Rq =
+            generate_rq_from_zq_vector(vec![Zq::new(4), Zq::new(3), Zq::new(2), Zq::ONE]);
         let result = &poly1 + &poly2;
         assert_eq!(
             result.coeffs,
@@ -434,24 +323,26 @@ mod tests {
         );
 
         // Outside of bounds
-        let poly3: Rq = vec![Zq::ONE, Zq::new(2), Zq::new(3), Zq::new(4)].into();
-        let poly4: Rq = vec![Zq::MAX, Zq::new(3), Zq::MAX, Zq::ONE].into();
+        let poly3: Rq =
+            generate_rq_from_zq_vector(vec![Zq::ONE, Zq::new(2), Zq::new(3), Zq::new(4)]);
+        let poly4: Rq = generate_rq_from_zq_vector(vec![Zq::MAX, Zq::new(3), Zq::MAX, Zq::ONE]);
         let result2 = &poly3 + &poly4;
         assert_eq!(
             result2.coeffs,
             helper::padded(&[Zq::ZERO, Zq::new(5), Zq::new(2), Zq::new(5)])
         );
         // Addition with zero polynomial
-        let poly5: Rq = vec![Zq::ONE, Zq::new(2), Zq::new(3), Zq::new(4)].into();
-        let poly6: Rq = vec![Zq::ZERO].into();
+        let poly5: Rq =
+            generate_rq_from_zq_vector(vec![Zq::ONE, Zq::new(2), Zq::new(3), Zq::new(4)]);
+        let poly6: Rq = generate_rq_from_zq_vector(vec![Zq::ZERO]);
         let result3 = &poly5 + &poly6;
         assert_eq!(
             result3.coeffs,
             helper::padded(&[Zq::ONE, Zq::new(2), Zq::new(3), Zq::new(4)])
         );
         // Addition with high coefficients
-        let poly7: Rq = vec![Zq::ONE, Zq::new(2), Zq::new(3), Zq::MAX].into();
-        let poly8: Rq = vec![Zq::MAX, Zq::MAX, Zq::MAX, Zq::MAX].into();
+        let poly7: Rq = generate_rq_from_zq_vector(vec![Zq::ONE, Zq::new(2), Zq::new(3), Zq::MAX]);
+        let poly8: Rq = generate_rq_from_zq_vector(vec![Zq::MAX, Zq::MAX, Zq::MAX, Zq::MAX]);
         let result3 = &poly7 + &poly8;
         assert_eq!(
             result3.coeffs,
@@ -468,8 +359,8 @@ mod tests {
     #[test]
     fn test_mul() {
         // Multiplication with wrapping
-        let poly1: Rq = vec![Zq::ONE, Zq::ONE, Zq::new(2)].into();
-        let poly2: Rq = vec![Zq::ONE, Zq::ONE].into();
+        let poly1: Rq = generate_rq_from_zq_vector(vec![Zq::ONE, Zq::ONE, Zq::new(2)]);
+        let poly2: Rq = generate_rq_from_zq_vector(vec![Zq::ONE, Zq::ONE]);
         let result = &poly1 * &poly2;
         assert_eq!(
             result.coeffs,
@@ -477,8 +368,8 @@ mod tests {
         );
 
         // Multiplication with zero polynomial
-        let poly3: Rq = vec![Zq::ONE, Zq::ONE, Zq::new(2)].into();
-        let poly4: Rq = vec![Zq::ZERO].into();
+        let poly3: Rq = generate_rq_from_zq_vector(vec![Zq::ONE, Zq::ONE, Zq::new(2)]);
+        let poly4: Rq = generate_rq_from_zq_vector(vec![Zq::ZERO]);
         let result2 = &poly3 * &poly4;
         assert_eq!(
             result2.coeffs,
@@ -487,7 +378,7 @@ mod tests {
 
         // Needs to be revised later
         // // Multiplication with wrapping higher order
-        // let poly5: Rq = vec![Zq::ONE, Zq::ONE, Zq::new(2)].into();
+        // let poly5: Rq = generate_rq_from_zq_vector(vec![Zq::ONE, Zq::ONE, Zq::new(2)]);
         // let poly6: Rq = vec![Zq::ONE, Zq::ONE, Zq::new(7), Zq::new(5)].into();
         // let result3 = poly5 * poly6;
         // assert_eq!(
@@ -500,8 +391,10 @@ mod tests {
     #[test]
     fn test_sub() {
         // within bounds
-        let poly1: Rq = vec![Zq::new(5), Zq::new(10), Zq::new(15), Zq::new(20)].into();
-        let poly2: Rq = vec![Zq::new(2), Zq::new(4), Zq::new(6), Zq::new(8)].into();
+        let poly1: Rq =
+            generate_rq_from_zq_vector(vec![Zq::new(5), Zq::new(10), Zq::new(15), Zq::new(20)]);
+        let poly2: Rq =
+            generate_rq_from_zq_vector(vec![Zq::new(2), Zq::new(4), Zq::new(6), Zq::new(8)]);
         let result = &poly1 - &poly2;
         assert_eq!(
             result.coeffs,
@@ -509,8 +402,9 @@ mod tests {
         );
 
         // Outside of bounds
-        let poly3: Rq = vec![Zq::ONE, Zq::ONE, Zq::new(3), Zq::new(2)].into();
-        let poly4: Rq = vec![Zq::new(2), Zq::new(4), Zq::new(6), Zq::new(8)].into();
+        let poly3: Rq = generate_rq_from_zq_vector(vec![Zq::ONE, Zq::ONE, Zq::new(3), Zq::new(2)]);
+        let poly4: Rq =
+            generate_rq_from_zq_vector(vec![Zq::new(2), Zq::new(4), Zq::new(6), Zq::new(8)]);
         let result2 = &poly3 - &poly4;
         assert_eq!(
             result2.coeffs,
@@ -522,8 +416,9 @@ mod tests {
             ])
         );
         // Subtraction with zero polynomial
-        let poly5: Rq = vec![Zq::ONE, Zq::new(2), Zq::new(3), Zq::new(4)].into();
-        let poly6: Rq = vec![Zq::ZERO].into();
+        let poly5: Rq =
+            generate_rq_from_zq_vector(vec![Zq::ONE, Zq::new(2), Zq::new(3), Zq::new(4)]);
+        let poly6: Rq = generate_rq_from_zq_vector(vec![Zq::ZERO]);
         let result3 = &poly6 - &poly5;
         let result4 = &poly5 - &poly6;
         assert_eq!(
@@ -541,96 +436,27 @@ mod tests {
         );
     }
 
-    // Test negation of polynomial
-    #[test]
-    fn test_neg() {
-        let poly: Rq = vec![Zq::ONE, Zq::new(2), Zq::new(3), Zq::new(4)].into();
-        let result = -poly;
-        assert_eq!(
-            result.coeffs,
-            helper::padded(&[
-                Zq::MAX,
-                Zq::new(u32::MAX - 1),
-                Zq::new(u32::MAX - 2),
-                Zq::new(u32::MAX - 3)
-            ])
-        );
-    }
-
     // Test scalar multiplication
     #[test]
     fn test_scalar_mul() {
-        let poly: Rq = vec![Zq::ONE, Zq::new(2), Zq::new(3), Zq::new(4)].into();
-        let result = &poly * Zq::new(2);
+        let poly: Rq =
+            generate_rq_from_zq_vector(vec![Zq::ONE, Zq::new(2), Zq::new(3), Zq::new(4)]);
+        let result = &poly * &Zq::new(2);
         assert_eq!(
             result.coeffs,
             helper::padded(&[Zq::new(2), Zq::new(4), Zq::new(6), Zq::new(8)])
         );
     }
 
-    // Test polynomial evaluation
-    #[test]
-    fn test_eval() {
-        let poly: Rq = vec![Zq::ONE, Zq::new(2), Zq::new(3), Zq::new(4)].into();
-        let result = poly.eval(Zq::new(2));
-        assert_eq!(result, Zq::new(49));
-    }
-
-    // Test equality check
-    #[test]
-    fn test_is_equal() {
-        let poly1: Rq = vec![Zq::ONE, Zq::new(2), Zq::new(3), Zq::new(4)].into();
-        let poly2: Rq = vec![Zq::ONE, Zq::new(2), Zq::new(3), Zq::new(4)].into();
-        let poly3: Rq = vec![Zq::new(4), Zq::new(3), Zq::new(2), Zq::ONE].into();
-        assert!(poly1.is_equal(&poly2));
-        assert!(!poly1.is_equal(&poly3));
-    }
-
-    // Test zero polynomial check
-    #[test]
-    fn test_is_zero_poly() {
-        let zero_poly: Rq = vec![Zq::ZERO; 4].into();
-        let non_zero_poly: Rq = vec![Zq::ONE, Zq::ZERO, Zq::ZERO, Zq::ZERO].into();
-        assert!(zero_poly.is_zero());
-        assert!(!non_zero_poly.is_zero());
-    }
-
-    #[test]
-    fn test_encode_message() {
-        // Test successful encoding
-        let message = vec![true, false, true, false];
-        let encoded = Rq::encode_message(&message).unwrap();
-        assert_eq!(
-            encoded.coeffs,
-            helper::padded(&[Zq::ONE, Zq::ZERO, Zq::ONE, Zq::ZERO])
-        );
-
-        // Test message shorter than degree
-        let short_message = vec![true, false];
-        let encoded_short = Rq::encode_message(&short_message).unwrap();
-        assert_eq!(
-            encoded_short.coeffs,
-            helper::padded(&[Zq::ONE, Zq::ZERO, Zq::ZERO, Zq::ZERO])
-        );
-
-        // Test message too long
-        let long_message = vec![true; Rq::DEGREE + 2];
-        assert!(Rq::encode_message(&long_message).is_none());
-
-        // Test empty message
-        let empty_message: Vec<bool> = vec![];
-        let encoded_empty = Rq::encode_message(&empty_message).unwrap();
-        assert!(encoded_empty.is_zero());
-    }
-
     // Test coefficient extraction
     #[test]
     fn test_get_coefficient() {
-        let poly: Rq = vec![Zq::ONE, Zq::ZERO, Zq::new(5), Zq::MAX].into();
+        let poly: Rq = generate_rq_from_zq_vector(vec![Zq::ONE, Zq::ZERO, Zq::new(5), Zq::MAX]);
         let vec = helper::padded(&[Zq::ONE, Zq::ZERO, Zq::new(5), Zq::MAX]).to_vec();
         assert!(poly.get_coefficients().to_vec() == vec);
 
-        let poly_zero: Rq = vec![Zq::ZERO, Zq::ZERO, Zq::ZERO, Zq::ZERO].into();
+        let poly_zero: Rq =
+            generate_rq_from_zq_vector(vec![Zq::ZERO, Zq::ZERO, Zq::ZERO, Zq::ZERO]);
         let vec_zero = helper::padded(&[Zq::ZERO, Zq::ZERO, Zq::ZERO, Zq::ZERO]).to_vec();
         assert!(poly_zero.get_coefficients().to_vec() == vec_zero);
     }
@@ -638,7 +464,8 @@ mod tests {
     #[test]
     fn test_base2_decomposition() {
         // Test case 1: Base 2 decomposition
-        let poly: Rq = vec![Zq::new(5), Zq::new(3), Zq::new(7), Zq::new(1)].into();
+        let poly: Rq =
+            generate_rq_from_zq_vector(vec![Zq::new(5), Zq::new(3), Zq::new(7), Zq::new(1)]);
         let parts = poly.decompose(Zq::TWO, 2);
 
         // Part 0: remainders mod 2 (no centering needed for base 2)
@@ -674,7 +501,8 @@ mod tests {
     #[test]
     fn test_base3_decomposition() {
         // Test case: Base 3 decomposition with centering
-        let specific_poly: Rq = vec![Zq::new(8), Zq::new(11), Zq::new(4), Zq::new(15)].into();
+        let specific_poly: Rq =
+            generate_rq_from_zq_vector(vec![Zq::new(8), Zq::new(11), Zq::new(4), Zq::new(15)]);
         let parts = specific_poly.decompose(Zq::new(3), 2);
 
         // Part 0: centered remainders mod 3
@@ -712,21 +540,21 @@ mod tests {
     #[test]
     fn test_decomposition_edge_cases() {
         // Test zero polynomial
-        let zero_poly: Rq = vec![Zq::ZERO; 4].into();
+        let zero_poly: Rq = generate_rq_from_zq_vector(vec![Zq::ZERO; 4]);
         let parts = zero_poly.decompose(Zq::TWO, 2);
         assert!(
-            parts.iter().all(|p| p.is_zero()),
+            // Check any polynomial is zero
+            parts
+                .iter()
+                .all(|p| p.get_coefficients().iter().all(|&coeff| coeff == Zq::ZERO)),
             "Zero polynomial decomposition failed"
         );
 
         // Test single part decomposition
-        let simple_poly: Rq = vec![Zq::ONE, Zq::new(2), Zq::new(3), Zq::new(4)].into();
+        let simple_poly: Rq =
+            generate_rq_from_zq_vector(vec![Zq::ONE, Zq::new(2), Zq::new(3), Zq::new(4)]);
         let parts = simple_poly.decompose(Zq::TWO, 1);
-        assert_eq!(
-            parts.get_elements().len(),
-            1,
-            "Single part decomposition length incorrect"
-        );
+        assert_eq!(parts.len(), 1, "Single part decomposition length incorrect");
         assert_eq!(
             parts[0], simple_poly,
             "Single part decomposition value incorrect"
@@ -736,7 +564,8 @@ mod tests {
     #[test]
     fn test_large_base_decomposition() {
         // Test decomposition with larger bases (8 and 16)
-        let poly: Rq = vec![Zq::new(120), Zq::new(33), Zq::new(255), Zq::new(19)].into();
+        let poly: Rq =
+            generate_rq_from_zq_vector(vec![Zq::new(120), Zq::new(33), Zq::new(255), Zq::new(19)]);
 
         // Base 8 decomposition
         let parts_base8 = poly.decompose(Zq::new(8), 2);
@@ -788,15 +617,20 @@ mod tests {
     #[test]
     fn test_multi_part_decomposition() {
         // Test with more than 2 parts
-        let poly: Rq = vec![Zq::new(123), Zq::new(456), Zq::new(789), Zq::new(101112)].into();
+        let poly: Rq = generate_rq_from_zq_vector(vec![
+            Zq::new(123),
+            Zq::new(456),
+            Zq::new(789),
+            Zq::new(101112),
+        ]);
 
         // Decompose into 3 parts with base 4
         let parts = poly.decompose(Zq::new(4), 3);
-        assert_eq!(parts.get_elements().len(), 3, "Should have 3 parts");
+        assert_eq!(parts.len(), 3, "Should have 3 parts");
 
         // Test reconstruction with all 3 parts
         let reconstructed =
-            &(&parts[0] + &(&(&parts[1] * Zq::new(4)) + &(&parts[2] * Zq::new(16)))); // 4²
+            &(&parts[0] + &(&(&parts[1] * &Zq::new(4)) + &(&parts[2] * &Zq::new(16)))); // 4²
 
         // Verify reconstruction coefficient by coefficient
         for i in 0..4 {
@@ -813,11 +647,8 @@ mod tests {
         // Test that centering works correctly for various values
         // Using base 5 which has half_base = 2
         let values = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-        let poly: Rq = values
-            .iter()
-            .map(|&v| Zq::new(v))
-            .collect::<Vec<Zq>>()
-            .into();
+        let poly: Rq =
+            generate_rq_from_zq_vector(values.iter().map(|&v| Zq::new(v)).collect::<Vec<Zq>>());
 
         let parts = poly.decompose(Zq::new(5), 2);
 
@@ -855,13 +686,13 @@ mod tests {
     #[test]
     fn test_extreme_values() {
         // Test with values near the extremes of the Zq range
-        let poly: Rq = vec![Zq::ZERO, Zq::MAX, Zq::MAX - Zq::ONE].into();
+        let poly: Rq = generate_rq_from_zq_vector(vec![Zq::ZERO, Zq::MAX, Zq::MAX - Zq::ONE]);
 
         // Decompose with base 3
         let parts = poly.decompose(Zq::new(3), 2);
 
         // Verify reconstruction
-        let reconstructed = &parts[0] + &(&parts[1] * Zq::new(3));
+        let reconstructed = &parts[0] + &(&parts[1] * &Zq::new(3));
 
         for i in 0..3 {
             assert_eq!(
@@ -886,7 +717,7 @@ mod tests {
     #[test]
     fn test_decomposition_properties() {
         // Test the algebraic property that all coefficients in first part should be small
-        let poly: Rq = vec![
+        let poly: Rq = generate_rq_from_zq_vector(vec![
             Zq::new(100),
             Zq::new(200),
             Zq::new(300),
@@ -895,8 +726,7 @@ mod tests {
             Zq::new(600),
             Zq::new(700),
             Zq::new(800),
-        ]
-        .into();
+        ]);
 
         for base in [2, 3, 4, 5, 8, 10, 16].iter() {
             let parts = poly.decompose(Zq::new(*base), 2);
@@ -921,16 +751,19 @@ mod tests {
             }
 
             // Verify reconstruction
-            let reconstructed = &parts[0] + &(&parts[1] * Zq::new(*base));
+            let reconstructed = &parts[0] + &(&parts[1] * &Zq::new(*base));
             assert_eq!(reconstructed, poly, "Base {}: Reconstruction failed", base);
         }
     }
 
     #[test]
     fn test_conjugate_automorphism() {
+        use crate::core::inner_product::compute_linear_combination;
+
         let poly1 = helper::rq_from(&[Zq::ONE, Zq::TWO, Zq::new(3)]);
         let poly2 = helper::rq_from(&[Zq::new(4), Zq::new(5), Zq::new(6)]);
-        let inner_12 = poly1.inner_product(&poly2);
+        let inner_12 =
+            compute_linear_combination(poly1.get_coefficients(), poly2.get_coefficients());
         let conjugated_1 = poly1.conjugate_automorphism();
         let inner_conjugated_12 = &conjugated_1 * &poly2;
 
