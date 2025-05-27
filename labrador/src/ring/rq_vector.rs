@@ -51,10 +51,18 @@ impl RqVector {
         }
     }
 
-    /// Create a random vector
+    // Create a random vector
     pub fn random_ternary<R: Rng + CryptoRng>(rng: &mut R, length: usize) -> Self {
         Self {
             elements: (0..length).map(|_| Rq::random_ternary(rng)).collect(),
+        }
+    }
+
+    pub fn random_with_bound<R: Rng + CryptoRng>(rng: &mut R, length: usize, bound: u32) -> Self {
+        Self {
+            elements: (0..length)
+                .map(|_| Rq::random_with_bound(rng, bound))
+                .collect(),
         }
     }
 
@@ -71,11 +79,10 @@ impl RqVector {
     }
 
     // Compute the squared norm of a vector of polynomials
-    pub fn compute_norm_squared(&self) -> Zq {
+    pub fn l2_norm_squared(&self) -> Zq {
         self.elements
             .iter()
-            .flat_map(|poly| poly.get_coefficients()) // Collect coefficients from all polynomials
-            .map(|coeff| *coeff * *coeff)
+            .map(|poly| poly.l2_norm_squared()) // Collect coefficients from all polynomials
             .sum()
     }
 
@@ -239,26 +246,16 @@ mod tests {
     // Test the square of the norm
     #[test]
     fn test_norm() {
-        let poly: RqVector = vec![
-            generate_rq_from_zq_vector(vec![Zq::ONE, Zq::ZERO, Zq::new(5), Zq::MAX]),
-            generate_rq_from_zq_vector(vec![Zq::ZERO, Zq::ZERO, Zq::new(5), Zq::ONE]),
-        ]
-        .into();
-        let result = Zq::new(53);
-        assert!(poly.compute_norm_squared() == result);
+        let poly1 =
+            generate_rq_from_zq_vector(vec![Zq::ONE, Zq::ZERO, Zq::new(5), Zq::MAX - Zq::new(1)]);
+        let poly2 = generate_rq_from_zq_vector(vec![Zq::ZERO, Zq::ZERO, Zq::new(5), Zq::ONE]);
+        let poly_vec1: RqVector = vec![poly1.clone(), poly2.clone()].into();
+        assert_eq!(
+            poly_vec1.l2_norm_squared(),
+            poly1.l2_norm_squared() + poly2.l2_norm_squared()
+        );
 
-        let poly2: RqVector = vec![generate_rq_from_zq_vector(vec![
-            Zq::new(5),
-            Zq::ONE,
-            Zq::MAX,
-            Zq::ZERO,
-        ])]
-        .into();
-        let result2 = Zq::new(27);
-        assert!(poly2.compute_norm_squared() == result2);
-
-        let poly_zero: RqVector = RqVector::zero(4);
-        let result_zero = Zq::ZERO;
-        assert!(poly_zero.compute_norm_squared() == result_zero);
+        let zero_vec: RqVector = RqVector::zero(4);
+        assert_eq!(zero_vec.l2_norm_squared(), Zq::ZERO);
     }
 }

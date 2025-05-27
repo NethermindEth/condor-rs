@@ -111,7 +111,7 @@ impl<'a> LabradorVerifier<'a> {
             .collect();
         let norm_z_ij = z_ij
             .iter()
-            .fold(Zq::ZERO, |acc, p| acc + p.compute_norm_squared());
+            .fold(Zq::ZERO, |acc, p| acc + p.l2_norm_squared());
         let norm_t_ij = Self::norm_squared(&t_ij);
         let norm_g_ij = Self::norm_squared(&g_ij);
         let norm_h_ij = Self::norm_squared(&h_ij);
@@ -264,7 +264,7 @@ impl<'a> LabradorVerifier<'a> {
         polys.iter().fold(Zq::ZERO, |acc, poly| {
             acc + poly
                 .iter()
-                .fold(Zq::ZERO, |acc, p| acc + p.compute_norm_squared())
+                .fold(Zq::ZERO, |acc, p| acc + p.l2_norm_squared())
         })
     }
 
@@ -328,7 +328,8 @@ impl<'a> LabradorVerifier<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::prover::{LabradorProver, Witness};
+    use crate::prover::LabradorProver;
+    use crate::relation::witness::Witness;
     use crate::transcript::sponges::shake::ShakeSponge;
 
     #[test]
@@ -336,7 +337,7 @@ mod tests {
         // set up example environment, use default set for testing.
         let ep_1 = EnvironmentParameters::default();
         // generate a random witness based on ep above
-        let witness_1 = Witness::new(&ep_1);
+        let witness_1 = Witness::new(ep_1.rank, ep_1.multiplicity, ep_1.beta);
         // generate public statements based on witness_1
         let st: Statement = Statement::new(&witness_1, &ep_1);
         // generate the common reference string matrices

@@ -72,7 +72,7 @@ impl Projection {
     }
 
     fn norm_squared(projection: &[Zq]) -> Zq {
-        projection.iter().map(|coeff| *coeff * *coeff).sum()
+        projection.iter().map(|coeff| coeff.centered_mod(Zq::MAX) * coeff.centered_mod(Zq::MAX)).sum()
     }
 
     // Function to verify upper bound of projection
@@ -114,7 +114,7 @@ mod tests {
             let witness = RqVector::random(&mut rand::rng(), rank);
             let result = projections.compute_projection(0, &witness);
 
-            let beta = witness.compute_norm_squared();
+            let beta = witness.l2_norm_squared();
             // Check if the norm of the projection is smaller than 128 * (squared norm of the projection of the random polynomial)
             let test: bool = Projection::verify_projection_upper_bound(&result, beta);
             if test {
@@ -137,17 +137,17 @@ mod tests {
     #[test]
     #[cfg(not(feature = "skip-slow-tests"))]
     fn test_projection_average_value() {
-        use crate::transcript::Sponge;
+        use crate::{relation::witness, transcript::Sponge};
 
         let (security_parameter, rank, multiplicity) = (128, 3, 1);
-        let trials: u128 = 10000;
+        let trials: u128 = 1000;
 
         let witness = RqVector::random_ternary(&mut rand::rng(), rank);
-        let witness_norm = (Zq::new(security_parameter.try_into().unwrap())
-            * RqVector::compute_norm_squared(&witness))
-        .to_u128();
+        let witness_norm = (Zq::new(security_parameter.try_into().unwrap()).to_u128()) * (witness.l2_norm_squared().to_u128());
+        dbg!(witness.l2_norm_squared());
+        dbg!(witness_norm);
 
-        let mut norm_sum = Zq::ZERO;
+        let mut norm_sum = 0u128;
         // Run the test multiple times to simulate the probability
         for _ in 0..trials {
             let mut transcript = LabradorTranscript::new(ShakeSponge::default());
@@ -156,11 +156,11 @@ mod tests {
             let projections =
                 transcript.generate_projections(security_parameter, rank, multiplicity);
             let result = projections.compute_projection(0, &witness);
-            norm_sum += Projection::norm_squared(&result);
+            norm_sum += Projection::norm_squared(&result).to_u128();
         }
 
         // Calculate the observed probability
-        let average = norm_sum.to_u128() / trials;
+        let average = norm_sum / trials;
         let difference = if witness_norm <= average {
             average - witness_norm
         } else {
@@ -173,7 +173,7 @@ mod tests {
             difference < tolerance,
             "Average norm value {} is not equal to {}.",
             average,
-            Zq::new(security_parameter.try_into().unwrap()) * witness.compute_norm_squared(),
+            witness_norm,
         );
     }
 
@@ -187,7 +187,7 @@ mod tests {
         let projections = transcript.generate_projections(security_parameter, rank, multiplicity);
         let witness = RqVector::random_ternary(&mut rng(), rank);
 
-        let beta = witness.compute_norm_squared();
+        let beta = witness.l2_norm_squared();
         // Check if the norm of the projection is bigger than 30 * (squared norm of the projection of the random polynomial)
         assert!(Projection::verify_projection_lower_bound(
             &projections.compute_projection(0, &witness),

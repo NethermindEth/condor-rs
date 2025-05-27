@@ -73,6 +73,27 @@ impl Rq {
         Self { coeffs }
     }
 
+    /// Generate random polynomial with a provided cryptographically secure RNG and given bound
+    pub fn random_with_bound<R: Rng + CryptoRng>(rng: &mut R, bound: u32) -> Self {
+        let uniform = Uniform::new_inclusive(Zq::ZERO, Zq::new(bound)).unwrap();
+        let mut coeffs = [Zq::ZERO; Self::DEGREE];
+        coeffs.iter_mut().for_each(|c| {
+            *c = if rng.random_bool(0.5) {
+                -uniform.sample(rng)
+            } else {
+                uniform.sample(rng)
+            }
+        });
+        Self { coeffs }
+    }
+
+    pub fn l2_norm_squared(&self) -> Zq {
+        self.coeffs
+            .iter()
+            .map(|coeff| coeff.centered_mod(Zq::MAX + Zq::ONE) * coeff.centered_mod(Zq::MAX + Zq::ONE))
+            .sum()
+    }
+
     /// Generate random small polynomial with secure RNG implementation
     pub fn random_ternary<R: Rng + CryptoRng>(rng: &mut R) -> Self {
         let mut coeffs = [Zq::ZERO; Self::DEGREE];
@@ -775,5 +796,21 @@ pub mod tests {
         // ct<\sigma_{-1}(poly1), poly2> ?= <poly1, poly2>
         let ct_inner_conjugated_12 = inner_conjugated_12.get_coefficients()[0];
         assert_eq!(ct_inner_conjugated_12, inner_12);
+    }
+
+    // Test the square of the norm
+    #[test]
+    fn test_norm() {
+        let poly1 =
+            generate_rq_from_zq_vector(vec![Zq::ONE, Zq::ZERO, Zq::new(5), Zq::MAX]);
+        let poly2 = generate_rq_from_zq_vector(vec![Zq::ZERO, Zq::ZERO, Zq::new(5), Zq::ONE]);
+        let poly3 =
+            generate_rq_from_zq_vector(vec![Zq::new(5), Zq::ONE, Zq::MAX - Zq::new(6), Zq::ZERO]);
+        let poly4 = Rq::zero();
+
+        assert_eq!(poly1.l2_norm_squared(), Zq::new(27));
+        assert_eq!(poly2.l2_norm_squared(), Zq::new(26));
+        assert_eq!(poly3.l2_norm_squared(), Zq::new(62));
+        assert_eq!(poly4.l2_norm_squared(), Zq::ZERO);
     }
 }

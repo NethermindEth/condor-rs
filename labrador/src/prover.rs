@@ -8,15 +8,12 @@ use crate::core::aggregate::FunctionsAggregation;
 use crate::core::aggregate::ZeroConstantFunctionsAggregation;
 use crate::core::garbage_polynomials::GarbagePolynomials;
 use crate::core::inner_product;
+use crate::core::{env_params::EnvironmentParameters, statement::Statement};
+use crate::relation::witness::Witness;
 use crate::ring::rq_matrix::RqMatrix;
 use crate::ring::zq::Zq;
 use crate::transcript::LabradorTranscript;
 use crate::transcript::Sponge;
-use crate::{
-    core::{env_params::EnvironmentParameters, statement::Statement},
-    ring::rq_vector::RqVector,
-};
-use rand::rng;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -34,34 +31,6 @@ pub enum ProverError {
     CommitError(#[from] ajtai_commitment::CommitError),
     #[error("decomposition failure")]
     DecompositionError(#[from] outer_commitments::DecompositionError),
-}
-
-pub struct Witness {
-    pub s: Vec<RqVector>,
-}
-
-impl Witness {
-    pub fn new(ep: &EnvironmentParameters) -> Self {
-        loop {
-            let s: Vec<RqVector> = (0..ep.multiplicity)
-                .map(|_| RqVector::random(&mut rng(), ep.rank))
-                .collect();
-            if Self::validate_l2_norm(&s, ep) {
-                return Self { s };
-            }
-        }
-    }
-
-    fn validate_l2_norm(candidate: &[RqVector], ep: &EnvironmentParameters) -> bool {
-        let beta2 = ep.beta * ep.beta;
-        for polys in candidate {
-            let witness_l2norm_squared = RqVector::compute_norm_squared(polys);
-            if witness_l2norm_squared > beta2 {
-                return false;
-            }
-        }
-        true
-    }
 }
 
 pub struct LabradorProver<'a> {
@@ -218,7 +187,7 @@ mod tests {
         // set up example environment parameters, use default set for testing.
         let ep_1 = EnvironmentParameters::default();
         // generate a random witness based on environment parameters above
-        let witness_1 = Witness::new(&ep_1);
+        let witness_1 = Witness::new(ep_1.rank, ep_1.multiplicity, ep_1.beta);
         // generate public statement based on witness_1
         let st: Statement = Statement::new(&witness_1, &ep_1);
         // generate the common reference string matrices A, B, C, D

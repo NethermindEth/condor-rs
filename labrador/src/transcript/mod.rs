@@ -320,7 +320,6 @@ mod test_generate_challenges {
                 Zq::new(71)
             );
             assert!(challenge_set.get_elements()[i].operator_norm() <= op_norm);
-            dbg!(&challenge_set.get_elements()[i].operator_norm());
         }
 
         for i in 0..multiplicity {

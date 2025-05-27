@@ -186,15 +186,16 @@ mod tests {
 
     // Test helpers
     mod test_utils {
+        use crate::relation::witness::Witness;
+
         use super::*;
 
         pub fn valid_witness(scheme: &AjtaiScheme) -> RqVector {
             vec![Rq::new([scheme.witness_bound(); Rq::DEGREE]); TEST_N].into()
         }
 
-        pub fn random_valid_witness() -> RqVector {
-            let mut rng = rand::rng();
-            RqVector::random_ternary(&mut rng, TEST_N)
+        pub fn random_valid_witness() -> Vec<RqVector> {
+            Witness::new(TEST_N, 1, Zq::new(10000)).s
         }
 
         pub fn setup_scheme() -> AjtaiScheme {
@@ -246,8 +247,8 @@ mod tests {
         // Ensure the witnesses are actually different
         assert_ne!(witness1, witness2, "Test requires different witnesses");
 
-        let c1 = scheme.commit(&witness1).unwrap();
-        let c2 = scheme.commit(&witness2).unwrap();
+        let c1 = scheme.commit(&witness1[0]).unwrap();
+        let c2 = scheme.commit(&witness2[0]).unwrap();
         assert_ne!(
             c1, c2,
             "Different witnesses should produce different commitments"

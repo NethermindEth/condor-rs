@@ -1,5 +1,5 @@
 use crate::core::env_params::EnvironmentParameters;
-use crate::prover::Witness;
+use crate::relation::witness::Witness;
 use crate::ring::rq::Rq;
 use crate::ring::rq_matrix::RqMatrix;
 use crate::ring::rq_vector::RqVector;
