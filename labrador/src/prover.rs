@@ -8,8 +8,8 @@ use crate::core::aggregate::FunctionsAggregation;
 use crate::core::aggregate::ZeroConstantFunctionsAggregation;
 use crate::core::garbage_polynomials::GarbagePolynomials;
 use crate::core::inner_product;
-use crate::core::{env_params::EnvironmentParameters, statement::Statement};
 use crate::relation::witness::Witness;
+use crate::relation::{env_params::EnvironmentParameters, statement::Statement};
 use crate::ring::rq_matrix::RqMatrix;
 use crate::ring::zq::Zq;
 use crate::transcript::LabradorTranscript;
@@ -140,41 +140,6 @@ impl<'a> LabradorProver<'a> {
 
         Ok(transcript)
     }
-
-    // The following is not part of the prover.
-    // Todo: Add jl projection constraints to the statement.
-    // /// check p_j? = ct(sum(<σ−1(pi_i^(j)), s_i>))
-    // fn check_projection(&self, p: &[Zq], pi: &[Vec<Vec<Zq>>]) -> Result<bool, ProverError> {
-    //     let s_coeffs: Vec<Vec<Zq>> = self
-    //         .witness
-    //         .s
-    //         .iter()
-    //         .map(|s_i| {
-    //             s_i.iter()
-    //                 .flat_map(|s_i_p| *s_i_p.get_coefficients())
-    //                 .collect()
-    //         })
-    //         .collect();
-
-    //     for (j, &p_j) in p.iter().enumerate() {
-    //         let mut poly = vec![Zq::ZERO; p.len()];
-    //         for (i, s_i) in s_coeffs.iter().enumerate() {
-    //             let pi_ele = &pi[i][j];
-    //             let pi_ele_ca = pi_ele.conjugate_automorphism();
-    //             poly = poly.add(&(pi_ele_ca.multiply(s_i)));
-    //         }
-
-    //         if poly[0] != p_j {
-    //             return Err(ProverError::ProjectionError {
-    //                 index: j,
-    //                 expected: p_j,
-    //                 computed: poly[0],
-    //             });
-    //         }
-    //     }
-
-    //     Ok(true)
-    // }
 }
 
 #[cfg(test)]

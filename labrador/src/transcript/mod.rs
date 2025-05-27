@@ -95,7 +95,7 @@ impl<S: Sponge> LabradorTranscript<S> {
                             .iter()
                             .map(|elem| {
                                 if elem.get_value() < 2_u32.pow(30) {
-                                    Zq::MAX
+                                    Zq::NEG_ONE
                                 } else if elem.get_value() < 2_u32.pow(31) {
                                     Zq::ONE
                                 } else {
@@ -211,7 +211,7 @@ mod tests_generate_pi {
                     match cell {
                         Zq::ZERO => counts[1] += 1.0,
                         Zq::ONE => counts[2] += 1.0,
-                        Zq::MAX => counts[0] += 1.0,
+                        Zq::NEG_ONE => counts[0] += 1.0,
                         _ => panic!("Should not occur"),
                     }
                 }

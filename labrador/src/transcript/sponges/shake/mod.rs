@@ -116,7 +116,7 @@ mod test_sponge_correctness {
     use rand::{distr::uniform::UniformSampler, rng};
 
     fn random_zq_vector(n: usize) -> Vec<Zq> {
-        let uniform = UniformZq::new_inclusive(Zq::ZERO, Zq::MAX).unwrap();
+        let uniform = UniformZq::new_inclusive(Zq::ZERO, Zq::NEG_ONE).unwrap();
         (0..n).map(|_| uniform.sample(&mut rng())).collect()
     }
 

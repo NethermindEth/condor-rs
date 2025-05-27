@@ -51,13 +51,6 @@ impl RqVector {
         }
     }
 
-    // Create a random vector
-    pub fn random_ternary<R: Rng + CryptoRng>(rng: &mut R, length: usize) -> Self {
-        Self {
-            elements: (0..length).map(|_| Rq::random_ternary(rng)).collect(),
-        }
-    }
-
     pub fn random_with_bound<R: Rng + CryptoRng>(rng: &mut R, length: usize, bound: u32) -> Self {
         Self {
             elements: (0..length)
@@ -246,8 +239,12 @@ mod tests {
     // Test the square of the norm
     #[test]
     fn test_norm() {
-        let poly1 =
-            generate_rq_from_zq_vector(vec![Zq::ONE, Zq::ZERO, Zq::new(5), Zq::MAX - Zq::new(1)]);
+        let poly1 = generate_rq_from_zq_vector(vec![
+            Zq::ONE,
+            Zq::ZERO,
+            Zq::new(5),
+            Zq::NEG_ONE - Zq::new(1),
+        ]);
         let poly2 = generate_rq_from_zq_vector(vec![Zq::ZERO, Zq::ZERO, Zq::new(5), Zq::ONE]);
         let poly_vec1: RqVector = vec![poly1.clone(), poly2.clone()].into();
         assert_eq!(

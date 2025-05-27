@@ -122,8 +122,7 @@ impl AjtaiScheme {
     /// - q is the modulus of the underlying ring
     fn verify_security_relation(beta: Zq, m: usize) -> Result<(), ParameterError> {
         // Calculate q from Zq properties
-        let q_val = Zq::MAX;
-        let q: u128 = q_val.to_u128() + 1;
+        let q: u128 = Zq::NEG_ONE.to_u128() + 1;
 
         // Calculate beta²
         let beta_squared = beta

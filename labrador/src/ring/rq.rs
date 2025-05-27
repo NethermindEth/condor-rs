@@ -67,7 +67,7 @@ impl Rq {
 
     /// Generate random polynomial with a provided cryptographically secure RNG
     pub fn random<R: Rng + CryptoRng>(rng: &mut R) -> Self {
-        let uniform = Uniform::new_inclusive(Zq::ZERO, Zq::MAX).unwrap();
+        let uniform = Uniform::new_inclusive(Zq::ZERO, Zq::NEG_ONE).unwrap();
         let mut coeffs = [Zq::ZERO; Self::DEGREE];
         coeffs.iter_mut().for_each(|c| *c = uniform.sample(rng));
         Self { coeffs }
@@ -87,29 +87,15 @@ impl Rq {
         Self { coeffs }
     }
 
+    #[allow(clippy::as_conversions)]
     pub fn l2_norm_squared(&self) -> Zq {
         self.coeffs
             .iter()
-            .map(|coeff| coeff.centered_mod(Zq::MAX + Zq::ONE) * coeff.centered_mod(Zq::MAX + Zq::ONE))
+            .map(|coeff| {
+                coeff.centered_mod(Zq::new(Zq::Q as u32))
+                    * coeff.centered_mod(Zq::new(Zq::Q as u32))
+            })
             .sum()
-    }
-
-    /// Generate random small polynomial with secure RNG implementation
-    pub fn random_ternary<R: Rng + CryptoRng>(rng: &mut R) -> Self {
-        let mut coeffs = [Zq::ZERO; Self::DEGREE];
-
-        for coeff in coeffs.iter_mut() {
-            // Explicitly sample from {-1, 0, 1} with equal probability
-            let val = match rng.random_range(0..3) {
-                0 => Zq::MAX,  // -1 mod q
-                1 => Zq::ZERO, // 0
-                2 => Zq::ONE,  // 1
-                _ => unreachable!(),
-            };
-            *coeff = val;
-        }
-
-        Rq::new(coeffs)
     }
 
     /// Decomposes a polynomial into base-B representation:
@@ -137,7 +123,7 @@ impl Rq {
 
     /// Compute the conjugate automorphism \sigma_{-1} of vector based on B) Constraints..., Page 21.
     pub fn conjugate_automorphism(&self) -> Self {
-        let q_minus_1 = Zq::MAX;
+        let q_minus_1 = Zq::NEG_ONE;
 
         let original_coefficients = self.get_coefficients();
 
@@ -173,9 +159,9 @@ impl Rq {
         let mut buffer: Vec<Complex<f64>> = coeffs
             .iter()
             .map(|&x| {
-                let half = Zq::MAX.scale_by(Zq::TWO);
+                let half = Zq::NEG_ONE.scale_by(Zq::TWO);
                 let converted_value = if x > half {
-                    x.to_u128() as f64 - Zq::MAX.to_u128() as f64 - 1.0
+                    x.to_u128() as f64 - Zq::NEG_ONE.to_u128() as f64 - 1.0
                 } else {
                     x.to_u128() as f64
                 };
@@ -346,7 +332,8 @@ pub mod tests {
         // Outside of bounds
         let poly3: Rq =
             generate_rq_from_zq_vector(vec![Zq::ONE, Zq::new(2), Zq::new(3), Zq::new(4)]);
-        let poly4: Rq = generate_rq_from_zq_vector(vec![Zq::MAX, Zq::new(3), Zq::MAX, Zq::ONE]);
+        let poly4: Rq =
+            generate_rq_from_zq_vector(vec![Zq::NEG_ONE, Zq::new(3), Zq::NEG_ONE, Zq::ONE]);
         let result2 = &poly3 + &poly4;
         assert_eq!(
             result2.coeffs,
@@ -362,17 +349,14 @@ pub mod tests {
             helper::padded(&[Zq::ONE, Zq::new(2), Zq::new(3), Zq::new(4)])
         );
         // Addition with high coefficients
-        let poly7: Rq = generate_rq_from_zq_vector(vec![Zq::ONE, Zq::new(2), Zq::new(3), Zq::MAX]);
-        let poly8: Rq = generate_rq_from_zq_vector(vec![Zq::MAX, Zq::MAX, Zq::MAX, Zq::MAX]);
+        let poly7: Rq =
+            generate_rq_from_zq_vector(vec![Zq::ONE, Zq::new(2), Zq::new(3), Zq::NEG_ONE]);
+        let poly8: Rq =
+            generate_rq_from_zq_vector(vec![Zq::NEG_ONE, Zq::NEG_ONE, Zq::NEG_ONE, Zq::NEG_ONE]);
         let result3 = &poly7 + &poly8;
         assert_eq!(
             result3.coeffs,
-            helper::padded(&[
-                Zq::ZERO,
-                Zq::ONE,
-                Zq::new(2),
-                Zq::new(u32::MAX.wrapping_add(u32::MAX))
-            ])
+            helper::padded(&[Zq::ZERO, Zq::ONE, Zq::new(2), -Zq::new(2)])
         );
     }
 
@@ -430,10 +414,10 @@ pub mod tests {
         assert_eq!(
             result2.coeffs,
             helper::padded(&[
-                Zq::MAX,
-                Zq::new(u32::MAX - 2),
-                Zq::new(u32::MAX - 2),
-                Zq::new(u32::MAX - 5)
+                Zq::ZERO - Zq::new(1),
+                Zq::ZERO - Zq::new(3),
+                Zq::ZERO - Zq::new(3),
+                Zq::ZERO - Zq::new(6),
             ])
         );
         // Subtraction with zero polynomial
@@ -445,10 +429,10 @@ pub mod tests {
         assert_eq!(
             result3.coeffs,
             helper::padded(&[
-                Zq::MAX,
-                Zq::new(u32::MAX - 1),
-                Zq::new(u32::MAX - 2),
-                Zq::new(u32::MAX - 3)
+                Zq::ZERO - Zq::new(1),
+                Zq::ZERO - Zq::new(2),
+                Zq::ZERO - Zq::new(3),
+                Zq::ZERO - Zq::new(4),
             ])
         );
         assert_eq!(
@@ -472,8 +456,8 @@ pub mod tests {
     // Test coefficient extraction
     #[test]
     fn test_get_coefficient() {
-        let poly: Rq = generate_rq_from_zq_vector(vec![Zq::ONE, Zq::ZERO, Zq::new(5), Zq::MAX]);
-        let vec = helper::padded(&[Zq::ONE, Zq::ZERO, Zq::new(5), Zq::MAX]).to_vec();
+        let poly: Rq = generate_rq_from_zq_vector(vec![Zq::ONE, Zq::ZERO, Zq::new(5), Zq::NEG_ONE]);
+        let vec = helper::padded(&[Zq::ONE, Zq::ZERO, Zq::new(5), Zq::NEG_ONE]).to_vec();
         assert!(poly.get_coefficients().to_vec() == vec);
 
         let poly_zero: Rq =
@@ -530,10 +514,10 @@ pub mod tests {
         assert_eq!(
             parts[0].coeffs,
             helper::padded(&[
-                Zq::MAX,  // 8 mod 3 = 2 -> -1 (centered)
-                Zq::MAX,  // 11 mod 3 = 2 -> -1 (centered)
-                Zq::ONE,  // 4 mod 3 = 1 -> 1 (centered)
-                Zq::ZERO, // 15 mod 3 = 0 -> 0 (centered)
+                Zq::NEG_ONE, // 8 mod 3 = 2 -> -1 (centered)
+                Zq::NEG_ONE, // 11 mod 3 = 2 -> -1 (centered)
+                Zq::ONE,     // 4 mod 3 = 1 -> 1 (centered)
+                Zq::ZERO,    // 15 mod 3 = 0 -> 0 (centered)
             ])
         );
 
@@ -595,10 +579,10 @@ pub mod tests {
         assert_eq!(
             parts_base8[0].coeffs,
             helper::padded(&[
-                Zq::ZERO,   // 120 mod 8 = 0 -> 0 (centered)
-                Zq::ONE,    // 33 mod 8 = 1 -> 1 (centered)
-                Zq::MAX,    // 255 mod 8 = 7 -> -1 (centered)
-                Zq::new(3), // 19 mod 8 = 3 -> 3 (centered)
+                Zq::ZERO,    // 120 mod 8 = 0 -> 0 (centered)
+                Zq::ONE,     // 33 mod 8 = 1 -> 1 (centered)
+                Zq::NEG_ONE, // 255 mod 8 = 7 -> -1 (centered)
+                Zq::new(3),  // 19 mod 8 = 3 -> 3 (centered)
             ])
         );
 
@@ -707,7 +691,7 @@ pub mod tests {
     #[test]
     fn test_extreme_values() {
         // Test with values near the extremes of the Zq range
-        let poly: Rq = generate_rq_from_zq_vector(vec![Zq::ZERO, Zq::MAX, Zq::MAX - Zq::ONE]);
+        let poly: Rq = generate_rq_from_zq_vector(vec![Zq::ZERO, Zq::NEG_ONE, -Zq::ONE]);
 
         // Decompose with base 3
         let parts = poly.decompose(Zq::new(3), 2);
@@ -726,13 +710,13 @@ pub mod tests {
         // Corrected test for high value divisibility
         // u32::MAX = 4294967295, which equals 1431655765 * 3 + 0
         // So u32::MAX mod 3 = 0, which remains 0 (no centering needed)
-        assert_eq!(parts[0].coeffs[1], Zq::ZERO); // Remainder after division by 3
-        assert_eq!(parts[1].coeffs[1], Zq::new(1431655765)); // Quotient
+        assert_eq!(parts[0].coeffs[1], -Zq::new(1)); // Remainder after division by 3
+        assert_eq!(parts[1].coeffs[1], Zq::ZERO); // Quotient
 
         // Check u32::MAX - 1 as well
         // 4294967294 mod 3 = 1, which remains 1 (no centering needed since 1 <= half_base)
-        assert_eq!(parts[0].coeffs[2], Zq::MAX); // u32::MAX - 1 is the third coefficient
-        assert_eq!(parts[1].coeffs[2], Zq::new(1431655765)); // Should be same quotient
+        assert_eq!(parts[0].coeffs[2], Zq::NEG_ONE); // u32::MAX - 1 is the third coefficient
+        assert_eq!(parts[1].coeffs[2], Zq::ZERO); // Should be same quotient
     }
 
     #[test]
@@ -801,11 +785,9 @@ pub mod tests {
     // Test the square of the norm
     #[test]
     fn test_norm() {
-        let poly1 =
-            generate_rq_from_zq_vector(vec![Zq::ONE, Zq::ZERO, Zq::new(5), Zq::MAX]);
+        let poly1 = generate_rq_from_zq_vector(vec![Zq::ONE, Zq::ZERO, Zq::new(5), Zq::NEG_ONE]);
         let poly2 = generate_rq_from_zq_vector(vec![Zq::ZERO, Zq::ZERO, Zq::new(5), Zq::ONE]);
-        let poly3 =
-            generate_rq_from_zq_vector(vec![Zq::new(5), Zq::ONE, Zq::MAX - Zq::new(6), Zq::ZERO]);
+        let poly3 = generate_rq_from_zq_vector(vec![Zq::new(5), Zq::ONE, -Zq::new(6), Zq::ZERO]);
         let poly4 = Rq::zero();
 
         assert_eq!(poly1.l2_norm_squared(), Zq::new(27));

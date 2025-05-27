@@ -1,11 +1,11 @@
-use crate::core::env_params::EnvironmentParameters;
+use super::env_params::EnvironmentParameters;
 use crate::relation::witness::Witness;
 use crate::ring::rq::Rq;
 use crate::ring::rq_matrix::RqMatrix;
 use crate::ring::rq_vector::RqVector;
 use crate::ring::zq::Zq;
 
-use super::inner_product;
+use crate::core::inner_product;
 
 /// Statement is the input of the prover, which contains the constraints.
 /// All parameters are from line 1, st, in the verifier process, page 18 from the paper.

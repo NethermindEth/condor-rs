@@ -6,7 +6,7 @@ use crate::commitments::common_instances::AjtaiInstances;
 use crate::commitments::outer_commitments::{self, DecompositionParameters, OuterCommitment};
 use crate::core::aggregate::{FunctionsAggregation, ZeroConstantFunctionsAggregation};
 use crate::core::inner_product;
-use crate::core::{env_params::EnvironmentParameters, statement::Statement};
+use crate::relation::{env_params::EnvironmentParameters, statement::Statement};
 use crate::ring::rq::Rq;
 use crate::ring::rq_matrix::RqMatrix;
 use crate::ring::rq_vector::RqVector;

@@ -203,29 +203,24 @@ mod tests {
     #[test]
     fn test_rqmartrix_mul() {
         let poly1: Rq = generate_rq_from_zq_vector(vec![Zq::new(8), Zq::new(6)]);
-        let poly2: Rq =
-            generate_rq_from_zq_vector(vec![Zq::new(u32::MAX - 4), Zq::new(u32::MAX - 4)]);
+        let poly2: Rq = generate_rq_from_zq_vector(vec![-Zq::new(5), -Zq::new(5)]);
         let poly3: Rq = generate_rq_from_zq_vector(vec![Zq::ONE, Zq::ZERO]);
         let poly4: Rq = generate_rq_from_zq_vector(vec![Zq::ZERO, Zq::new(4)]);
         let matrix_1: RqMatrix = RqMatrix::new(vec![RqVector::from(vec![poly1, poly2])], false);
         let vec_1: RqVector = RqVector::from(vec![poly3, poly4]);
 
         let result_1 = matrix_1.mul(&vec_1);
-        let expected_poly_1 = generate_rq_from_zq_vector(vec![
-            Zq::new(8),
-            Zq::new(u32::MAX - 13),
-            Zq::new(u32::MAX - 19),
-        ]);
+        let expected_poly_1 =
+            generate_rq_from_zq_vector(vec![Zq::new(8), -Zq::new(14), -Zq::new(20)]);
         let expected_1 = RqVector::from(vec![expected_poly_1]);
         assert_eq!(result_1, expected_1);
 
-        let poly5: Rq = generate_rq_from_zq_vector(vec![Zq::new(u32::MAX - 6), Zq::new(7)]);
-        let poly6: Rq = generate_rq_from_zq_vector(vec![Zq::new(u32::MAX - 2), Zq::ZERO]);
-        let poly7: Rq = generate_rq_from_zq_vector(vec![Zq::new(8), Zq::new(u32::MAX - 1)]);
-        let poly8: Rq = generate_rq_from_zq_vector(vec![Zq::new(u32::MAX - 3), Zq::new(4)]);
-        let poly9: Rq = generate_rq_from_zq_vector(vec![Zq::MAX, Zq::new(u32::MAX - 1)]);
-        let poly10: Rq =
-            generate_rq_from_zq_vector(vec![Zq::new(u32::MAX - 2), Zq::new(u32::MAX - 2)]);
+        let poly5: Rq = generate_rq_from_zq_vector(vec![-Zq::new(7), Zq::new(7)]);
+        let poly6: Rq = generate_rq_from_zq_vector(vec![-Zq::new(3), Zq::ZERO]);
+        let poly7: Rq = generate_rq_from_zq_vector(vec![Zq::new(8), -Zq::new(2)]);
+        let poly8: Rq = generate_rq_from_zq_vector(vec![-Zq::new(4), Zq::new(4)]);
+        let poly9: Rq = generate_rq_from_zq_vector(vec![Zq::NEG_ONE, -Zq::new(2)]);
+        let poly10: Rq = generate_rq_from_zq_vector(vec![-Zq::new(3), -Zq::new(3)]);
         let matrix_2: RqMatrix = RqMatrix::new(
             vec![
                 RqVector::from(vec![poly5, poly6]),
@@ -237,12 +232,9 @@ mod tests {
 
         let result_2 = matrix_2.mul(&vec_2);
         let expected_poly_2_1 =
-            generate_rq_from_zq_vector(vec![Zq::new(16), Zq::new(16), Zq::new(u32::MAX - 13)]);
-        let expected_poly_2_2 = generate_rq_from_zq_vector(vec![
-            Zq::new(4),
-            Zq::new(u32::MAX - 13),
-            Zq::new(u32::MAX - 7),
-        ]);
+            generate_rq_from_zq_vector(vec![Zq::new(16), Zq::new(16), -Zq::new(14)]);
+        let expected_poly_2_2 =
+            generate_rq_from_zq_vector(vec![Zq::new(4), -Zq::new(14), -Zq::new(8)]);
         let expected_2 = RqVector::from(vec![expected_poly_2_1, expected_poly_2_2]);
         assert_eq!(result_2, expected_2);
     }

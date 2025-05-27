@@ -12,8 +12,9 @@ pub struct Zq {
 }
 
 impl Zq {
-    /// Modulus q = 2^32 (stored as 0 in u32 due to wrapping behavior)
-    pub const Q: u32 = u32::MAX.wrapping_add(1);
+    /// Modulus q = 2^32 - 1
+    #[allow(clippy::as_conversions)]
+    pub const Q: u64 = u32::MAX as u64;
     /// Zero element (additive identity)
     pub const ZERO: Self = Self::new(0);
     /// Multiplicative identity
@@ -21,7 +22,7 @@ impl Zq {
     /// Two
     pub const TWO: Self = Self::new(2);
     /// Maximum element
-    pub const MAX: Self = Self::new(u32::MAX);
+    pub const NEG_ONE: Self = Self::new(u32::MAX - 1);
 
     /// Creates a new Zq element from a raw u32 value.
     /// No explicit modulo needed as u32 automatically wraps
@@ -75,6 +76,24 @@ impl Zq {
         assert!(rhs != Zq::ZERO, "cannot scale by zero");
         Self::new(self.value / rhs.value)
     }
+
+    #[allow(clippy::as_conversions)]
+    fn add_op(self, rhs: Zq) -> Zq {
+        let sum = (self.value as u64 + rhs.value as u64) % Zq::Q;
+        Zq::new(sum as u32)
+    }
+
+    #[allow(clippy::as_conversions)]
+    fn sub_op(self, rhs: Zq) -> Zq {
+        let sub = (self.value as u64 + Zq::Q - rhs.value as u64) % Zq::Q;
+        Zq::new(sub as u32)
+    }
+
+    #[allow(clippy::as_conversions)]
+    fn mul_op(self, b: Zq) -> Zq {
+        let prod = (self.value as u64 * b.value as u64) % Zq::Q;
+        Zq::new(prod as u32)
+    }
 }
 
 // Macro to generate arithmetic trait implementations
@@ -84,13 +103,13 @@ macro_rules! impl_arithmetic {
             type Output = Self;
 
             fn $method(self, rhs: Self) -> Self::Output {
-                Self::new(self.value.$op(rhs.value))
+                self.$op(rhs)
             }
         }
 
         impl $assign_trait for Zq {
             fn $assign_method(&mut self, rhs: Self) {
-                self.value = self.value.$op(rhs.value);
+                *self = self.$op(rhs);
             }
         }
 
@@ -98,7 +117,7 @@ macro_rules! impl_arithmetic {
             type Output = Zq;
 
             fn $method(self, rhs: Zq) -> Self::Output {
-                Zq::new(self.value.$op(rhs.value))
+                self.$op(rhs)
             }
         }
 
@@ -106,20 +125,38 @@ macro_rules! impl_arithmetic {
             type Output = Zq;
 
             fn $method(self, rhs: &Zq) -> Self::Output {
-                Zq::new(self.value.$op(rhs.value))
+                self.$op(*rhs)
             }
         }
     };
 }
 
-impl_arithmetic!(Add, AddAssign, add, add_assign, wrapping_add);
-impl_arithmetic!(Sub, SubAssign, sub, sub_assign, wrapping_sub);
-impl_arithmetic!(Mul, MulAssign, mul, mul_assign, wrapping_mul);
+impl_arithmetic!(Add, AddAssign, add, add_assign, add_op);
+impl_arithmetic!(Sub, SubAssign, sub, sub_assign, sub_op);
+impl_arithmetic!(Mul, MulAssign, mul, mul_assign, mul_op);
+
+// Implement the Neg trait for Zq.
+impl Neg for Zq {
+    type Output = Zq;
+
+    /// Returns the additive inverse of the field element.
+    ///
+    /// Wrap around (q - a) mod q.
+    fn neg(self) -> Zq {
+        // If the value is zero, its inverse is itself.
+        if self.value == 0 {
+            self
+        } else {
+            #[allow(clippy::as_conversions)]
+            Zq::new(Zq::Q as u32 - self.get_value())
+        }
+    }
+}
 
 impl fmt::Display for Zq {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // Shows value with modulus for clarity
-        write!(f, "{} (mod 2^32)", self.value)
+        write!(f, "{} (mod {})", self.value, Zq::Q)
     }
 }
 
@@ -150,23 +187,6 @@ impl UniformSampler for UniformZq {
 
 impl SampleUniform for Zq {
     type Sampler = UniformZq;
-}
-
-// Implement the Neg trait for Zq.
-impl Neg for Zq {
-    type Output = Zq;
-
-    /// Returns the additive inverse of the field element.
-    ///
-    /// Wrap around (q - a) mod q.
-    fn neg(self) -> Zq {
-        // If the value is zero, its inverse is itself.
-        if self.value == 0 {
-            self
-        } else {
-            Zq::MAX + Zq::ONE - self
-        }
-    }
 }
 
 impl Sum for Zq {
@@ -205,7 +225,7 @@ mod tests {
 
     #[test]
     fn test_wrapping_arithmetic() {
-        let a = Zq::MAX;
+        let a = Zq::NEG_ONE;
         let b = Zq::ONE;
 
         assert_eq!((a + b).value, 0, "u32::MAX + 1 should wrap to 0");
@@ -214,7 +234,7 @@ mod tests {
 
     #[test]
     fn test_subtraction_edge_cases() {
-        let max = Zq::MAX;
+        let max = Zq::NEG_ONE;
         let one = Zq::ONE;
         let two = Zq::TWO;
 
@@ -229,7 +249,7 @@ mod tests {
         let two = Zq::TWO;
 
         // Multiplication wraps when exceeding u32 range
-        assert_eq!((a * two).value, 0, "2^31 * 2 should wrap to 0");
+        assert_eq!((a * two).value, 1, "2^31 * 2 should wrap to 1");
     }
 
     #[test]
@@ -260,19 +280,19 @@ mod tests {
 
         // Test underflow handling (3 - 5 in u32 terms)
         let result = small - large;
-        assert_eq!(result.value, u32::MAX - 1, "3 - 5 should wrap to 2^32 - 2");
+        assert_eq!(result.value, u32::MAX - 2, "3 - 5 should wrap to 2^32 - 2");
 
         // Test compound negative operations
         let mut x = Zq::new(10);
         x -= Zq::new(15);
-        assert_eq!(x.value, u32::MAX - 4, "10 -= 15 should wrap to 2^32 - 5");
+        assert_eq!(x.value, u32::MAX - 5, "10 -= 15 should wrap to 2^32 - 5");
 
         // Test negative equivalent value in multiplication
-        let a = Zq::MAX; // Represents -1 in mod 2^32 arithmetic
+        let a = Zq::NEG_ONE; // Represents -1 in mod 2^32 arithmetic
         let b = Zq::TWO;
         assert_eq!(
             (a * b).value,
-            u32::MAX - 1,
+            u32::MAX - 2,
             "(-1) * 2 should be -2 ≡ 2^32 - 2"
         );
     }
@@ -280,15 +300,18 @@ mod tests {
     #[test]
     fn test_display_implementation() {
         let a = Zq::new(5);
-        let max = Zq::MAX;
-
-        assert_eq!(format!("{}", a), "5 (mod 2^32)");
-        assert_eq!(format!("{}", max), "4294967295 (mod 2^32)");
+        let max = Zq::NEG_ONE;
+        assert_eq!(format!("{}", a), format!("5 (mod {})", Zq::Q));
+        assert_eq!(format!("{}", max), format!("4294967294 (mod {})", Zq::Q));
     }
 
     #[test]
     fn test_maximum_element() {
-        assert_eq!(Zq::MAX, Zq::ZERO - Zq::ONE);
+        dbg!(Zq::NEG_ONE);
+        dbg!(Zq::ZERO);
+        dbg!(Zq::ONE);
+        dbg!(Zq::ZERO - Zq::ONE);
+        assert_eq!(Zq::NEG_ONE, Zq::ZERO - Zq::ONE);
     }
 
     #[test]
