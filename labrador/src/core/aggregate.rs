@@ -35,11 +35,10 @@ impl<'a> ZeroConstantFunctionsAggregation<'a> {
     ///
     /// @return: a_{ij}^{''(k)}, return a vector length k of matrix a_{ij}^{''}
     pub fn calculate_agg_a_double_prime(&mut self, vector_psi: &[Vec<Zq>], a_prime: &[RqMatrix]) {
-        let mut a_prime_l_vector: Vec<&Rq> = Vec::new();
         for i in 0..self.ep.multiplicity {
             for j in 0..i + 1 {
-                a_prime_l_vector.clear(); // Re-use a_prime_l to prevent repetitive heap allocations
-                a_prime_l_vector = a_prime.iter().map(|matrix| matrix.get_cell(i, j)).collect();
+                let a_prime_l_vector: Vec<&Rq> =
+                    a_prime.iter().map(|matrix| matrix.get_cell(i, j)).collect();
 
                 for (k, matrix) in self.a_double_prime.iter_mut().enumerate() {
                     matrix.set_sell(
@@ -71,10 +70,9 @@ impl<'a> ZeroConstantFunctionsAggregation<'a> {
         vector_psi: &[Vec<Zq>],
         vector_omega: &[Vec<Zq>],
     ) {
-        let mut phi_prime_l_vector: Vec<&RqVector> = Vec::new();
         for i in 0..self.ep.multiplicity {
-            phi_prime_l_vector.clear();
-            phi_prime_l_vector = phi_prime.iter().map(|elems| &elems[i]).collect();
+            let phi_prime_l_vector: Vec<&RqVector> =
+                phi_prime.iter().map(|elems| &elems[i]).collect();
             for (k, phi_k) in self.phi_double_prime.iter_mut().enumerate() {
                 phi_k[i] =
                     inner_product::compute_linear_combination(&phi_prime_l_vector, &vector_psi[k]);
@@ -165,17 +163,13 @@ impl<'a> FunctionsAggregation<'a> {
         vector_alpha: &RqVector,
         vector_beta: &RqVector,
     ) {
-        let mut a_constraint_k: Vec<&Rq> = Vec::new();
-        let mut a_double_prime_k: Vec<&Rq> = Vec::new();
         for i in 0..self.ep.multiplicity {
             for j in 0..i + 1 {
-                a_constraint_k.clear();
-                a_constraint_k = a_constraint
+                let a_constraint_k: Vec<&Rq> = a_constraint
                     .iter()
                     .map(|matrix| matrix.get_cell(i, j))
                     .collect();
-                a_double_prime_k.clear();
-                a_double_prime_k = a_double_prime
+                let a_double_prime_k: Vec<&Rq> = a_double_prime
                     .iter()
                     .map(|matrix| matrix.get_cell(i, j))
                     .collect();
@@ -211,14 +205,11 @@ impl<'a> FunctionsAggregation<'a> {
         vector_alpha: &RqVector,
         vector_beta: &RqVector,
     ) {
-        let mut phi_constraint_k: Vec<&RqVector> = Vec::new();
-        let mut phi_double_prime_k: Vec<&RqVector> = Vec::new();
-
         for i in 0..self.ep.multiplicity {
-            phi_constraint_k.clear();
-            phi_constraint_k = phi_constraint.iter().map(|element| &element[i]).collect();
-            phi_double_prime_k.clear();
-            phi_double_prime_k = phi_double_prime.iter().map(|element| &element[i]).collect();
+            let phi_constraint_k: Vec<&RqVector> =
+                phi_constraint.iter().map(|element| &element[i]).collect();
+            let phi_double_prime_k: Vec<&RqVector> =
+                phi_double_prime.iter().map(|element| &element[i]).collect();
             self.aggregated_phi[i] =
                 &inner_product::compute_linear_combination::<&RqVector, RqVector, Rq>(
                     &phi_constraint_k,
