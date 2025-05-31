@@ -2,66 +2,50 @@ use crate::ring::{rq_matrix::RqMatrix, rq_vector::RqVector};
 
 use super::inner_product;
 
-pub struct GarbagePolynomials<'a> {
-    witness_vector: &'a [RqVector],
-    pub g: RqMatrix,
-    pub h: RqMatrix,
+/// Calculate the garbage polynomials g_{ij} = <s_i, s_j>
+/// Exploits symmetry by only calculating for i ≤ j since g_{ij} = g_{ji}
+pub fn compute_g(witness_vector: &[RqVector]) -> RqMatrix {
+    let mut g_i = Vec::new();
+    for i in 0..witness_vector.len() {
+        let mut g_ij = Vec::new();
+        for j in 0..=i {
+            // Only calculate for j ≤ i (upper triangular)
+            g_ij.push(inner_product::compute_linear_combination(
+                witness_vector[i].get_elements(),
+                witness_vector[j].get_elements(),
+            ));
+        }
+        g_i.push(RqVector::new(g_ij));
+    }
+    RqMatrix::new(g_i, true)
 }
 
-impl<'a> GarbagePolynomials<'a> {
-    pub fn new(witness_vector: &'a [RqVector]) -> Self {
-        Self {
-            witness_vector,
-            g: RqMatrix::new(Vec::new(), true),
-            h: RqMatrix::new(Vec::new(), true),
-        }
-    }
+/// Calculate the h_{ij} = <φ_i, s_j> + <φ_j, s_i> garbage polynomials
+/// In the paper, h_{ij} is defined with a factor of 1/2 in front
+/// However, since we're using q = 2^32, division by 2 is problematic in Z_q
+/// So we store h'_{ij} = 2*h_{ij} = <φ_i, s_j> + <φ_j, s_i> directly
+/// Exploits symmetry by only calculating for i ≤ j since h_{ij} = h_{ji}
+pub fn compute_h(witness_vector: &[RqVector], phi: &[RqVector]) -> RqMatrix {
+    let r = witness_vector.len();
+    let mut h_i = Vec::with_capacity((r * (r + 1)) / 2);
 
-    /// Calculate the garbage polynomials g_{ij} = <s_i, s_j>
-    /// Exploits symmetry by only calculating for i ≤ j since g_{ij} = g_{ji}
-    pub fn compute_g(&mut self) {
-        let mut g_i = Vec::new();
-        for i in 0..self.witness_vector.len() {
-            let mut g_ij = Vec::new();
-            for j in 0..=i {
-                // Only calculate for j ≤ i (upper triangular)
-                g_ij.push(inner_product::compute_linear_combination(
-                    self.witness_vector[i].get_elements(),
-                    self.witness_vector[j].get_elements(),
-                ));
-            }
-            g_i.push(RqVector::new(g_ij));
+    for i in 0..r {
+        let mut h_ij = Vec::new();
+        for j in 0..=i {
+            // Only calculate for j ≤ i (upper triangular)
+            let inner_phi_i_s_j = inner_product::compute_linear_combination(
+                phi[i].get_elements(),
+                witness_vector[j].get_elements(),
+            );
+            let inner_phi_j_s_i = inner_product::compute_linear_combination(
+                phi[j].get_elements(),
+                witness_vector[i].get_elements(),
+            );
+            h_ij.push(&inner_phi_i_s_j + &inner_phi_j_s_i);
         }
-        self.g = RqMatrix::new(g_i, true);
+        h_i.push(RqVector::new(h_ij));
     }
-
-    /// Calculate the h_{ij} = <φ_i, s_j> + <φ_j, s_i> garbage polynomials
-    /// In the paper, h_{ij} is defined with a factor of 1/2 in front
-    /// However, since we're using q = 2^32, division by 2 is problematic in Z_q
-    /// So we store h'_{ij} = 2*h_{ij} = <φ_i, s_j> + <φ_j, s_i> directly
-    /// Exploits symmetry by only calculating for i ≤ j since h_{ij} = h_{ji}
-    pub fn compute_h(&mut self, phi: &[RqVector]) {
-        let r = self.witness_vector.len();
-        let mut h_i = Vec::with_capacity((r * (r + 1)) / 2);
-
-        for i in 0..r {
-            let mut h_ij = Vec::new();
-            for j in 0..=i {
-                // Only calculate for j ≤ i (upper triangular)
-                let inner_phi_i_s_j = inner_product::compute_linear_combination(
-                    phi[i].get_elements(),
-                    self.witness_vector[j].get_elements(),
-                );
-                let inner_phi_j_s_i = inner_product::compute_linear_combination(
-                    phi[j].get_elements(),
-                    self.witness_vector[i].get_elements(),
-                );
-                h_ij.push(&inner_phi_i_s_j + &inner_phi_j_s_i);
-            }
-            h_i.push(RqVector::new(h_ij));
-        }
-        self.h = RqMatrix::new(h_i, true);
-    }
+    RqMatrix::new(h_i, true)
 }
 
 // Todo: Revise and complete the following
@@ -211,16 +195,12 @@ mod tests {
     fn test_g_matrix_size() {
         let multiplicity = 3;
         let (witnesses, _) = create_test_witnesses(multiplicity);
-        let mut garbage_polynomial = GarbagePolynomials::new(&witnesses);
-        garbage_polynomial.compute_g();
+        let g = compute_g(&witnesses);
 
-        assert_eq!(garbage_polynomial.g.get_row_len(), 3);
+        assert_eq!(g.get_row_len(), 3);
         // Assert that g stores half of the matrix
         for row in 0..multiplicity {
-            assert_eq!(
-                garbage_polynomial.g.get_elements()[row].get_length(),
-                row + 1
-            );
+            assert_eq!(g.get_elements()[row].get_length(), row + 1);
         }
     }
 
@@ -228,8 +208,7 @@ mod tests {
     fn test_g_calculation() {
         let (witnesses, _) = create_test_witnesses(3);
 
-        let mut garbage_polynomial = GarbagePolynomials::new(&witnesses);
-        garbage_polynomial.compute_g();
+        let g = compute_g(&witnesses);
 
         // Verify a few specific values
         let expected_g_01 = inner_product::compute_linear_combination(
@@ -247,33 +226,28 @@ mod tests {
             witnesses[2].get_elements(),
         );
 
-        assert_eq!(*garbage_polynomial.g.get_cell(0, 1), expected_g_01);
-        assert_eq!(*garbage_polynomial.g.get_cell(1, 0), expected_g_10);
-        assert_eq!(*garbage_polynomial.g.get_cell(2, 2), expected_g_22);
+        assert_eq!(*g.get_cell(0, 1), expected_g_01);
+        assert_eq!(*g.get_cell(1, 0), expected_g_10);
+        assert_eq!(*g.get_cell(2, 2), expected_g_22);
     }
 
     #[test]
     fn test_h_matrix_size() {
         let multiplicity = 3;
         let (witnesses, phi) = create_test_witnesses(multiplicity);
-        let mut garbage_polynomial = GarbagePolynomials::new(&witnesses);
-        garbage_polynomial.compute_h(&phi);
+        let h = compute_h(&witnesses, &phi);
 
-        assert_eq!(garbage_polynomial.h.get_row_len(), 3);
+        assert_eq!(h.get_row_len(), 3);
         // Assert that g stores half of the matrix
         for row in 0..multiplicity {
-            assert_eq!(
-                garbage_polynomial.h.get_elements()[row].get_length(),
-                row + 1
-            );
+            assert_eq!(h.get_elements()[row].get_length(), row + 1);
         }
     }
 
     #[test]
     fn test_h_calculation() {
         let (witnesses, phi) = create_test_witnesses(3);
-        let mut garbage_polynomial = GarbagePolynomials::new(&witnesses);
-        garbage_polynomial.compute_h(&phi);
+        let h = compute_h(&witnesses, &phi);
 
         // Verify a specific value
         let phi_0_s_1 = inner_product::compute_linear_combination(
@@ -286,11 +260,8 @@ mod tests {
         );
         let expected_h_01 = &phi_0_s_1 + &phi_1_s_0;
 
-        assert_eq!(
-            garbage_polynomial.h.get_cell(0, 1),
-            garbage_polynomial.h.get_cell(1, 0)
-        );
-        assert_eq!(expected_h_01, *garbage_polynomial.h.get_cell(0, 1));
+        assert_eq!(h.get_cell(0, 1), h.get_cell(1, 0));
+        assert_eq!(expected_h_01, *h.get_cell(0, 1));
     }
 
     // #[test]
