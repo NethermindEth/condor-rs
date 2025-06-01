@@ -51,14 +51,27 @@ pub enum VerifierError {
     DecompositionError(#[from] outer_commitments::DecompositionError),
 }
 pub struct LabradorVerifier<'a> {
-    params: EnvironmentParameters,
+    params: &'a EnvironmentParameters,
     crs: &'a AjtaiInstances,
     st: &'a Statement,
+    // Aggregation instances
+    constant_aggregator: ZeroConstantFunctionsAggregation<'a>,
+    funcs_aggregator: FunctionsAggregation<'a>,
 }
 
 impl<'a> LabradorVerifier<'a> {
-    pub fn new(params: EnvironmentParameters, crs: &'a AjtaiInstances, st: &'a Statement) -> Self {
-        Self { params, crs, st }
+    pub fn new(
+        params: &'a EnvironmentParameters,
+        crs: &'a AjtaiInstances,
+        st: &'a Statement,
+    ) -> Self {
+        Self {
+            params,
+            crs,
+            st,
+            constant_aggregator: ZeroConstantFunctionsAggregation::new(params),
+            funcs_aggregator: FunctionsAggregation::new(params),
+        }
     }
 
     /// All check conditions are from page 18
@@ -67,8 +80,6 @@ impl<'a> LabradorVerifier<'a> {
         proof: &LabradorTranscript<S>,
     ) -> Result<bool, VerifierError> {
         let mut transcript = LabradorTranscript::new(S::default());
-        let mut constant_aggregation = ZeroConstantFunctionsAggregation::new(&self.params);
-        let mut funcs_aggregator = FunctionsAggregation::new(&self.params);
 
         transcript.absorb_u1(&proof.u1);
         let projections = transcript.generate_projections(
@@ -90,7 +101,7 @@ impl<'a> LabradorVerifier<'a> {
             transcript.generate_challenges(env_params::OPERATOR_NORM, self.params.multiplicity);
 
         // check b_0^{''(k)} ?= <omega^(k),p> + \sum(psi_l^(k) * b_0^{'(l)})
-        Self::check_b_0_aggr(self, proof, &self.params, &psi, &omega)?;
+        Self::check_b_0_aggr(self, proof, self.params, &psi, &omega)?;
 
         // 3. line 14: check norm_sum(z, t, g, h) <= (beta')^2
 
@@ -158,20 +169,20 @@ impl<'a> LabradorVerifier<'a> {
         }
 
         // 6. line 17: check \sum(<\phi_i, z>c_i) ?= \sum(h_ij * c_i * c_j)
-        constant_aggregation.calculate_agg_phi_double_prime(
+        self.constant_aggregator.calculate_agg_phi_double_prime(
             &self.st.phi_ct,
             &projections.get_conjugated_projection_matrices(),
             &psi,
             &omega,
         );
-        funcs_aggregator.calculate_aggr_phi(
+        self.funcs_aggregator.calculate_aggr_phi(
             &self.st.phi_constraint,
-            constant_aggregation.get_phi_double_prime(),
+            self.constant_aggregator.get_phi_double_prime(),
             &vector_alpha,
             &vector_beta,
         );
         let sum_phi_z_c =
-            Self::calculate_phi_z_c(funcs_aggregator.get_appr_phi(), &challenges, &proof.z);
+            Self::calculate_phi_z_c(self.funcs_aggregator.get_appr_phi(), &challenges, &proof.z);
         let sum_hij_cij = Self::calculate_gh_ci_cj(&proof.h, &challenges, self.params.multiplicity);
 
         // Left side multiple by 2 because of when we calculate h_ij, we didn't apply the division (divided by 2)
@@ -184,15 +195,16 @@ impl<'a> LabradorVerifier<'a> {
 
         // 7. line 18: check \sum(a_ij * g_ij) + \sum(h_ii) - b ?= 0
 
-        constant_aggregation.calculate_agg_a_double_prime(&psi, &self.st.a_ct);
-        funcs_aggregator.calculate_agg_a(
+        self.constant_aggregator
+            .calculate_agg_a_double_prime(&psi, &self.st.a_ct);
+        self.funcs_aggregator.calculate_agg_a(
             &self.st.a_constraint,
-            constant_aggregation.get_alpha_double_prime(),
+            self.constant_aggregator.get_alpha_double_prime(),
             &vector_alpha,
             &vector_beta,
         );
 
-        funcs_aggregator.calculate_aggr_b(
+        self.funcs_aggregator.calculate_aggr_b(
             &self.st.b_constraint,
             &proof.b_ct_aggr,
             &vector_alpha,
@@ -200,8 +212,8 @@ impl<'a> LabradorVerifier<'a> {
         );
 
         if !Self::check_relation(
-            funcs_aggregator.get_agg_a(),
-            funcs_aggregator.get_aggr_b(),
+            self.funcs_aggregator.get_agg_a(),
+            self.funcs_aggregator.get_aggr_b(),
             &proof.g,
             &proof.h,
         ) {
@@ -355,7 +367,7 @@ mod tests {
         let proof: LabradorTranscript<ShakeSponge> = prover.prove().unwrap();
 
         // create a new verifier
-        let mut verifier = LabradorVerifier::new(EnvironmentParameters::default(), &crs, &st);
+        let mut verifier = LabradorVerifier::new(&ep_1, &crs, &st);
         let result = verifier.verify(&proof);
         assert!(result.unwrap());
     }

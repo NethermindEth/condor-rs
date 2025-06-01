@@ -21,19 +21,16 @@ impl AjtaiInstances {
         Self {
             commitment_scheme_a: AjtaiScheme::new(
                 ep.beta,
-                ep.beta,
                 Self::challenge_rq_matrix(ep.kappa, ep.rank),
             )
             .expect("Invalid Parameters for commitment scheme A"),
             commitment_scheme_b: AjtaiScheme::new(
-                ep.gamma_1,
                 ep.gamma_1,
                 Self::challenge_rq_matrix(ep.kappa_1, ep.multiplicity * ep.t_1 * ep.kappa),
             )
             .expect("Invalid Parameters for commitment scheme B"),
             // Todo: gamma_1 should be changed to a valid witness bound
             commitment_scheme_c: AjtaiScheme::new(
-                ep.gamma_1,
                 ep.gamma_1,
                 Self::challenge_rq_matrix(
                     ep.kappa_1,
@@ -42,7 +39,6 @@ impl AjtaiInstances {
             )
             .expect("Invalid Parameters for commitment scheme C"),
             commitment_scheme_d: AjtaiScheme::new(
-                ep.gamma_2,
                 ep.gamma_2,
                 Self::challenge_rq_matrix(
                     ep.kappa_2,

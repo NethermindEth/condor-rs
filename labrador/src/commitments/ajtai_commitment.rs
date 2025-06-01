@@ -44,16 +44,12 @@ pub struct AjtaiScheme {
 }
 
 impl AjtaiScheme {
-    pub fn new(
-        beta: Zq,
-        witness_bound: Zq,
-        random_matrix: RqMatrix,
-    ) -> Result<Self, ParameterError> {
+    pub fn new(witness_bound: Zq, random_matrix: RqMatrix) -> Result<Self, ParameterError> {
         if witness_bound.is_zero() {
             return Err(ParameterError::InvalidWitnessBounds(witness_bound));
         }
         Self::validate_parameters(
-            beta,
+            witness_bound,
             random_matrix.get_row_len(),
             random_matrix.get_col_len(),
         )?;
@@ -200,14 +196,13 @@ mod tests {
         pub fn setup_scheme() -> AjtaiScheme {
             let mut rng = rand::rng();
             let random_matrix = RqMatrix::random(&mut rng, TEST_M, TEST_N);
-            AjtaiScheme::new(Zq::ONE, Zq::ONE, random_matrix).unwrap()
+            AjtaiScheme::new(Zq::ONE, random_matrix).unwrap()
         }
     }
 
     #[test]
     fn rejects_invalid_parameters() {
         assert!(AjtaiScheme::new(
-            Zq::ONE,
             Zq::ZERO,
             RqMatrix::new(vec![RqVector::new(vec![Rq::zero()])], false)
         )
