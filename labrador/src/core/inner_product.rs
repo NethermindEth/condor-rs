@@ -34,7 +34,7 @@ mod tests {
 
     #[test]
     #[should_panic]
-    fn test_inputs_with_different_legths_panic() {
+    fn test_inputs_with_different_lengths_panic() {
         let vector_a = RqVector::random(&mut rng(), 100);
         let vector_b = RqVector::random(&mut rng(), 90);
         let _ = compute_linear_combination(vector_a.get_elements(), vector_b.get_elements());

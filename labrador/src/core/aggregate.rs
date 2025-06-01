@@ -262,7 +262,7 @@ impl<'a> FunctionsAggregation<'a> {
 
 #[cfg(test)]
 #[allow(clippy::needless_range_loop)]
-mod tests {
+mod constant_agg_tests {
     use crate::relation::env_params;
 
     use super::*;
@@ -468,5 +468,141 @@ mod tests {
             }
             assert_eq!(b_double_prime.get_elements()[k], &rhs + &lhs);
         }
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::needless_range_loop)]
+mod func_agg_tests {
+    use super::*;
+
+    mod variable_generator {
+        use super::*;
+        use rand::rng;
+
+        pub fn generate_rq_vector(vec_length: usize) -> RqVector {
+            let mut vector_alpha = Vec::new();
+            for _ in 0..vec_length {
+                vector_alpha.push(Rq::random(&mut rng()));
+            }
+            RqVector::new(vector_alpha)
+        }
+
+        pub fn generate_matrix_vector(vec_length: usize, matrix_size: usize) -> Vec<RqMatrix> {
+            let mut a_constraint = Vec::new();
+            for _ in 0..vec_length {
+                a_constraint.push(RqMatrix::symmetric_random(&mut rng(), matrix_size));
+            }
+            a_constraint
+        }
+
+        pub fn generate_rqvector_vector(
+            vec_length: usize,
+            inner_vec_length: usize,
+            inner_inner_vec_length: usize,
+        ) -> Vec<Vec<RqVector>> {
+            let mut phi_constraint = Vec::new();
+            for _ in 0..vec_length {
+                let mut inner_vec = Vec::new();
+                for _ in 0..inner_vec_length {
+                    inner_vec.push(RqVector::random(&mut rng(), inner_inner_vec_length));
+                }
+                phi_constraint.push(inner_vec);
+            }
+            phi_constraint
+        }
+    }
+
+    #[test]
+    fn test_calculate_agg_a() {
+        let params = EnvironmentParameters::default();
+        let mut aggregator = FunctionsAggregation::new(&params);
+
+        let vector_alpha = variable_generator::generate_rq_vector(params.constraint_k);
+        let vector_beta = variable_generator::generate_rq_vector(params.const_agg_length);
+        let a_constraint =
+            variable_generator::generate_matrix_vector(params.constraint_k, params.multiplicity);
+        let a_double_prime = variable_generator::generate_matrix_vector(
+            params.const_agg_length,
+            params.multiplicity,
+        );
+
+        aggregator.calculate_agg_a(&a_constraint, &a_double_prime, &vector_alpha, &vector_beta);
+
+        for i in 0..params.multiplicity {
+            for j in 0..params.multiplicity {
+                let mut rhs = Rq::zero();
+                for k in 0..params.constraint_k {
+                    rhs = &rhs + &(a_constraint[k].get_cell(i, j) * &vector_alpha.get_elements()[k])
+                }
+                let mut lhs = Rq::zero();
+                for k in 0..params.const_agg_length {
+                    lhs =
+                        &lhs + &(a_double_prime[k].get_cell(i, j) * &vector_beta.get_elements()[k])
+                }
+                assert_eq!(*aggregator.aggregated_a.get_cell(i, j), &rhs + &lhs);
+            }
+        }
+    }
+
+    #[test]
+    fn test_calculate_agg_phi() {
+        let params = EnvironmentParameters::default();
+        let mut aggregator = FunctionsAggregation::new(&params);
+
+        let vector_alpha = variable_generator::generate_rq_vector(params.constraint_k);
+        let vector_beta = variable_generator::generate_rq_vector(params.const_agg_length);
+        let phi_constraint = variable_generator::generate_rqvector_vector(
+            params.constraint_k,
+            params.multiplicity,
+            params.rank,
+        );
+        let phi_double_prime = variable_generator::generate_rqvector_vector(
+            params.const_agg_length,
+            params.multiplicity,
+            params.rank,
+        );
+
+        aggregator.calculate_aggr_phi(
+            &phi_constraint,
+            &phi_double_prime,
+            &vector_alpha,
+            &vector_beta,
+        );
+
+        for i in 0..params.multiplicity {
+            let mut rhs = RqVector::zero(params.rank);
+            for k in 0..params.constraint_k {
+                rhs = &rhs + &(&phi_constraint[k][i] * &vector_alpha.get_elements()[k])
+            }
+            let mut lhs = RqVector::zero(params.rank);
+            for k in 0..params.const_agg_length {
+                lhs = &lhs + &(&phi_double_prime[k][i] * &vector_beta.get_elements()[k])
+            }
+            assert_eq!(aggregator.aggregated_phi[i], &rhs + &lhs);
+        }
+    }
+
+    #[test]
+    fn test_calculate_agg_b() {
+        let params = EnvironmentParameters::default();
+        let mut aggregator = FunctionsAggregation::new(&params);
+
+        let vector_alpha = variable_generator::generate_rq_vector(params.constraint_k);
+        let vector_beta = variable_generator::generate_rq_vector(params.const_agg_length);
+        let b_constraint = variable_generator::generate_rq_vector(params.constraint_k);
+        let b_double_prime = variable_generator::generate_rq_vector(params.const_agg_length);
+
+        aggregator.calculate_aggr_b(&b_constraint, &b_double_prime, &vector_alpha, &vector_beta);
+
+        let mut rhs = Rq::zero();
+        for k in 0..params.constraint_k {
+            rhs = &rhs + &(&b_constraint.get_elements()[k] * &vector_alpha.get_elements()[k])
+        }
+        let mut lhs = Rq::zero();
+        for k in 0..params.const_agg_length {
+            lhs = &lhs + &(&b_double_prime.get_elements()[k] * &vector_beta.get_elements()[k])
+        }
+        assert_eq!(aggregator.aggregated_b, &rhs + &lhs);
     }
 }
