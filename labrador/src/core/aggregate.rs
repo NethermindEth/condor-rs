@@ -260,53 +260,213 @@ impl<'a> FunctionsAggregation<'a> {
     }
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-//     use crate::prover::Challenges;
-//     use crate::verifier::LabradorVerifier;
-//     #[test]
-//     fn test_check_relation_full() {
-//         // set up example environment, use set1 for testing.
-//         let ep = EnvironmentParameters::default();
-//         // generate a random witness based on ep above
-//         let witness_1 = Witness::new(&ep);
-//         // generate public statements based on witness_1
-//         let st = Statement::new(&witness_1, &ep);
-//         // generate random challenges
-//         let tr = Challenges::new(&ep);
-//         // first aggregation
-//         let aggr_1 = AggregationOne::new(&witness_1, &st, &ep, &tr);
-//         // second aggregation
-//         let aggr_2 = AggregationTwo::new(&aggr_1, &st, &ep, &tr);
+#[cfg(test)]
+#[allow(clippy::needless_range_loop)]
+mod tests {
+    use crate::relation::env_params;
 
-//         // calculate garbage polynomial g_{ij} = <s_i, s_j>
-//         let g = (0..ep.multiplicity)
-//             .map(|i| {
-//                 (0..ep.multiplicity)
-//                     .map(|j| witness_1.s[i].inner_product_poly_vector(&witness_1.s[j]))
-//                     .collect()
-//             })
-//             .collect();
+    use super::*;
 
-//         // calculate h_{ii}
-//         let h = (0..ep.multiplicity)
-//             .map(|i| {
-//                 (0..ep.multiplicity)
-//                     .map(|j| {
-//                         let inner_phii_sj =
-//                             aggr_2.phi_i[i].inner_product_poly_vector(&witness_1.s[j]);
-//                         let inner_phij_si =
-//                             aggr_2.phi_i[j].inner_product_poly_vector(&witness_1.s[i]);
-//                         &inner_phii_sj + &inner_phij_si
-//                     })
-//                     .collect()
-//             })
-//             .collect();
+    mod variable_generator {
+        use super::*;
+        use rand::{
+            distr::{Distribution, Uniform},
+            rng,
+        };
+        fn sample_zq_vector(length: usize) -> Vec<Zq> {
+            let uniform = Uniform::new_inclusive(Zq::ZERO, Zq::NEG_ONE).unwrap();
+            let mut coeffs = vec![Zq::ZERO; length];
+            coeffs
+                .iter_mut()
+                .for_each(|c| *c = uniform.sample(&mut rng()));
+            coeffs
+        }
 
-//         // check aggregation relation
-//         let relation = LabradorVerifier::check_relation(&aggr_2.a_i, &aggr_2.b_i, &g, &h);
+        pub fn generate_vector_psi(vec_length: usize, inner_vec_size: usize) -> Vec<Vec<Zq>> {
+            let mut vector_psi = Vec::new();
+            for _ in 0..vec_length {
+                vector_psi.push(sample_zq_vector(inner_vec_size));
+            }
+            vector_psi
+        }
 
-//         assert!(relation);
-//     }
-// }
+        pub fn generate_a_prime(vec_length: usize, matrix_size: usize) -> Vec<RqMatrix> {
+            let mut a_prime = Vec::new();
+            for _ in 0..vec_length {
+                a_prime.push(RqMatrix::symmetric_random(&mut rng(), matrix_size));
+            }
+            a_prime
+        }
+
+        pub fn generate_phi_prime(
+            vec_length: usize,
+            inner_vec_length: usize,
+            inner_inner_vec_length: usize,
+        ) -> Vec<Vec<RqVector>> {
+            let mut phi_prime = Vec::new();
+            for _ in 0..vec_length {
+                let mut inner_vec = Vec::new();
+                for _ in 0..inner_vec_length {
+                    inner_vec.push(RqVector::random(&mut rng(), inner_inner_vec_length));
+                }
+                phi_prime.push(inner_vec);
+            }
+            phi_prime
+        }
+
+        pub fn generate_conjugated_pi(
+            vec_length: usize,
+            matrix_row: usize,
+            matrix_col: usize,
+        ) -> Vec<RqMatrix> {
+            let mut conjugated_pi = Vec::new();
+            for _ in 0..vec_length {
+                conjugated_pi.push(RqMatrix::random(&mut rng(), matrix_row, matrix_col));
+            }
+            conjugated_pi
+        }
+
+        pub fn generate_omega(vec_length: usize, inner_vec_length: usize) -> Vec<Vec<Zq>> {
+            let mut vector_omega = Vec::new();
+            for _ in 0..vec_length {
+                vector_omega.push(variable_generator::sample_zq_vector(inner_vec_length));
+            }
+            vector_omega
+        }
+
+        pub fn generate_witness(vec_length: usize, inner_vec_length: usize) -> Vec<RqVector> {
+            let mut witness = Vec::new();
+            for _ in 0..vec_length {
+                witness.push(RqVector::random(&mut rng(), inner_vec_length));
+            }
+            witness
+        }
+    }
+
+    #[test]
+    fn test_calculate_agg_a_double_prime() {
+        let params = EnvironmentParameters::default();
+        let mut aggregator = ZeroConstantFunctionsAggregation::new(&params);
+
+        let vector_psi =
+            variable_generator::generate_vector_psi(params.const_agg_length, params.constraint_l);
+        let a_prime =
+            variable_generator::generate_a_prime(params.constraint_l, params.multiplicity);
+
+        aggregator.calculate_agg_a_double_prime(&vector_psi, &a_prime);
+
+        for k in 0..params.const_agg_length {
+            for i in 0..params.multiplicity {
+                for j in 0..params.multiplicity {
+                    let mut rhs = Rq::zero();
+                    for l in 0..params.constraint_l {
+                        rhs = &rhs + &(a_prime[l].get_cell(i, j) * &vector_psi[k][l])
+                    }
+                    assert_eq!(*aggregator.a_double_prime[k].get_cell(i, j), rhs);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_calculate_agg_phi_double_prime() {
+        let params = EnvironmentParameters::default();
+        let mut aggregator = ZeroConstantFunctionsAggregation::new(&params);
+
+        let phi_prime = variable_generator::generate_phi_prime(
+            params.constraint_l,
+            params.multiplicity,
+            params.rank,
+        );
+        let conjugated_pi = variable_generator::generate_conjugated_pi(
+            params.multiplicity,
+            2 * env_params::SECURITY_PARAMETER,
+            params.rank,
+        );
+        let vector_psi =
+            variable_generator::generate_vector_psi(params.const_agg_length, params.constraint_l);
+        let vector_omega = variable_generator::generate_omega(
+            params.const_agg_length,
+            2 * env_params::SECURITY_PARAMETER,
+        );
+
+        aggregator.calculate_agg_phi_double_prime(
+            &phi_prime,
+            &conjugated_pi,
+            &vector_psi,
+            &vector_omega,
+        );
+
+        for k in 0..params.const_agg_length {
+            for i in 0..params.multiplicity {
+                let mut rhs = RqVector::zero(params.rank);
+                for l in 0..params.constraint_l {
+                    rhs = &rhs + &(&phi_prime[l][i] * vector_psi[k][l]);
+                }
+                let mut lhs = RqVector::zero(params.rank);
+                for j in 0..2 * env_params::SECURITY_PARAMETER {
+                    lhs = &lhs + &(&conjugated_pi[i].get_elements()[j] * vector_omega[k][j]);
+                }
+                assert_eq!(aggregator.phi_double_prime[k][i], &rhs + &lhs);
+            }
+        }
+    }
+
+    #[test]
+    fn test_calculate_agg_b_double_prime() {
+        let params = EnvironmentParameters::default();
+        let mut aggregator = ZeroConstantFunctionsAggregation::new(&params);
+
+        let phi_prime = variable_generator::generate_phi_prime(
+            params.constraint_l,
+            params.multiplicity,
+            params.rank,
+        );
+        let conjugated_pi = variable_generator::generate_conjugated_pi(
+            params.multiplicity,
+            2 * env_params::SECURITY_PARAMETER,
+            params.rank,
+        );
+        let vector_psi =
+            variable_generator::generate_vector_psi(params.const_agg_length, params.constraint_l);
+        let vector_omega = variable_generator::generate_omega(
+            params.const_agg_length,
+            2 * env_params::SECURITY_PARAMETER,
+        );
+        let a_prime =
+            variable_generator::generate_a_prime(params.constraint_l, params.multiplicity);
+        let witness_vector = variable_generator::generate_witness(params.multiplicity, params.rank);
+
+        aggregator.calculate_agg_a_double_prime(&vector_psi, &a_prime);
+        aggregator.calculate_agg_phi_double_prime(
+            &phi_prime,
+            &conjugated_pi,
+            &vector_psi,
+            &vector_omega,
+        );
+        let b_double_prime = aggregator.calculate_agg_b_double_prime(&witness_vector);
+
+        for k in 0..params.const_agg_length {
+            let mut rhs = Rq::zero();
+            for i in 0..params.multiplicity {
+                for j in 0..params.multiplicity {
+                    rhs = &rhs
+                        + &(aggregator.a_double_prime[k].get_cell(i, j)
+                            * &inner_product::compute_linear_combination(
+                                witness_vector[i].get_elements(),
+                                witness_vector[j].get_elements(),
+                            ));
+                }
+            }
+            let mut lhs = Rq::zero();
+            for i in 0..params.multiplicity {
+                lhs = &lhs
+                    + (&inner_product::compute_linear_combination(
+                        aggregator.phi_double_prime[k][i].get_elements(),
+                        witness_vector[i].get_elements(),
+                    ));
+            }
+            assert_eq!(b_double_prime.get_elements()[k], &rhs + &lhs);
+        }
+    }
+}

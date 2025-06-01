@@ -211,6 +211,27 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_to_u128() {
+        let a = Zq::new(10);
+        let b = a.to_u128();
+        assert_eq!(b, 10u128);
+    }
+
+    #[test]
+    fn test_is_zero() {
+        let a = Zq::new(0);
+        let b = Zq::new(10);
+        assert!(a.is_zero());
+        assert!(!b.is_zero());
+    }
+
+    #[test]
+    fn test_get_value() {
+        let a = Zq::new(1000);
+        assert_eq!(a.get_value(), 1000u32);
+    }
+
+    #[test]
     fn test_basic_arithmetic() {
         let a = Zq::new(5);
         let b = Zq::new(3);
