@@ -3,6 +3,50 @@ use std::{
     ops::{Add, Mul},
 };
 
+/// Computes the **linear combination** of two equally-sized slices, returning the
+/// sum of pair-wise products.
+///
+/// Conceptually, given two slices  
+/// `elements = [A1, A2, … , An]` and `challenges = [c1, c2, … , cn]`,  
+/// the function evaluates  
+///
+/// ```text
+/// Σ (Ai · ci)  for i = 1 .. n
+/// ```
+///
+/// where `·` is multiplication for the underlying types and `+` is the
+/// corresponding addition. The result’s type (`B`) is the same as the borrowed
+/// type of each element in `elements`.
+///
+/// # Arguments
+///
+/// * `elements`   – Slice of items whose borrowed values will be multiplied by
+///   the corresponding entries in `challenges`.
+/// * `challenges` – Slice of multipliers—**must** be the same length as
+///   `elements`.
+///
+/// # Returns
+///
+/// The accumulated sum **Σ `(elements[i] * challenges[i])`** as a value of type
+/// `B`.
+///
+///
+/// # Examples
+///
+/// Basic usage with primitive integers:
+///
+/// ```rust
+/// use std::borrow::Borrow;
+/// use rand::rng;
+/// use labrador::ring::rq::Rq;
+/// use labrador::core::inner_product::compute_linear_combination;
+///
+/// // The function is generic; we can call it directly.
+/// let elems = [Rq::random(&mut rng()), Rq::random(&mut rng()), Rq::random(&mut rng()), Rq::random(&mut rng()), Rq::random(&mut rng())];
+/// let challenges = [Rq::random(&mut rng()), Rq::random(&mut rng()), Rq::random(&mut rng()), Rq::random(&mut rng()), Rq::random(&mut rng())];
+/// let sum = compute_linear_combination(&elems, &challenges);
+/// ```
+///
 pub fn compute_linear_combination<E, B, C>(elements: &[E], challenges: &[C]) -> B
 where
     E: Borrow<B>,
