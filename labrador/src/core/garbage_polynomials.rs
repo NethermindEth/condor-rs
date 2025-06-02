@@ -174,6 +174,8 @@ pub fn compute_h(witness_vector: &[RqVector], phi: &[RqVector]) -> RqMatrix {
 
 #[cfg(test)]
 mod tests {
+    use crate::ring::rq::Rq;
+
     use super::*;
     use rand::rng;
 
@@ -262,6 +264,31 @@ mod tests {
 
         assert_eq!(h.get_cell(0, 1), h.get_cell(1, 0));
         assert_eq!(expected_h_01, *h.get_cell(0, 1));
+    }
+
+    #[test]
+    fn test_g_computation_with_zero_vectors() {
+        let witness_vector = vec![RqVector::zero(100); 50];
+        let g = compute_g(&witness_vector);
+
+        for row in g.get_elements() {
+            for cell in row.get_elements() {
+                assert_eq!(*cell, Rq::zero());
+            }
+        }
+    }
+
+    #[test]
+    fn test_h_computation_with_zero_vectors() {
+        let witness_vector = vec![RqVector::zero(100); 50];
+        let phi = vec![RqVector::zero(100); 50];
+        let h = compute_h(&witness_vector, &phi);
+
+        for row in h.get_elements() {
+            for cell in row.get_elements() {
+                assert_eq!(*cell, Rq::zero());
+            }
+        }
     }
 
     // #[test]
