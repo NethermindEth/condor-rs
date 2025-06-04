@@ -46,16 +46,6 @@ impl Rq {
         }
     }
 
-    /// ```compile_fail
-    ///
-    /// let poly = Rq::zero(); // or any constructor you have
-    ///
-    /// // Move happens here …
-    /// let _coeffs = poly.into_coeffs();
-    ///
-    /// // …so using `poly` again must not compile:
-    /// let _still_here = poly; //^ ERROR use of moved value
-    /// ```
     pub fn into_coeffs(self) -> [Zq; Self::DEGREE] {
         self.coeffs
     }

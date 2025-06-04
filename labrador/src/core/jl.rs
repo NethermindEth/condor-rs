@@ -98,15 +98,13 @@ mod tests {
     use super::*;
     use crate::relation::witness::Witness;
     use crate::transcript::sponges::shake::ShakeSponge;
-    use crate::transcript::{LabradorTranscript, Sponge};
+    use crate::transcript::LabradorTranscript;
     use rand::rng;
 
     // Test that the probability of the inequality being true is close to 1/2
     #[test]
     #[cfg(not(feature = "skip-slow-tests"))]
     fn test_projection_is_smaller_than_upper_bound() {
-        use crate::transcript::Sponge;
-
         let (security_parameter, rank, multiplicity) = (128, 5, 1);
         // 1000 was chosen to provide a reasonably large sample size
 
@@ -145,7 +143,7 @@ mod tests {
     #[test]
     #[cfg(not(feature = "skip-slow-tests"))]
     fn test_projection_average_value() {
-        use crate::{relation::witness::Witness, transcript::Sponge};
+        use crate::relation::witness::Witness;
 
         let (security_parameter, rank, multiplicity) = (128, 3, 1);
         let trials: u128 = 10000;

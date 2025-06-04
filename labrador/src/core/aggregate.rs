@@ -41,7 +41,7 @@ impl<'a> ZeroConstantFunctionsAggregation<'a> {
                     a_prime.iter().map(|matrix| matrix.get_cell(i, j)).collect();
 
                 for (k, matrix) in self.a_double_prime.iter_mut().enumerate() {
-                    matrix.set_sell(
+                    matrix.set_cell(
                         i,
                         j,
                         inner_product::compute_linear_combination(
@@ -173,7 +173,7 @@ impl<'a> FunctionsAggregation<'a> {
                     .iter()
                     .map(|matrix| matrix.get_cell(i, j))
                     .collect();
-                self.aggregated_a.set_sell(
+                self.aggregated_a.set_cell(
                     i,
                     j,
                     &inner_product::compute_linear_combination::<&Rq, Rq, Rq>(

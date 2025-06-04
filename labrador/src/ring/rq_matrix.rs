@@ -48,7 +48,7 @@ impl RqMatrix {
         }
     }
 
-    pub fn set_sell(&mut self, row: usize, col: usize, value: Rq) {
+    pub fn set_cell(&mut self, row: usize, col: usize, value: Rq) {
         self.elements[row].set(col, value);
     }
 
@@ -133,8 +133,8 @@ mod tests {
     #[test]
     fn test_set_sell() {
         let mut matrix = RqMatrix::zero(10, 18);
-        matrix.set_sell(4, 9, Rq::new([Zq::new(10); Rq::DEGREE]));
-        matrix.set_sell(8, 1, Rq::new([Zq::new(3); Rq::DEGREE]));
+        matrix.set_cell(4, 9, Rq::new([Zq::new(10); Rq::DEGREE]));
+        matrix.set_cell(8, 1, Rq::new([Zq::new(3); Rq::DEGREE]));
 
         for (i, vector) in matrix.get_elements().iter().enumerate() {
             for (j, poly) in vector.get_elements().iter().enumerate() {
