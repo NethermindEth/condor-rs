@@ -1,6 +1,6 @@
 use rand::rng;
 
-use crate::ring::{rq::Rq, rq_vector::RqVector, zq::Zq};
+use crate::ring::{rq::Rq, rq_vector::RqVector, zq::Zq, Norms};
 
 pub struct Witness {
     pub s: Vec<RqVector>,
@@ -35,7 +35,7 @@ impl Witness {
 #[cfg(test)]
 mod tests {
 
-    use crate::ring::{rq::Rq, rq_vector::RqVector, zq::Zq};
+    use crate::ring::{rq::Rq, rq_vector::RqVector, zq::Zq, Norms};
 
     use super::Witness;
 

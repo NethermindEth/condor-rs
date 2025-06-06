@@ -211,9 +211,9 @@ pub fn add_assign_two_zq_vectors(first: &mut [Zq], second: Vec<Zq>) {
 impl Norms for [Zq] {
     type NormType = Zq;
 
+    #[allow(clippy::as_conversions)]
     fn l2_norm_squared(&self) -> Self::NormType {
-        self
-            .iter()
+        self.iter()
             .map(|coeff| {
                 coeff.centered_mod(Zq::new(Zq::Q as u32))
                     * coeff.centered_mod(Zq::new(Zq::Q as u32))
@@ -228,7 +228,15 @@ mod norm_tests {
 
     #[test]
     fn test_l2_norm() {
-        let zq_vector = vec![Zq::new(1), Zq::new(2), Zq::new(3), Zq::new(4), Zq::new(5), Zq::new(6), Zq::new(7)];
+        let zq_vector = [
+            Zq::new(1),
+            Zq::new(2),
+            Zq::new(3),
+            Zq::new(4),
+            Zq::new(5),
+            Zq::new(6),
+            Zq::new(7),
+        ];
         let res = zq_vector.l2_norm_squared();
 
         assert_eq!(res, Zq::new(140));
@@ -236,7 +244,15 @@ mod norm_tests {
 
     #[test]
     fn test_l2_norm_with_negative_values() {
-        let zq_vector = vec![Zq::new(1), Zq::new(2), Zq::new(3), -Zq::new(4), -Zq::new(5), -Zq::new(6), -Zq::new(7)];
+        let zq_vector = [
+            Zq::new(1),
+            Zq::new(2),
+            Zq::new(3),
+            -Zq::new(4),
+            -Zq::new(5),
+            -Zq::new(6),
+            -Zq::new(7),
+        ];
         let res = zq_vector.l2_norm_squared();
 
         assert_eq!(res, Zq::new(140));

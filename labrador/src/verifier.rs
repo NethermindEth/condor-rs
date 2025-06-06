@@ -12,6 +12,7 @@ use crate::ring::rq::Rq;
 use crate::ring::rq_matrix::RqMatrix;
 use crate::ring::rq_vector::RqVector;
 use crate::ring::zq::Zq;
+use crate::ring::Norms;
 use crate::transcript::{LabradorTranscript, Sponge};
 
 #[derive(Debug, Error)]
