@@ -3,6 +3,8 @@ use rand::distr::uniform::{Error, SampleBorrow, SampleUniform, UniformInt, Unifo
 use rand::prelude::*;
 use std::fmt;
 use std::iter::Sum;
+
+use crate::ring::Norms;
 /// Represents an element in the ring Z/qZ where q = 2^32.
 /// Uses native u32 operations with automatic modulo reduction through wrapping arithmetic.
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Default)]
@@ -204,6 +206,41 @@ pub fn add_assign_two_zq_vectors(first: &mut [Zq], second: Vec<Zq>) {
         .iter_mut()
         .zip(second)
         .for_each(|(first_coeff, second_coeff)| *first_coeff += second_coeff);
+}
+
+impl Norms for [Zq] {
+    type NormType = Zq;
+
+    fn l2_norm_squared(&self) -> Self::NormType {
+        self
+            .iter()
+            .map(|coeff| {
+                coeff.centered_mod(Zq::new(Zq::Q as u32))
+                    * coeff.centered_mod(Zq::new(Zq::Q as u32))
+            })
+            .sum()
+    }
+}
+
+#[cfg(test)]
+mod norm_tests {
+    use super::*;
+
+    #[test]
+    fn test_l2_norm() {
+        let zq_vector = vec![Zq::new(1), Zq::new(2), Zq::new(3), Zq::new(4), Zq::new(5), Zq::new(6), Zq::new(7)];
+        let res = zq_vector.l2_norm_squared();
+
+        assert_eq!(res, Zq::new(140));
+    }
+
+    #[test]
+    fn test_l2_norm_with_negative_values() {
+        let zq_vector = vec![Zq::new(1), Zq::new(2), Zq::new(3), -Zq::new(4), -Zq::new(5), -Zq::new(6), -Zq::new(7)];
+        let res = zq_vector.l2_norm_squared();
+
+        assert_eq!(res, Zq::new(140));
+    }
 }
 
 #[cfg(test)]

@@ -82,11 +82,13 @@ impl<'a> LabradorVerifier<'a> {
         let mut transcript = LabradorTranscript::new(S::default());
 
         transcript.absorb_u1(&proof.u1);
+
         let projections = transcript.generate_projections(
             env_params::SECURITY_PARAMETER,
             self.params.rank,
             self.params.multiplicity,
         );
+
         transcript.absorb_vector_p(&proof.vector_p);
         let size_of_psi = usize::div_ceil(env_params::SECURITY_PARAMETER, self.params.log_q);
         let size_of_omega = size_of_psi;
