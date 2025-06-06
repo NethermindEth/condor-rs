@@ -1,20 +1,23 @@
-use crate::core::env_params::EnvironmentParameters;
-use crate::prover::Witness;
+use super::env_params::EnvironmentParameters;
+use crate::relation::witness::Witness;
 use crate::ring::rq::Rq;
+use crate::ring::rq_matrix::RqMatrix;
 use crate::ring::rq_vector::RqVector;
 use crate::ring::zq::Zq;
+
+use crate::core::inner_product;
 
 /// Statement is the input of the prover, which contains the constraints.
 /// All parameters are from line 1, st, in the verifier process, page 18 from the paper.
 pub struct Statement {
     // $a_{ij}^k$
-    pub a_constraint: Vec<Vec<RqVector>>,
+    pub a_constraint: Vec<RqMatrix>,
     // $\varphi_i^k$
     pub phi_constraint: Vec<Vec<RqVector>>,
     // $b^{(k)}$
     pub b_constraint: RqVector,
     // $a_{ij}^{'(l)}$
-    pub a_ct: Vec<Vec<RqVector>>,
+    pub a_ct: Vec<RqMatrix>,
     // $\varphi_i^{'(l)}$
     pub phi_ct: Vec<Vec<RqVector>>,
     // $b_0^{'(l)}$
@@ -24,12 +27,8 @@ pub struct Statement {
 impl Statement {
     pub fn new(witness: &Witness, ep: &EnvironmentParameters) -> Self {
         // generate random a_constraint with size: constraint_k * r * n
-        let a_constraint: Vec<Vec<RqVector>> = (0..ep.constraint_k)
-            .map(|_| {
-                (0..ep.multiplicity)
-                    .map(|_| RqVector::random(&mut rand::rng(), ep.rank))
-                    .collect()
-            })
+        let a_constraint: Vec<RqMatrix> = (0..ep.constraint_k)
+            .map(|_| RqMatrix::symmetric_random(&mut rand::rng(), ep.multiplicity))
             .collect();
 
         // generate random phi_constraint with size: constraint_k * r * n
@@ -47,12 +46,8 @@ impl Statement {
             .collect();
 
         // generate example a_ct with size: constraint_l * r * n
-        let a_ct: Vec<Vec<RqVector>> = (0..ep.constraint_l)
-            .map(|_| {
-                (0..ep.multiplicity)
-                    .map(|_| RqVector::random(&mut rand::rng(), ep.rank))
-                    .collect()
-            })
+        let a_ct: Vec<RqMatrix> = (0..ep.constraint_l)
+            .map(|_| RqMatrix::symmetric_random(&mut rand::rng(), ep.multiplicity))
             .collect();
 
         // generate random phi_ct with size: constraint_k * r * n
@@ -97,24 +92,24 @@ impl Statement {
 #[rustfmt::skip]
 pub fn calculate_b_constraint(
     s: &[RqVector],
-    a_constraint: &[RqVector],
+    a_constraint: &RqMatrix,
     phi_constraint: &[RqVector],
 ) -> Rq {
     let size_s = s.len();
     // calculate \sum(a_{ij}^{k}<s_i, s_j>)
     let left_side = (0..size_s).map(|i| {
-        (0..size_s).map(|j| {
-            a_constraint[i].get_elements()[j].clone()
-                * s[i].inner_product_poly_vector(&s[j])
+        (0..size_s).map(|j: usize| {
+            a_constraint.get_cell(i, j)
+                * &inner_product::compute_linear_combination(s[i].get_elements(), s[j].get_elements())
         })
-        .fold(Rq::zero(), |acc, val| acc + val )
+        .fold(Rq::zero(), |acc, val| &acc + &val )
     })
-    .fold(Rq::zero(), |acc, val| acc + val );
+    .fold(Rq::zero(), |acc, val| &acc + &val );
 
     // calculate \sum(<phi_{i}^{k}, s_i>)
     let right_side = (0..size_s).fold(Rq::zero(), |acc, i| {
-        acc + phi_constraint[i].inner_product_poly_vector(&s[i])
+        &acc + &inner_product::compute_linear_combination(phi_constraint[i].get_elements(), s[i].get_elements())
     });
 
-    left_side + right_side
+    &left_side + &right_side
 }

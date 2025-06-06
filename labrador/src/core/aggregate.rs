@@ -1,595 +1,608 @@
-use crate::core::{env_params::EnvironmentParameters, statement::Statement};
-use crate::prover::Witness;
+use crate::relation::env_params::EnvironmentParameters;
 use crate::ring::rq::Rq;
+use crate::ring::rq_matrix::RqMatrix;
 use crate::ring::rq_vector::RqVector;
 use crate::ring::zq::Zq;
 
-/// First step of aggregation
-pub struct AggregationOne {
-    // a_{ij}^{''(k)}
-    pub a_ct_aggr: Vec<Vec<RqVector>>,
-    // \phi_{i}^{''(k)}
-    pub phi_ct_aggr: Vec<Vec<RqVector>>,
-    // b^{''(k)}
-    pub b_ct_aggr: RqVector,
+use super::inner_product;
+
+/// This struct serves as aggregation of functions with constant value 0.
+pub struct ZeroConstantFunctionsAggregation<'a> {
+    ep: &'a EnvironmentParameters,
+    a_double_prime: Vec<RqMatrix>,
+    phi_double_prime: Vec<Vec<RqVector>>,
 }
 
-impl AggregationOne {
-    pub fn new(
-        witness: &Witness,
-        st: &Statement,
-        ep: &EnvironmentParameters,
-        pi: &[Vec<Vec<Zq>>],
-        psi: &[Vec<Zq>],
-        omega: &[Vec<Zq>],
-    ) -> Self {
-        Self::aggregate(witness, st, ep, pi, psi, omega)
-    }
-
-    fn aggregate(
-        witness: &Witness,
-        st: &Statement,
-        ep: &EnvironmentParameters,
-        pi: &[Vec<Vec<Zq>>],
-        psi: &[Vec<Zq>],
-        omega: &[Vec<Zq>],
-    ) -> Self {
-        // calculate a_{ij}^{''(k)}
-        let a_ct_aggr: Vec<Vec<RqVector>> = Self::get_a_ct_aggr(psi, &st.a_ct, ep);
-
-        // calculate \phi_{i}^{''(k)}
-        let phi_ct_aggr: Vec<Vec<RqVector>> = Self::get_phi_ct_aggr(&st.phi_ct, pi, psi, omega, ep);
-
-        // calculate b^{''(k)}
-        let b_ct_aggr: RqVector = Self::get_b_ct_aggr(&a_ct_aggr, &phi_ct_aggr, witness, ep);
-
+impl<'a> ZeroConstantFunctionsAggregation<'a> {
+    pub fn new(parameters: &'a EnvironmentParameters) -> Self {
         Self {
-            a_ct_aggr,
-            phi_ct_aggr,
-            b_ct_aggr,
+            ep: parameters,
+            a_double_prime: vec![
+                RqMatrix::symmetric_zero(parameters.multiplicity);
+                parameters.const_agg_length
+            ],
+            phi_double_prime: vec![
+                vec![RqVector::zero(parameters.rank); parameters.multiplicity];
+                parameters.const_agg_length
+            ],
         }
     }
 
-    pub fn get_a_ct_aggr(
-        psi: &[Vec<Zq>],
-        a_ct: &[Vec<RqVector>],
-        ep: &EnvironmentParameters,
-    ) -> Vec<Vec<RqVector>> {
-        calculate_aggr_ct_a(psi, a_ct, ep)
-    }
+    /// Calculate a_double_primes from a_prime, a_{i,j}^{''k} = \sum_{l=1}^{L}\psi_l^{k}a_{ij}^{'(l)}
+    ///
+    /// @param: vector_psi: \psi_l^k
+    /// @param: a_prime: a_{ij}^{'(l)}, each a_{ij} is a ring element (PolyRing)
+    ///
+    /// @return: a_{ij}^{''(k)}, return a vector length k of matrix a_{ij}^{''}
+    pub fn calculate_agg_a_double_prime(&mut self, vector_psi: &[Vec<Zq>], a_prime: &[RqMatrix]) {
+        for i in 0..self.ep.multiplicity {
+            for j in 0..i + 1 {
+                let a_prime_l_vector: Vec<&Rq> =
+                    a_prime.iter().map(|matrix| matrix.get_cell(i, j)).collect();
 
-    pub fn get_phi_ct_aggr(
-        phi_ct: &[Vec<RqVector>],
-        pi: &[Vec<Vec<Zq>>],
-        psi: &[Vec<Zq>],
-        omega: &[Vec<Zq>],
-        ep: &EnvironmentParameters,
-    ) -> Vec<Vec<RqVector>> {
-        calculate_aggr_ct_phi(phi_ct, pi, psi, omega, ep)
-    }
-
-    pub fn get_b_ct_aggr(
-        a_ct_aggr: &[Vec<RqVector>],
-        phi_ct_aggr: &[Vec<RqVector>],
-        witness: &Witness,
-        ep: &EnvironmentParameters,
-    ) -> RqVector {
-        calculate_aggr_ct_b(a_ct_aggr, phi_ct_aggr, &witness.s, ep)
-    }
-}
-
-/// Second step of aggregation
-pub struct AggregationTwo {
-    // a_{ij}
-    pub a_i: Vec<RqVector>,
-    // \phi_{i}
-    pub phi_i: Vec<RqVector>,
-    // b
-    pub b_i: Rq,
-}
-
-impl AggregationTwo {
-    pub fn new(
-        aggr_one: &AggregationOne,
-        st: &Statement,
-        ep: &EnvironmentParameters,
-        alpha_vector: &RqVector,
-        beta_vector: &RqVector,
-    ) -> Self {
-        Self::aggregate(aggr_one, st, ep, alpha_vector, beta_vector)
-    }
-
-    fn aggregate(
-        aggr_one: &AggregationOne,
-        st: &Statement,
-        ep: &EnvironmentParameters,
-        alpha_vector: &RqVector,
-        beta_vector: &RqVector,
-    ) -> Self {
-        // calculate a_i
-        let a_i = Self::get_a_i(
-            &st.a_constraint,
-            &aggr_one.a_ct_aggr,
-            alpha_vector,
-            beta_vector,
-            ep,
-        );
-
-        // calculate phi_i
-        let phi_i = Self::get_phi_i(
-            &st.phi_constraint,
-            &aggr_one.phi_ct_aggr,
-            alpha_vector,
-            beta_vector,
-            ep,
-        );
-
-        // calculate b_i
-        let b_i = Self::get_b_i(
-            &st.b_constraint,
-            &aggr_one.b_ct_aggr,
-            alpha_vector,
-            beta_vector,
-            ep,
-        );
-
-        Self { a_i, phi_i, b_i }
-    }
-
-    pub fn get_a_i(
-        a_constraint: &[Vec<RqVector>],
-        a_ct_aggr: &[Vec<RqVector>],
-        random_alpha: &RqVector,
-        random_beta: &RqVector,
-        ep: &EnvironmentParameters,
-    ) -> Vec<RqVector> {
-        calculate_aggr_a(a_constraint, a_ct_aggr, random_alpha, random_beta, ep)
-    }
-
-    pub fn get_phi_i(
-        phi_constraint: &[Vec<RqVector>],
-        phi_ct_aggr: &[Vec<RqVector>],
-        random_alpha: &RqVector,
-        random_beta: &RqVector,
-        ep: &EnvironmentParameters,
-    ) -> Vec<RqVector> {
-        calculate_aggr_phi(phi_constraint, phi_ct_aggr, random_alpha, random_beta, ep)
-    }
-
-    pub fn get_b_i(
-        b_constraint: &RqVector,
-        b_ct_aggr: &RqVector,
-        random_alpha: &RqVector,
-        random_beta: &RqVector,
-        ep: &EnvironmentParameters,
-    ) -> Rq {
-        calculate_aggr_b(b_constraint, b_ct_aggr, random_alpha, random_beta, ep)
-    }
-}
-
-/// Calculate aprimes from aprime_l, a_{i,j}^{''k} = \sum_{l=1}^{L}\psi_l^{k}a_{ij}^{'(l)}
-///
-/// @param: random_psi: \psi_l^k
-/// @param: a_ct: a_{ij}^{'(l)}, each a_{ij} is a ring element (PolyRing)
-/// @param: ep: struct SizeParams
-///
-/// @return: a_{ij}^{'(k)}, return a vector length k of matrix a_{ij}
-#[rustfmt::skip]
-fn calculate_aggr_ct_a(
-    random_psi: &[Vec<Zq>],
-    a_ct: &[Vec<RqVector>],
-    ep: &EnvironmentParameters,
-) -> Vec<Vec<RqVector>> {
-    let aprimes: Vec<Vec<RqVector>> = (0..ep.kappa).map(|k| {
-        let psi_k = &random_psi[k];
-        (0..ep.multiplicity).map(|i| {
-            (0..ep.multiplicity).map(|j| {
-                // calculate a_{ij}^{'(l)} * \psi_l^k
-                (0..ep.constraint_l).map(|l| {
-                    &a_ct[l][i].get_elements()[j]
-                        * &psi_k[l]
-                })
-                .fold(
-                    // sum over all l
-                    Rq::zero(),
-                    |acc, val| acc + val,
-                )
-            }).collect::<RqVector>()
-        }).collect::<Vec<RqVector>>()
-    }).collect();
-
-    aprimes
-}
-
-/// calculate \phi_{i}^{''(k)} = \sum_{l=1}^{L}\psi_l^{k}\phi_{i}^{'(l)} + \sum(\omega_j^{k} * \sigma_{-1} * pi_i^{j})
-/// in the prover process, page 17 from the paper.
-///
-/// @param: phi_ct: \phi_{i}^{'(l)}
-/// @param: pi: pi_i^{j}
-/// @param: random_psi: \psi_l^{k}
-/// @param: random_omega: \omega_j^{k}
-/// @param: ep: struct SizeParams
-/// @param: security_level2: 256 in the paper
-///
-/// return: \phi_{i}^{''(k)}
-fn calculate_aggr_ct_phi(
-    phi_ct: &[Vec<RqVector>],
-    pi: &[Vec<Vec<Zq>>],
-    random_psi: &[Vec<Zq>],
-    random_omega: &[Vec<Zq>],
-    ep: &EnvironmentParameters,
-) -> Vec<Vec<RqVector>> {
-    let phi_ct_aggr: Vec<Vec<RqVector>> = (0..ep.kappa)
-        .map(|k| {
-            (0..ep.multiplicity)
-                .map(|i| {
-                    // \sum_{l=1}^{L}\psi_l^{k}\phi_{i}^{'(l)}
-                    let left_side = (0..ep.constraint_l)
-                        .map(|l| {
-                            phi_ct[l][i]
-                                .iter()
-                                .map(|phi| phi * &random_psi[k][l])
-                                .collect::<RqVector>()
-                        })
-                        .fold(RqVector::new(vec![Rq::zero(); ep.rank]), |acc, val| {
-                            acc.iter().zip(val.iter()).map(|(a, b)| a + b).collect()
-                        });
-
-                    // Calculate the right side: \sum(\omega_j^{k} * \sigma_{-1} * pi_i^{j})
-                    // Because the length of pi is n*d, so we need to split it into n parts, each part has d elements to do the conjugate automorphism.
-                    let right_side = (0..(2 * ep.security_parameter))
-                        .map(|j| {
-                            let omega_j = random_omega[k][j];
-                            (0..ep.rank)
-                                .map(|chunk_index| {
-                                    let start = chunk_index * Rq::DEGREE;
-                                    let end = start + Rq::DEGREE;
-
-                                    let pi_poly = Rq::new(pi[i][j][start..end].try_into().unwrap());
-                                    let pi_poly_conjugate = pi_poly.conjugate_automorphism();
-                                    &pi_poly_conjugate * &omega_j
-                                })
-                                .collect::<RqVector>()
-                        })
-                        .fold(RqVector::new(vec![Rq::zero(); ep.rank]), |acc, val| {
-                            acc.iter().zip(val.iter()).map(|(a, b)| a + b).collect()
-                        });
-
-                    &left_side + &right_side
-                })
-                .collect::<Vec<RqVector>>()
-        })
-        .collect::<Vec<Vec<RqVector>>>();
-
-    phi_ct_aggr
-}
-
-/// calculate b^{''(k)} = \sum_{i,j=1}^{r} a_{ij}^{''(k)} * <s_i, s_j> + \sum_{i=1}^{r} <\phi_{i}^{''(k)} * s_i>
-///
-/// @param: a_ct_aggr: a_{ij}^{''(k)}
-/// @param: phi_ct_aggr: \phi_{i}^{''(k)}
-/// @param: witness: s_i
-/// @param: ep: struct SizeParams
-///
-/// @return: b^{''(k)}
-#[rustfmt::skip]
-fn calculate_aggr_ct_b(
-    a_ct_aggr: &[Vec<RqVector>],
-    phi_ct_aggr: &[Vec<RqVector>],
-    witness: &[RqVector],
-    ep: &EnvironmentParameters,
-) -> RqVector {
-    (0..ep.kappa).map(|k| {
-        (0..ep.multiplicity).map(|i| {
-            (0..ep.multiplicity).map(|j| {
-                // calculate a_{ij}^{''(k)} * <s_i, s_j>
-                a_ct_aggr[k][i].get_elements()[j].clone()
-                    * witness[i].inner_product_poly_vector(&witness[j])
-            })
-            .fold(
-                // sum over all i,j
-                Rq::zero(),
-                |acc, val| acc + val,
-            )
-            // add \phi_{i}^{''(k)} * s[i]
-            + phi_ct_aggr[k][i].inner_product_poly_vector(&witness[i])
-        }) // sum over all i,j
-        .fold(Rq::zero(), |acc, val| {
-            acc + val
-        })
-    }).collect()
-}
-
-/// calculate a_i = \sum(alpha_k * a_{ij}) + \sum(beta_k * a_{ij}^{''(k)})
-/// equation 5, in the verifier process, page 18 from the paper.
-///
-/// @param: a_constraint: a_{ij}
-/// @param: a_ct_aggr: a_{ij}^{''(k)}
-/// @param: random_alpha: alpha_k
-/// @param: random_beta: beta_k
-/// @param: ep: struct SizeParams
-///
-/// @return: a_i
-fn calculate_aggr_a(
-    a_constraint: &[Vec<RqVector>],
-    a_ct_aggr: &[Vec<RqVector>],
-    random_alpha: &RqVector,
-    random_beta: &RqVector,
-    ep: &EnvironmentParameters,
-) -> Vec<RqVector> {
-    let a_i: Vec<RqVector> = (0..ep.multiplicity)
-        .map(|i| {
-            (0..ep.multiplicity)
-                .map(|j| {
-                    // calculate \sum(alpha_k * a_{ij}), k is constraint_k
-                    let left_side = (0..ep.constraint_k)
-                        .map(|k| {
-                            a_constraint[k][i].get_elements()[j].clone()
-                                * random_alpha.get_elements()[k].clone()
-                        })
-                        .fold(Rq::zero(), |acc, val| acc + val);
-
-                    // calculate \sum(beta_k * a_{ij}^{''(k)}), k is size k
-                    let right_side = (0..ep.kappa)
-                        .map(|k| {
-                            a_ct_aggr[k][i].get_elements()[j].clone()
-                                * random_beta.get_elements()[k].clone()
-                        })
-                        .fold(Rq::zero(), |acc, val| acc + val);
-
-                    left_side + right_side
-                })
-                .collect::<RqVector>()
-        })
-        .collect::<Vec<RqVector>>();
-
-    a_i
-}
-
-/// calculate phi_i = \sum(alpha_k * \phi_{i}^{k}) + \sum(beta_k * \phi_{i}^{''(k)})
-/// equation 6, in the verifier process, page 18 from the paper.
-///
-/// param: phi_constraint: \phi_{i}^{k}
-/// param: phi_ct_aggr: \phi_{i}^{''(k)}
-/// param: random_alpha: alpha_k
-/// param: random_beta: beta_k
-/// param: ep: struct SizeParams
-///
-/// return: phi_i
-fn calculate_aggr_phi(
-    phi_constraint: &[Vec<RqVector>],
-    phi_ct_aggr: &[Vec<RqVector>],
-    random_alpha: &RqVector,
-    random_beta: &RqVector,
-    ep: &EnvironmentParameters,
-) -> Vec<RqVector> {
-    let phi_i: Vec<RqVector> = (0..ep.multiplicity)
-        .map(|i| {
-            // calculate \sum(alpha_k * \phi_{i}^{k})
-            let left_side: RqVector = (0..ep.constraint_k)
-                .map(|k| {
-                    phi_constraint[k][i]
-                        .iter()
-                        .map(|phi| phi * &random_alpha.get_elements()[k])
-                        .collect::<RqVector>()
-                })
-                .fold(RqVector::new(vec![Rq::zero(); ep.rank]), |acc, val| {
-                    acc.iter().zip(val.iter()).map(|(a, b)| a + b).collect()
-                });
-
-            // calculate \sum(beta_k * \phi_{i}^{''(k)})
-            let right_side: RqVector = (0..ep.kappa)
-                .map(|k| {
-                    phi_ct_aggr[k][i]
-                        .iter()
-                        .map(|phi| phi * &random_beta.get_elements()[k])
-                        .collect::<RqVector>()
-                })
-                .fold(RqVector::new(vec![Rq::zero(); ep.rank]), |acc, val| {
-                    acc.iter().zip(val.iter()).map(|(a, b)| a + b).collect()
-                });
-
-            &left_side + &right_side
-        })
-        .collect::<Vec<RqVector>>();
-
-    phi_i
-}
-
-/// calculate b_i = \sum(alpha_k * b^{k}) + \sum(beta_k * b^{''(k})
-/// equation 7, in the verifier process, page 18 from the paper.
-///
-/// @param: b_constraint: b^{k}
-/// @param: b_ct_aggr: b^{''(k)}
-/// @param: random_alpha: alpha_k
-/// @param: random_beta: beta_k
-/// @param: ep: struct SizeParams
-///
-/// @return: b_i
-fn calculate_aggr_b(
-    b_constraint: &RqVector,
-    b_ct_aggr: &RqVector,
-    random_alpha: &RqVector,
-    random_beta: &RqVector,
-    ep: &EnvironmentParameters,
-) -> Rq {
-    let left_side = (0..ep.constraint_k)
-        .map(|k| b_constraint.get_elements()[k].clone() * random_alpha.get_elements()[k].clone())
-        .fold(Rq::zero(), |acc, val| acc + val);
-
-    let right_side = (0..ep.kappa)
-        .map(|k| b_ct_aggr.get_elements()[k].clone() * random_beta.get_elements()[k].clone())
-        .fold(Rq::zero(), |acc, val| acc + val);
-
-    left_side + right_side
-}
-
-/// calculate h_{ij} = 1/2 * (<\phi_i, s_j> + <\phi_j, s_i>), then use base b to decompose the polynomial
-///
-/// @param: phi_i: phi_i
-/// @param: s: witness s_i
-/// @param: ep: struct SizeParams
-///
-/// return h_{ij}
-pub fn calculate_hij(
-    phi_i: &[RqVector],
-    s: &[RqVector],
-    ep: &EnvironmentParameters,
-) -> Vec<RqVector> {
-    (0..ep.multiplicity)
-        .map(|i| {
-            (0..ep.multiplicity)
-                .map(|j| {
-                    let left_side = &phi_i[i].inner_product_poly_vector(&s[j]);
-                    let right_side = &phi_i[j].inner_product_poly_vector(&s[i]);
-                    left_side + right_side
-                })
-                .collect()
-        })
-        .collect()
-}
-
-/// calculate garbage polynomial g = <s_i, s_j>
-///
-/// @param: phi_i: phi_i
-/// @param: s: witness s_i
-/// @param: r: size_r
-///
-/// return g_{ij}
-pub fn calculate_gij(s: &[RqVector], r: usize) -> Vec<RqVector> {
-    (0..r)
-        .map(|i| {
-            (0..r)
-                .map(|j| s[i].inner_product_poly_vector(&s[j]))
-                .collect()
-        })
-        .collect()
-}
-
-/// calculate z = c_1*s_1 + ... + c_r*s_r
-/// or calculate Az = c_1*t_1 + ... + c_r*t_r
-///
-/// @param: x: witness s_i or Ajtai commitments t_i
-/// @param: random_c: c_i from challenge set
-///
-/// return z
-pub fn calculate_z(x: &[RqVector], random_c: &RqVector) -> RqVector {
-    x.iter()
-        .zip(random_c.iter())
-        .map(|(s_row, c_element)| s_row * c_element)
-        .fold(
-            RqVector::new(vec![Rq::zero(); x[0].get_elements().len()]),
-            |acc, x| &acc + &x,
-        )
-}
-
-/// line 19, page 18: calculate u_1 = \sum(B_ik * t_i^(k)) + sum(C_ijk * g_ij^(k))
-pub fn calculate_u_1(
-    b: &[Vec<Vec<RqVector>>],
-    c: &[Vec<Vec<Vec<RqVector>>>],
-    t_i: &[Vec<RqVector>],
-    g_ij: &[Vec<RqVector>],
-    ep: &EnvironmentParameters,
-) -> RqVector {
-    let mut u_1 = vec![Rq::zero(); ep.kappa_1];
-    // calculate left side
-    for i in 0..ep.multiplicity {
-        for k in 0..ep.t_1 {
-            let b_ik_t_ik = &t_i[i][k] * &b[i][k];
-            u_1 = u_1
-                .iter()
-                .zip(b_ik_t_ik.iter())
-                .map(|(a, b)| a + b)
-                .collect();
-        }
-    }
-    // calculate right side
-    for i in 0..ep.multiplicity {
-        for j in i..ep.multiplicity {
-            for k in 0..ep.t_2 {
-                let c_ijk_g_ij = &g_ij[i][j] * &c[i][j][k];
-                u_1 = u_1
-                    .iter()
-                    .zip(c_ijk_g_ij.iter())
-                    .map(|(a, b)| a + b)
-                    .collect();
+                for (k, matrix) in self.a_double_prime.iter_mut().enumerate() {
+                    matrix.set_cell(
+                        i,
+                        j,
+                        inner_product::compute_linear_combination(
+                            &a_prime_l_vector,
+                            &vector_psi[k],
+                        ),
+                    );
+                }
             }
         }
     }
 
-    RqVector::new(u_1)
+    /// calculate \phi_{i}^{''(k)} = \sum_{l=1}^{L}\psi_l^{k}\phi_{i}^{'(l)} + \sum(\omega_j^{k} * \sigma_{-1} * pi_i^{j})
+    /// in the prover process, page 17 from the paper.
+    ///
+    /// @param: phi_ct: \phi_{i}^{'(l)}
+    /// @param: pi: pi_i^{j}
+    /// @param: random_psi: \psi_l^{k}
+    /// @param: random_omega: \omega_j^{k}
+    ///
+    /// return: \phi_{i}^{''(k)}
+    pub fn calculate_agg_phi_double_prime(
+        &mut self,
+        phi_prime: &[Vec<RqVector>],
+        conjugated_pi: &[RqMatrix],
+        vector_psi: &[Vec<Zq>],
+        vector_omega: &[Vec<Zq>],
+    ) {
+        for i in 0..self.ep.multiplicity {
+            let phi_prime_l_vector: Vec<&RqVector> =
+                phi_prime.iter().map(|elems| &elems[i]).collect();
+            for (k, phi_k) in self.phi_double_prime.iter_mut().enumerate() {
+                phi_k[i] =
+                    inner_product::compute_linear_combination(&phi_prime_l_vector, &vector_psi[k]);
+            }
+        }
+
+        for (i, pi_i) in conjugated_pi.iter().enumerate() {
+            for (k, phi_k) in self.phi_double_prime.iter_mut().enumerate() {
+                phi_k[i] = &phi_k[i]
+                    + &inner_product::compute_linear_combination(
+                        pi_i.get_elements(),
+                        &vector_omega[k],
+                    );
+            }
+        }
+    }
+
+    /// calculate b^{''(k)} = \sum_{i,j=1}^{r} a_{ij}^{''(k)} * <s_i, s_j> + \sum_{i=1}^{r} <\phi_{i}^{''(k)} * s_i>
+    ///
+    /// @param: a_ct_aggr: a_{ij}^{''(k)}
+    /// @param: phi_ct_aggr: \phi_{i}^{''(k)}
+    /// @param: witness: s_i
+    ///
+    /// @return: b^{''(k)}
+    pub fn calculate_agg_b_double_prime(&mut self, witness: &[RqVector]) -> RqVector {
+        (0..self.ep.kappa)
+            .map(|k| {
+                (0..self.ep.multiplicity)
+                    .map(|i| {
+                        &(0..self.ep.multiplicity).map(|j| {
+                    // calculate a_{ij}^{''(k)} * <s_i, s_j>
+                    self.a_double_prime[k].get_cell(i, j)
+                        * &inner_product::compute_linear_combination(witness[i].get_elements(), witness[j].get_elements())
+                })
+                .fold(
+                    // sum over all i,j
+                    Rq::zero(),
+                    |acc, val| &acc + &val,
+                )
+                // add \phi_{i}^{''(k)} * s[i]
+                + &inner_product::compute_linear_combination(self.phi_double_prime[k][i].get_elements(), witness[i].get_elements())
+                    }) // sum over all i,j
+                    .fold(Rq::zero(), |acc, val| &acc + &val)
+            })
+            .collect()
+    }
+
+    pub fn get_alpha_double_prime(&self) -> &[RqMatrix] {
+        &self.a_double_prime
+    }
+
+    pub fn get_phi_double_prime(&self) -> &[Vec<RqVector>] {
+        &self.phi_double_prime
+    }
 }
 
-/// line 20, page 18: calculate u_2 = \sum(D_ijk * h_ij^(k))
-pub fn calculate_u_2(
-    d: &[Vec<Vec<Vec<RqVector>>>],
-    h_ij: &[Vec<RqVector>],
-    ep: &EnvironmentParameters,
-) -> RqVector {
-    // Pre-collect the iterator over (i, j, k) into a vector.
-    let flat_vec: Vec<(usize, usize, usize)> = (0..ep.multiplicity)
-        .flat_map(|i| (i..ep.multiplicity).flat_map(move |j| (0..ep.t_2).map(move |k| (i, j, k))))
-        .collect();
-
-    flat_vec.into_iter().fold(
-        RqVector::new(vec![Rq::zero(); ep.rank]),
-        |acc, (i, j, k)| {
-            let d_ijk_h_ij = &h_ij[i][j] * &d[i][j][k];
-            acc.iter()
-                .zip(d_ijk_h_ij.iter())
-                .map(|(a, b)| a + b)
-                .collect::<RqVector>()
-        },
-    )
+pub struct FunctionsAggregation<'a> {
+    ep: &'a EnvironmentParameters,
+    aggregated_a: RqMatrix,
+    aggregated_phi: Vec<RqVector>,
+    aggregated_b: Rq,
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-//     use crate::prover::Challenges;
-//     use crate::verifier::LabradorVerifier;
-//     #[test]
-//     fn test_check_relation_full() {
-//         // set up example environment, use set1 for testing.
-//         let ep = EnvironmentParameters::default();
-//         // generate a random witness based on ep above
-//         let witness_1 = Witness::new(&ep);
-//         // generate public statements based on witness_1
-//         let st = Statement::new(&witness_1, &ep);
-//         // generate random challenges
-//         let tr = Challenges::new(&ep);
-//         // first aggregation
-//         let aggr_1 = AggregationOne::new(&witness_1, &st, &ep, &tr);
-//         // second aggregation
-//         let aggr_2 = AggregationTwo::new(&aggr_1, &st, &ep, &tr);
+impl<'a> FunctionsAggregation<'a> {
+    pub fn new(parameters: &'a EnvironmentParameters) -> Self {
+        Self {
+            ep: parameters,
+            aggregated_a: RqMatrix::symmetric_zero(parameters.multiplicity),
+            aggregated_phi: vec![RqVector::zero(parameters.rank); parameters.multiplicity],
+            aggregated_b: Rq::zero(),
+        }
+    }
 
-//         // calculate garbage polynomial g_{ij} = <s_i, s_j>
-//         let g = (0..ep.multiplicity)
-//             .map(|i| {
-//                 (0..ep.multiplicity)
-//                     .map(|j| witness_1.s[i].inner_product_poly_vector(&witness_1.s[j]))
-//                     .collect()
-//             })
-//             .collect();
+    /// calculate a_i = \sum(alpha_k * a_{ij}) + \sum(beta_k * a_{ij}^{''(k)})
+    /// equation 5, in the verifier process, page 18 from the paper.
+    ///
+    /// @param: a_constraint: a_{ij}
+    /// @param: a_ct_aggr: a_{ij}^{''(k)}
+    /// @param: random_alpha: alpha_k
+    /// @param: random_beta: beta_k
+    /// @param: ep: struct SizeParams
+    ///
+    /// @return: a_i
+    pub fn calculate_agg_a(
+        &mut self,
+        a_constraint: &[RqMatrix],
+        a_double_prime: &[RqMatrix],
+        vector_alpha: &RqVector,
+        vector_beta: &RqVector,
+    ) {
+        for i in 0..self.ep.multiplicity {
+            for j in 0..i + 1 {
+                let a_constraint_k: Vec<&Rq> = a_constraint
+                    .iter()
+                    .map(|matrix| matrix.get_cell(i, j))
+                    .collect();
+                let a_double_prime_k: Vec<&Rq> = a_double_prime
+                    .iter()
+                    .map(|matrix| matrix.get_cell(i, j))
+                    .collect();
+                self.aggregated_a.set_cell(
+                    i,
+                    j,
+                    &inner_product::compute_linear_combination::<&Rq, Rq, Rq>(
+                        &a_constraint_k,
+                        vector_alpha.get_elements(),
+                    ) + &inner_product::compute_linear_combination(
+                        &a_double_prime_k,
+                        vector_beta.get_elements(),
+                    ),
+                );
+            }
+        }
+    }
 
-//         // calculate h_{ii}
-//         let h = (0..ep.multiplicity)
-//             .map(|i| {
-//                 (0..ep.multiplicity)
-//                     .map(|j| {
-//                         let inner_phii_sj =
-//                             aggr_2.phi_i[i].inner_product_poly_vector(&witness_1.s[j]);
-//                         let inner_phij_si =
-//                             aggr_2.phi_i[j].inner_product_poly_vector(&witness_1.s[i]);
-//                         &inner_phii_sj + &inner_phij_si
-//                     })
-//                     .collect()
-//             })
-//             .collect();
+    /// calculate phi_i = \sum(alpha_k * \phi_{i}^{k}) + \sum(beta_k * \phi_{i}^{''(k)})
+    /// equation 6, in the verifier process, page 18 from the paper.
+    ///
+    /// param: phi_constraint: \phi_{i}^{k}
+    /// param: phi_ct_aggr: \phi_{i}^{''(k)}
+    /// param: random_alpha: alpha_k
+    /// param: random_beta: beta_k
+    /// param: ep: struct SizeParams
+    ///
+    /// return: phi_i
+    pub fn calculate_aggr_phi(
+        &mut self,
+        phi_constraint: &[Vec<RqVector>],
+        phi_double_prime: &[Vec<RqVector>],
+        vector_alpha: &RqVector,
+        vector_beta: &RqVector,
+    ) {
+        for i in 0..self.ep.multiplicity {
+            let phi_constraint_k: Vec<&RqVector> =
+                phi_constraint.iter().map(|element| &element[i]).collect();
+            let phi_double_prime_k: Vec<&RqVector> =
+                phi_double_prime.iter().map(|element| &element[i]).collect();
+            self.aggregated_phi[i] =
+                &inner_product::compute_linear_combination::<&RqVector, RqVector, Rq>(
+                    &phi_constraint_k,
+                    vector_alpha.get_elements(),
+                ) + &inner_product::compute_linear_combination(
+                    &phi_double_prime_k,
+                    vector_beta.get_elements(),
+                );
+        }
+    }
 
-//         // check aggregation relation
-//         let relation = LabradorVerifier::check_relation(&aggr_2.a_i, &aggr_2.b_i, &g, &h);
+    /// calculate b_i = \sum(alpha_k * b^{k}) + \sum(beta_k * b^{''(k})
+    /// equation 7, in the verifier process, page 18 from the paper.
+    ///
+    /// @param: b_constraint: b^{k}
+    /// @param: b_ct_aggr: b^{''(k)}
+    /// @param: random_alpha: alpha_k
+    /// @param: random_beta: beta_k
+    /// @param: ep: struct SizeParams
+    ///
+    /// @return: b_i
+    pub fn calculate_aggr_b(
+        &mut self,
+        b_constraint: &RqVector,
+        b_double_prime: &RqVector,
+        vector_alpha: &RqVector,
+        vector_beta: &RqVector,
+    ) {
+        self.aggregated_b = &inner_product::compute_linear_combination(
+            b_constraint.get_elements(),
+            vector_alpha.get_elements(),
+        ) + &inner_product::compute_linear_combination(
+            b_double_prime.get_elements(),
+            vector_beta.get_elements(),
+        )
+    }
 
-//         assert!(relation);
-//     }
-// }
+    pub fn get_agg_a(&self) -> &RqMatrix {
+        &self.aggregated_a
+    }
+
+    pub fn get_appr_phi(&self) -> &[RqVector] {
+        &self.aggregated_phi
+    }
+
+    pub fn get_aggr_b(&self) -> &Rq {
+        &self.aggregated_b
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::needless_range_loop)]
+mod constant_agg_tests {
+    use crate::relation::env_params;
+
+    use super::*;
+
+    mod variable_generator {
+        use super::*;
+        use rand::{
+            distr::{Distribution, Uniform},
+            rng,
+        };
+        fn sample_zq_vector(length: usize) -> Vec<Zq> {
+            let uniform = Uniform::new_inclusive(Zq::ZERO, Zq::NEG_ONE).unwrap();
+            let mut coeffs = vec![Zq::ZERO; length];
+            coeffs
+                .iter_mut()
+                .for_each(|c| *c = uniform.sample(&mut rng()));
+            coeffs
+        }
+
+        pub fn generate_vector_psi(vec_length: usize, inner_vec_size: usize) -> Vec<Vec<Zq>> {
+            let mut vector_psi = Vec::new();
+            for _ in 0..vec_length {
+                vector_psi.push(sample_zq_vector(inner_vec_size));
+            }
+            vector_psi
+        }
+
+        pub fn generate_a_prime(vec_length: usize, matrix_size: usize) -> Vec<RqMatrix> {
+            let mut a_prime = Vec::new();
+            for _ in 0..vec_length {
+                a_prime.push(RqMatrix::symmetric_random(&mut rng(), matrix_size));
+            }
+            a_prime
+        }
+
+        pub fn generate_phi_prime(
+            vec_length: usize,
+            inner_vec_length: usize,
+            inner_inner_vec_length: usize,
+        ) -> Vec<Vec<RqVector>> {
+            let mut phi_prime = Vec::new();
+            for _ in 0..vec_length {
+                let mut inner_vec = Vec::new();
+                for _ in 0..inner_vec_length {
+                    inner_vec.push(RqVector::random(&mut rng(), inner_inner_vec_length));
+                }
+                phi_prime.push(inner_vec);
+            }
+            phi_prime
+        }
+
+        pub fn generate_conjugated_pi(
+            vec_length: usize,
+            matrix_row: usize,
+            matrix_col: usize,
+        ) -> Vec<RqMatrix> {
+            let mut conjugated_pi = Vec::new();
+            for _ in 0..vec_length {
+                conjugated_pi.push(RqMatrix::random(&mut rng(), matrix_row, matrix_col));
+            }
+            conjugated_pi
+        }
+
+        pub fn generate_omega(vec_length: usize, inner_vec_length: usize) -> Vec<Vec<Zq>> {
+            let mut vector_omega = Vec::new();
+            for _ in 0..vec_length {
+                vector_omega.push(variable_generator::sample_zq_vector(inner_vec_length));
+            }
+            vector_omega
+        }
+
+        pub fn generate_witness(vec_length: usize, inner_vec_length: usize) -> Vec<RqVector> {
+            let mut witness = Vec::new();
+            for _ in 0..vec_length {
+                witness.push(RqVector::random(&mut rng(), inner_vec_length));
+            }
+            witness
+        }
+    }
+
+    #[test]
+    fn test_calculate_agg_a_double_prime() {
+        let params = EnvironmentParameters::default();
+        let mut aggregator = ZeroConstantFunctionsAggregation::new(&params);
+
+        let vector_psi =
+            variable_generator::generate_vector_psi(params.const_agg_length, params.constraint_l);
+        let a_prime =
+            variable_generator::generate_a_prime(params.constraint_l, params.multiplicity);
+
+        aggregator.calculate_agg_a_double_prime(&vector_psi, &a_prime);
+
+        for k in 0..params.const_agg_length {
+            for i in 0..params.multiplicity {
+                for j in 0..params.multiplicity {
+                    let mut rhs = Rq::zero();
+                    for l in 0..params.constraint_l {
+                        rhs = &rhs + &(a_prime[l].get_cell(i, j) * &vector_psi[k][l])
+                    }
+                    assert_eq!(*aggregator.a_double_prime[k].get_cell(i, j), rhs);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_calculate_agg_phi_double_prime() {
+        let params = EnvironmentParameters::default();
+        let mut aggregator = ZeroConstantFunctionsAggregation::new(&params);
+
+        let phi_prime = variable_generator::generate_phi_prime(
+            params.constraint_l,
+            params.multiplicity,
+            params.rank,
+        );
+        let conjugated_pi = variable_generator::generate_conjugated_pi(
+            params.multiplicity,
+            2 * env_params::SECURITY_PARAMETER,
+            params.rank,
+        );
+        let vector_psi =
+            variable_generator::generate_vector_psi(params.const_agg_length, params.constraint_l);
+        let vector_omega = variable_generator::generate_omega(
+            params.const_agg_length,
+            2 * env_params::SECURITY_PARAMETER,
+        );
+
+        aggregator.calculate_agg_phi_double_prime(
+            &phi_prime,
+            &conjugated_pi,
+            &vector_psi,
+            &vector_omega,
+        );
+
+        for k in 0..params.const_agg_length {
+            for i in 0..params.multiplicity {
+                let mut rhs = RqVector::zero(params.rank);
+                for l in 0..params.constraint_l {
+                    rhs = &rhs + &(&phi_prime[l][i] * vector_psi[k][l]);
+                }
+                let mut lhs = RqVector::zero(params.rank);
+                for j in 0..2 * env_params::SECURITY_PARAMETER {
+                    lhs = &lhs + &(&conjugated_pi[i].get_elements()[j] * vector_omega[k][j]);
+                }
+                assert_eq!(aggregator.phi_double_prime[k][i], &rhs + &lhs);
+            }
+        }
+    }
+
+    #[test]
+    fn test_calculate_agg_b_double_prime() {
+        let params = EnvironmentParameters::default();
+        let mut aggregator = ZeroConstantFunctionsAggregation::new(&params);
+
+        let phi_prime = variable_generator::generate_phi_prime(
+            params.constraint_l,
+            params.multiplicity,
+            params.rank,
+        );
+        let conjugated_pi = variable_generator::generate_conjugated_pi(
+            params.multiplicity,
+            2 * env_params::SECURITY_PARAMETER,
+            params.rank,
+        );
+        let vector_psi =
+            variable_generator::generate_vector_psi(params.const_agg_length, params.constraint_l);
+        let vector_omega = variable_generator::generate_omega(
+            params.const_agg_length,
+            2 * env_params::SECURITY_PARAMETER,
+        );
+        let a_prime =
+            variable_generator::generate_a_prime(params.constraint_l, params.multiplicity);
+        let witness_vector = variable_generator::generate_witness(params.multiplicity, params.rank);
+
+        aggregator.calculate_agg_a_double_prime(&vector_psi, &a_prime);
+        aggregator.calculate_agg_phi_double_prime(
+            &phi_prime,
+            &conjugated_pi,
+            &vector_psi,
+            &vector_omega,
+        );
+        let b_double_prime = aggregator.calculate_agg_b_double_prime(&witness_vector);
+
+        for k in 0..params.const_agg_length {
+            let mut rhs = Rq::zero();
+            for i in 0..params.multiplicity {
+                for j in 0..params.multiplicity {
+                    rhs = &rhs
+                        + &(aggregator.a_double_prime[k].get_cell(i, j)
+                            * &inner_product::compute_linear_combination(
+                                witness_vector[i].get_elements(),
+                                witness_vector[j].get_elements(),
+                            ));
+                }
+            }
+            let mut lhs = Rq::zero();
+            for i in 0..params.multiplicity {
+                lhs = &lhs
+                    + (&inner_product::compute_linear_combination(
+                        aggregator.phi_double_prime[k][i].get_elements(),
+                        witness_vector[i].get_elements(),
+                    ));
+            }
+            assert_eq!(b_double_prime.get_elements()[k], &rhs + &lhs);
+        }
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::needless_range_loop)]
+mod func_agg_tests {
+    use super::*;
+
+    mod variable_generator {
+        use super::*;
+        use rand::rng;
+
+        pub fn generate_rq_vector(vec_length: usize) -> RqVector {
+            let mut vector_alpha = Vec::new();
+            for _ in 0..vec_length {
+                vector_alpha.push(Rq::random(&mut rng()));
+            }
+            RqVector::new(vector_alpha)
+        }
+
+        pub fn generate_matrix_vector(vec_length: usize, matrix_size: usize) -> Vec<RqMatrix> {
+            let mut a_constraint = Vec::new();
+            for _ in 0..vec_length {
+                a_constraint.push(RqMatrix::symmetric_random(&mut rng(), matrix_size));
+            }
+            a_constraint
+        }
+
+        pub fn generate_rqvector_vector(
+            vec_length: usize,
+            inner_vec_length: usize,
+            inner_inner_vec_length: usize,
+        ) -> Vec<Vec<RqVector>> {
+            let mut phi_constraint = Vec::new();
+            for _ in 0..vec_length {
+                let mut inner_vec = Vec::new();
+                for _ in 0..inner_vec_length {
+                    inner_vec.push(RqVector::random(&mut rng(), inner_inner_vec_length));
+                }
+                phi_constraint.push(inner_vec);
+            }
+            phi_constraint
+        }
+    }
+
+    #[test]
+    fn test_calculate_agg_a() {
+        let params = EnvironmentParameters::default();
+        let mut aggregator = FunctionsAggregation::new(&params);
+
+        let vector_alpha = variable_generator::generate_rq_vector(params.constraint_k);
+        let vector_beta = variable_generator::generate_rq_vector(params.const_agg_length);
+        let a_constraint =
+            variable_generator::generate_matrix_vector(params.constraint_k, params.multiplicity);
+        let a_double_prime = variable_generator::generate_matrix_vector(
+            params.const_agg_length,
+            params.multiplicity,
+        );
+
+        aggregator.calculate_agg_a(&a_constraint, &a_double_prime, &vector_alpha, &vector_beta);
+
+        for i in 0..params.multiplicity {
+            for j in 0..params.multiplicity {
+                let mut rhs = Rq::zero();
+                for k in 0..params.constraint_k {
+                    rhs = &rhs + &(a_constraint[k].get_cell(i, j) * &vector_alpha.get_elements()[k])
+                }
+                let mut lhs = Rq::zero();
+                for k in 0..params.const_agg_length {
+                    lhs =
+                        &lhs + &(a_double_prime[k].get_cell(i, j) * &vector_beta.get_elements()[k])
+                }
+                assert_eq!(*aggregator.aggregated_a.get_cell(i, j), &rhs + &lhs);
+            }
+        }
+    }
+
+    #[test]
+    fn test_calculate_agg_phi() {
+        let params = EnvironmentParameters::default();
+        let mut aggregator = FunctionsAggregation::new(&params);
+
+        let vector_alpha = variable_generator::generate_rq_vector(params.constraint_k);
+        let vector_beta = variable_generator::generate_rq_vector(params.const_agg_length);
+        let phi_constraint = variable_generator::generate_rqvector_vector(
+            params.constraint_k,
+            params.multiplicity,
+            params.rank,
+        );
+        let phi_double_prime = variable_generator::generate_rqvector_vector(
+            params.const_agg_length,
+            params.multiplicity,
+            params.rank,
+        );
+
+        aggregator.calculate_aggr_phi(
+            &phi_constraint,
+            &phi_double_prime,
+            &vector_alpha,
+            &vector_beta,
+        );
+
+        for i in 0..params.multiplicity {
+            let mut rhs = RqVector::zero(params.rank);
+            for k in 0..params.constraint_k {
+                rhs = &rhs + &(&phi_constraint[k][i] * &vector_alpha.get_elements()[k])
+            }
+            let mut lhs = RqVector::zero(params.rank);
+            for k in 0..params.const_agg_length {
+                lhs = &lhs + &(&phi_double_prime[k][i] * &vector_beta.get_elements()[k])
+            }
+            assert_eq!(aggregator.aggregated_phi[i], &rhs + &lhs);
+        }
+    }
+
+    #[test]
+    fn test_calculate_agg_b() {
+        let params = EnvironmentParameters::default();
+        let mut aggregator = FunctionsAggregation::new(&params);
+
+        let vector_alpha = variable_generator::generate_rq_vector(params.constraint_k);
+        let vector_beta = variable_generator::generate_rq_vector(params.const_agg_length);
+        let b_constraint = variable_generator::generate_rq_vector(params.constraint_k);
+        let b_double_prime = variable_generator::generate_rq_vector(params.const_agg_length);
+
+        aggregator.calculate_aggr_b(&b_constraint, &b_double_prime, &vector_alpha, &vector_beta);
+
+        let mut rhs = Rq::zero();
+        for k in 0..params.constraint_k {
+            rhs = &rhs + &(&b_constraint.get_elements()[k] * &vector_alpha.get_elements()[k])
+        }
+        let mut lhs = Rq::zero();
+        for k in 0..params.const_agg_length {
+            lhs = &lhs + &(&b_double_prime.get_elements()[k] * &vector_beta.get_elements()[k])
+        }
+        assert_eq!(aggregator.aggregated_b, &rhs + &lhs);
+    }
+}

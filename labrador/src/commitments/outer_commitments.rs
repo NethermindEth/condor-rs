@@ -5,6 +5,8 @@ use crate::{
     ring::{rq_matrix::RqMatrix, rq_vector::RqVector, zq::Zq},
 };
 
+use super::ajtai_commitment::AjtaiScheme;
+
 #[derive(Debug, Error)]
 pub enum DecompositionError {
     #[error("invalid decomposition base: {0}")]
@@ -48,62 +50,34 @@ impl DecompositionParameters {
     }
 }
 
-pub struct OuterCommitment<'a> {
-    crs: &'a AjtaiInstances,
-    pub u_1: RqVector,
-    pub u_2: RqVector,
+fn decompose_and_commit(
+    commitment_matrix: &AjtaiScheme,
+    input: &RqMatrix,
+    params: &DecompositionParameters,
+) -> RqVector {
+    let decomposed_input = input.decompose_each_cell(params.base, params.num_parts);
+    commitment_matrix
+        .commit(&decomposed_input)
+        .expect("Commitment error in committing to decomposed input")
 }
 
-impl<'a> OuterCommitment<'a> {
-    pub fn new(crs: &'a AjtaiInstances) -> Self {
-        Self {
-            crs,
-            u_1: RqVector::new(Vec::new()),
-            u_2: RqVector::new(Vec::new()),
-        }
-    }
+pub fn compute_u1(
+    crs: &AjtaiInstances,
+    t: &RqMatrix,
+    t_decomposition_params: DecompositionParameters,
+    g: &RqMatrix,
+    g_decomposition_params: DecompositionParameters,
+) -> RqVector {
+    &decompose_and_commit(&crs.commitment_scheme_b, t, &t_decomposition_params)
+        + &decompose_and_commit(&crs.commitment_scheme_c, g, &g_decomposition_params)
+}
 
-    pub fn compute_u1(
-        &mut self,
-        t: RqMatrix,
-        t_decomposition_params: DecompositionParameters,
-        g: RqMatrix,
-        g_decomposition_params: DecompositionParameters,
-    ) {
-        let decomposed_t = t.decompose_each_cell(
-            t_decomposition_params.base,
-            t_decomposition_params.num_parts,
-        );
-        let u1_left = self
-            .crs
-            .commitment_scheme_b
-            .commit(&decomposed_t)
-            .expect("Commitment error in committing to decomposed t");
-
-        let decomposed_g = g.decompose_each_cell(
-            g_decomposition_params.base,
-            g_decomposition_params.num_parts,
-        );
-        let u2_left = self
-            .crs
-            .commitment_scheme_c
-            .commit(&decomposed_g)
-            .expect("Commitment error in committing to decomposed g");
-
-        self.u_1 = &u1_left + &u2_left;
-    }
-
-    pub fn compute_u2(&mut self, h: RqMatrix, h_decomposition_params: DecompositionParameters) {
-        let decomposed_h = h.decompose_each_cell(
-            h_decomposition_params.base,
-            h_decomposition_params.num_parts,
-        );
-        self.u_2 = self
-            .crs
-            .commitment_scheme_d
-            .commit(&decomposed_h)
-            .expect("Commitment error in committing to decomposed h");
-    }
+pub fn compute_u2(
+    crs: &AjtaiInstances,
+    h: &RqMatrix,
+    h_decomposition_params: DecompositionParameters,
+) -> RqVector {
+    decompose_and_commit(&crs.commitment_scheme_d, h, &h_decomposition_params)
 }
 
 #[cfg(test)]

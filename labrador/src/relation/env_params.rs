@@ -1,12 +1,13 @@
 #![allow(clippy::as_conversions)]
 use crate::ring::{rq::Rq, zq::Zq};
 
+/// Security Parameter
+pub const SECURITY_PARAMETER: usize = 128;
+pub const OPERATOR_NORM: f64 = 15.0;
+
 // Example Environment parameters used for LaBRADOR, can be expanded as required by testing.
 #[derive(Clone)]
 pub struct EnvironmentParameters {
-    /// Security Parameter
-    pub security_parameter: usize, // security parameter
-
     /// Relation R Parameters
     pub rank: usize, // size of each witness s_i
     pub multiplicity: usize, // number of witness elements
@@ -32,17 +33,16 @@ pub struct EnvironmentParameters {
 
     /// Function Families Sizes
     pub constraint_k: usize, // Number of constraints of the form f
-    pub constraint_l: usize, // Number of constraints of the form f'
+    pub constraint_l: usize,     // Number of constraints of the form f'
+    pub const_agg_length: usize, // Number of functions in the first aggregation step
 
     /// Other Parameters
     pub log_q: usize, // Size of log(q) in bits, where q is the modulo
-    pub operator_norm: f64,
 }
 
 impl EnvironmentParameters {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        security_parameter: usize,
         rank: usize,
         multiplicity: usize,
         beta: f64,
@@ -53,7 +53,6 @@ impl EnvironmentParameters {
         constraint_l: usize,
         tau: f64,
         modulo_q: usize,
-        operator_norm: f64,
     ) -> Self {
         let std_s = Self::compute_std_s(rank, multiplicity, beta);
 
@@ -73,11 +72,11 @@ impl EnvironmentParameters {
             Self::compute_gamma1(base_b1, parts_t1, multiplicity, kappa, base_b2, parts_t2);
         let gamma_2 = Self::compute_gamma2(base_b1, parts_t1, multiplicity);
         let beta_prime = Self::compute_beta_prime(base_b, gamma, gamma_1, gamma_2);
+        let log_q = (modulo_q as f64).log2() as usize;
         EnvironmentParameters {
-            security_parameter,
             rank,
             multiplicity,
-            b: Zq::from(base_b as u32),
+            b: Zq::new(base_b as u32),
             b_1: base_b1,
             t_1: parts_t1,
             b_2: base_b2,
@@ -92,8 +91,8 @@ impl EnvironmentParameters {
             kappa_2,
             constraint_k,
             constraint_l,
-            log_q: (modulo_q as f64).log2() as usize, // Size of log(q) in bits, where q is the modulo
-            operator_norm,
+            const_agg_length: usize::div_ceil(SECURITY_PARAMETER, log_q),
+            log_q, // Size of log(q) in bits, where q is the modulo
         }
     }
 
@@ -180,20 +179,7 @@ impl EnvironmentParameters {
 
 impl Default for EnvironmentParameters {
     fn default() -> Self {
-        Self::new(
-            128,
-            5,
-            3,
-            65535.0,
-            4,
-            5,
-            5,
-            5,
-            5,
-            65535.0,
-            (1u64 << 32) as usize,
-            15.0,
-        )
+        Self::new(5, 3, 65535.0, 4, 5, 5, 5, 5, 65535.0, (1u64 << 32) as usize)
     }
 }
 
@@ -327,20 +313,8 @@ mod tests {
             let beta = 10.0 + seed as f64;
             let tau = 32.0 + seed as f64;
             let q = (1usize << 20) + (seed as usize * 12345);
-            let params = EnvironmentParameters::new(
-                128,
-                rank,
-                multiplicity,
-                beta,
-                4,
-                4,
-                4,
-                3,
-                3,
-                tau,
-                q,
-                15.0, // operator norm
-            );
+            let params =
+                EnvironmentParameters::new(rank, multiplicity, beta, 4, 4, 4, 3, 3, tau, q);
 
             // main invariants
             assert!(params.b >= Zq::TWO);

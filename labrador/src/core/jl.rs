@@ -1,3 +1,5 @@
+use crate::ring;
+use crate::ring::rq_matrix::RqMatrix;
 use crate::ring::rq_vector::RqVector;
 use crate::ring::zq::Zq;
 
@@ -6,12 +8,12 @@ const UPPER_BOUND_FACTOR: Zq = Zq::new(128);
 const LOWER_BOUND_FACTOR: Zq = Zq::new(30);
 
 pub struct Projection {
-    random_linear_map_vector: Vec<Vec<Vec<Zq>>>,
+    random_linear_map_vector: Vec<RqMatrix>,
     security_level: usize,
 }
 
 impl Projection {
-    pub fn new(random_linear_map_vector: Vec<Vec<Vec<Zq>>>, security_level: usize) -> Self {
+    pub fn new(random_linear_map_vector: Vec<RqMatrix>, security_level: usize) -> Self {
         Self {
             random_linear_map_vector,
             security_level,
@@ -21,8 +23,13 @@ impl Projection {
     fn compute_projection(&self, index: usize, witness: &RqVector) -> Vec<Zq> {
         let mut projection = vec![Zq::ZERO; 2 * self.security_level];
         let coefficients = witness.concatenate_coefficients();
-        for (i, item) in projection.iter_mut().enumerate() {
-            *item = self.random_linear_map_vector[index][i]
+        for (i, pi_ij) in self.random_linear_map_vector[index]
+            .get_elements()
+            .iter()
+            .enumerate()
+        {
+            projection[i] = pi_ij
+                .concatenate_coefficients()
                 .iter()
                 .zip(coefficients.iter())
                 .map(|(m, s)| *m * *s)
@@ -34,19 +41,45 @@ impl Projection {
     pub fn compute_batch_projection(&self, witness_vector: &[RqVector]) -> Vec<Zq> {
         let mut result = vec![Zq::ZERO; 2 * self.security_level];
         for (index_i, witness) in witness_vector.iter().enumerate() {
-            for (index_j, element) in result.iter_mut().enumerate() {
-                *element += self.compute_projection(index_i, witness)[index_j];
-            }
+            ring::zq::add_assign_two_zq_vectors(
+                &mut result,
+                self.compute_projection(index_i, witness),
+            );
         }
         result
     }
 
-    pub fn get_projection_matrices(&self) -> &[Vec<Vec<Zq>>] {
+    pub fn get_projection_matrices(&self) -> &[RqMatrix] {
         &self.random_linear_map_vector
     }
 
+    pub fn get_conjugated_projection_matrices(&self) -> Vec<RqMatrix> {
+        self.random_linear_map_vector
+            .iter()
+            .map(|pi_i| {
+                pi_i.get_elements()
+                    .iter()
+                    .map(|pi_ij| {
+                        pi_ij
+                            .get_elements()
+                            .iter()
+                            .map(|polynomial| polynomial.conjugate_automorphism())
+                            .collect()
+                    })
+                    .collect()
+            })
+            .collect()
+    }
+
+    #[allow(clippy::as_conversions)]
     fn norm_squared(projection: &[Zq]) -> Zq {
-        projection.iter().map(|coeff| *coeff * *coeff).sum()
+        projection
+            .iter()
+            .map(|coeff| {
+                coeff.centered_mod(Zq::new(Zq::Q as u32))
+                    * coeff.centered_mod(Zq::new(Zq::Q as u32))
+            })
+            .sum()
     }
 
     // Function to verify upper bound of projection
@@ -63,6 +96,7 @@ impl Projection {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::relation::witness::Witness;
     use crate::transcript::sponges::shake::ShakeSponge;
     use crate::transcript::LabradorTranscript;
     use rand::rng;
@@ -77,20 +111,16 @@ mod tests {
         let trials: f64 = 1000.0;
         let mut success_count: f64 = 0.0;
         for _ in 0..1000 {
-            let mut transcript = LabradorTranscript::new(
-                ShakeSponge::default(),
-                security_parameter,
-                rank,
-                multiplicity,
-            );
+            let mut transcript = LabradorTranscript::new(ShakeSponge::default());
             // This gives randomness to the transcript, to generate random projection matrices.
-            transcript.absorb_u1(RqVector::random(&mut rng(), 1));
-            let projections = transcript.generate_projections();
+            transcript.set_u1(RqVector::random(&mut rng(), 1));
+            let projections =
+                transcript.generate_projections(security_parameter, rank, multiplicity);
 
             let witness = RqVector::random(&mut rand::rng(), rank);
             let result = projections.compute_projection(0, &witness);
 
-            let beta = witness.compute_norm_squared();
+            let beta = witness.l2_norm_squared();
             // Check if the norm of the projection is smaller than 128 * (squared norm of the projection of the random polynomial)
             let test: bool = Projection::verify_projection_upper_bound(&result, beta);
             if test {
@@ -113,45 +143,42 @@ mod tests {
     #[test]
     #[cfg(not(feature = "skip-slow-tests"))]
     fn test_projection_average_value() {
+        use crate::relation::witness::Witness;
+
         let (security_parameter, rank, multiplicity) = (128, 3, 1);
         let trials: u128 = 10000;
 
-        let witness = RqVector::random_ternary(&mut rand::rng(), rank);
-        let witness_norm = (Zq::new(security_parameter.try_into().unwrap())
-            * RqVector::compute_norm_squared(&witness))
-        .to_u128();
+        // let witness = RqVector::random_ternary(&mut rand::rng(), rank);
+        let witness = Witness::new(rank, multiplicity, Zq::new(6400)).s;
+        let witness_norm = (128 * witness[0].l2_norm_squared().to_u128()) as f64;
 
-        let mut norm_sum = Zq::ZERO;
+        let mut norm_sum = 0u128;
         // Run the test multiple times to simulate the probability
         for _ in 0..trials {
-            let mut transcript = LabradorTranscript::new(
-                ShakeSponge::default(),
-                security_parameter,
-                rank,
-                multiplicity,
-            );
+            let mut transcript = LabradorTranscript::new(ShakeSponge::default());
             // This gives randomness to the transcript, to generate random projection matrices.
-            transcript.absorb_u1(RqVector::random(&mut rng(), 1));
-            let projections = transcript.generate_projections();
-            let result = projections.compute_projection(0, &witness);
-            norm_sum += Projection::norm_squared(&result);
+            transcript.set_u1(RqVector::random(&mut rng(), 1));
+            let projections =
+                transcript.generate_projections(security_parameter, rank, multiplicity);
+            let result = projections.compute_projection(0, &witness[0]);
+            norm_sum += Projection::norm_squared(&result).to_u128();
         }
 
         // Calculate the observed probability
-        let average = norm_sum.to_u128() / trials;
-        let difference = if witness_norm <= average {
-            average - witness_norm
+        let average = norm_sum as f64 / trials as f64;
+        let ratio = if witness_norm <= average {
+            average / witness_norm
         } else {
-            witness_norm - average
+            witness_norm / average
         };
 
         // we choose a small tolerance value for possible statistical error
-        let tolerance: u128 = 50;
+        let tolerance_percent: f64 = 1.01;
         assert!(
-            difference < tolerance,
+            ratio < tolerance_percent,
             "Average norm value {} is not equal to {}.",
             average,
-            Zq::new(security_parameter.try_into().unwrap()) * witness.compute_norm_squared(),
+            witness_norm,
         );
     }
 
@@ -160,20 +187,15 @@ mod tests {
     fn test_lower_bound() {
         let (security_parameter, rank, multiplicity) = (128, 5, 1);
 
-        let mut transcript = LabradorTranscript::new(
-            ShakeSponge::default(),
-            security_parameter,
-            rank,
-            multiplicity,
-        );
-        transcript.absorb_u1(RqVector::random(&mut rng(), 1));
-        let projections = transcript.generate_projections();
-        let witness = RqVector::random_ternary(&mut rng(), rank);
+        let mut transcript = LabradorTranscript::new(ShakeSponge::default());
+        transcript.set_u1(RqVector::random(&mut rng(), 1));
+        let projections = transcript.generate_projections(security_parameter, rank, multiplicity);
+        let witness = Witness::new(rank, multiplicity, Zq::new(6400)).s;
 
-        let beta = witness.compute_norm_squared();
+        let beta = witness[0].l2_norm_squared();
         // Check if the norm of the projection is bigger than 30 * (squared norm of the projection of the random polynomial)
         assert!(Projection::verify_projection_lower_bound(
-            &projections.compute_projection(0, &witness),
+            &projections.compute_projection(0, &witness[0]),
             beta
         ));
     }
