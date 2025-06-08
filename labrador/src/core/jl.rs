@@ -1,7 +1,7 @@
-use crate::ring;
 use crate::ring::rq_matrix::RqMatrix;
 use crate::ring::rq_vector::RqVector;
 use crate::ring::zq::Zq;
+use crate::ring::{self, Norms};
 
 // LaBRADOR: Compact Proofs for R1CS from Module-SIS | Page 5 | Proving smallness section
 const UPPER_BOUND_FACTOR: Zq = Zq::new(128);
@@ -71,25 +71,14 @@ impl Projection {
             .collect()
     }
 
-    #[allow(clippy::as_conversions)]
-    fn norm_squared(projection: &[Zq]) -> Zq {
-        projection
-            .iter()
-            .map(|coeff| {
-                coeff.centered_mod(Zq::new(Zq::Q as u32))
-                    * coeff.centered_mod(Zq::new(Zq::Q as u32))
-            })
-            .sum()
-    }
-
     // Function to verify upper bound of projection
     pub fn verify_projection_upper_bound(projection: &[Zq], beta_squared: Zq) -> bool {
-        Self::norm_squared(projection) < (UPPER_BOUND_FACTOR * beta_squared)
+        projection.l2_norm_squared() < (UPPER_BOUND_FACTOR * beta_squared)
     }
 
     // Function to verify lower bound of projection
     pub fn verify_projection_lower_bound(projection: &[Zq], beta_squared: Zq) -> bool {
-        Self::norm_squared(projection) > (LOWER_BOUND_FACTOR * beta_squared)
+        projection.l2_norm_squared() > (LOWER_BOUND_FACTOR * beta_squared)
     }
 }
 
@@ -162,7 +151,7 @@ mod tests {
             let projections =
                 transcript.generate_projections(security_parameter, rank, multiplicity);
             let result = projections.compute_projection(0, &witness[0]);
-            norm_sum += Projection::norm_squared(&result).to_u128();
+            norm_sum += result.l2_norm_squared().to_u128();
         }
 
         // Calculate the observed probability
