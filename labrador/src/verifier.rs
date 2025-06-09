@@ -1,20 +1,36 @@
+//! Labrador Verifier
+//!
+//! This module implements the **verifier** side of the protocol in
+//! Fig. 2 (and the verification algorithm in Fig. 3) of the paper.  The prover
+//! proof `proof` is accepted **iff** every arithmetic check listed in Fig. 2
+//! and lines 8–20 of Fig. 3 succeeds.
+//!
+//! The verifier receives:
+//! * a public statement `st`;
+//! * the CRS containing the Ajtai commitment matrices \(\mathbf{A},\mathbf{B},\mathbf{C},\mathbf{D}\);
+//! * a proof `proof` comprising
+//!   \[(\mathbf{u}_1,\mathbf{u}_2,\,\vec p,\,b''^{(k)}\,\vec z,\tilde\mathbf t,\tilde\mathbf g,\tilde\mathbf h)\]  
+//!   exactly as dispatched by the prover.
+//!
+//! ## Outline of the nine verifier checks
+//! The implementation follows Fig. 3 literally:
+//!
+//! On failure the function returns [`VerifierError`] precisely identifying the
+//! violated condition.
+
 #![allow(clippy::result_large_err)]
 
-use thiserror::Error;
-
-use crate::commitments::common_instances::AjtaiInstances;
-use crate::commitments::outer_commitments::{self, DecompositionParameters};
+use crate::commitments::{
+    common_instances::AjtaiInstances,
+    outer_commitments::{self, DecompositionParameters},
+};
 use crate::core::aggregate::{FunctionsAggregation, ZeroConstantFunctionsAggregation};
-use crate::core::inner_product;
-use crate::core::jl::Projection;
+use crate::core::{inner_product, jl::Projection};
 use crate::relation::env_params;
 use crate::relation::{env_params::EnvironmentParameters, statement::Statement};
-use crate::ring::rq::Rq;
-use crate::ring::rq_matrix::RqMatrix;
-use crate::ring::rq_vector::RqVector;
-use crate::ring::zq::Zq;
-use crate::ring::Norms;
+use crate::ring::{rq::Rq, rq_matrix::RqMatrix, rq_vector::RqVector, zq::Zq, Norms};
 use crate::transcript::{LabradorTranscript, Sponge};
+use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum VerifierError {
@@ -56,16 +72,23 @@ pub enum VerifierError {
     #[error(transparent)]
     DecompositionError(#[from] outer_commitments::DecompositionError),
 }
+
+/// Implements the algorithm executed by the verifier \(\mathcal{V}\) in the paper.
 pub struct LabradorVerifier<'a> {
+    /// System‑wide environment parameters like rank and multiplicity.
     params: &'a EnvironmentParameters,
+    /// Common reference string (CRS) holding the commitment matrices
+    /// \(\mathbf{A},\mathbf{B},\mathbf{C},\mathbf{D}\).
     crs: &'a AjtaiInstances,
+    /// Public relation statement.
     st: &'a Statement,
-    // Aggregation instances
+    /* --- aggregation instances ---------------------------------------------------------- */
     constant_aggregator: ZeroConstantFunctionsAggregation<'a>,
     funcs_aggregator: FunctionsAggregation<'a>,
 }
 
 impl<'a> LabradorVerifier<'a> {
+    /// Constructs a new verifier instance.
     pub fn new(
         params: &'a EnvironmentParameters,
         crs: &'a AjtaiInstances,
@@ -80,76 +103,10 @@ impl<'a> LabradorVerifier<'a> {
         }
     }
 
-    /// All check conditions are from page 18
-    pub fn verify<S: Sponge>(
-        &mut self,
-        proof: &LabradorTranscript<S>,
-    ) -> Result<bool, VerifierError> {
-        let mut transcript = LabradorTranscript::new(S::default());
-
-        let projections = self.check_vector_p_norm_bound(proof, &mut transcript)?;
-
-        // check b_0^{''(k)} ?= <omega^(k),p> + \sum(psi_l^(k) * b_0^{'(l)})
-        let (psi, omega) = self.check_b_double_prime_constant(proof, &mut transcript)?;
-
-        // 3. line 14: check norm_sum(z, t, g, h) <= (beta')^2
-        self.check_final_norm_sum(proof)?;
-
-        let vector_alpha = transcript.generate_rq_vector(self.params.constraint_k);
-        let vector_beta = transcript.generate_rq_vector(usize::div_ceil(
-            env_params::SECURITY_PARAMETER,
-            self.params.log_q,
-        ));
-        transcript.absorb_u2(&proof.u2);
-
-        // 4. line 15: check Az ?= c_1 * t_1 + ... + c_r * t_r
-        let challenges = self.check_az_amortization_correctness(proof, &mut transcript)?;
-
-        // 5. lne 16: check <z, z> ?= \sum(g_ij * c_i * c_j)
-        self.check_g_correctness(proof, &challenges)?;
-
-        // 6. line 17: check \sum(<\phi_i, z>c_i) ?= \sum(h_ij * c_i * c_j)
-        self.constant_aggregator.calculate_agg_phi_double_prime(
-            &self.st.phi_ct,
-            &projections.get_conjugated_projection_matrices(),
-            &psi,
-            &omega,
-        );
-        self.funcs_aggregator.calculate_aggr_phi(
-            &self.st.phi_constraint,
-            self.constant_aggregator.get_phi_double_prime(),
-            &vector_alpha,
-            &vector_beta,
-        );
-        self.check_h_correctness(proof, &challenges)?;
-
-        // 7. line 18: check \sum(a_ij * g_ij) + \sum(h_ii) - b ?= 0
-        self.constant_aggregator
-            .calculate_agg_a_double_prime(&psi, &self.st.a_ct);
-        self.funcs_aggregator.calculate_agg_a(
-            &self.st.a_constraint,
-            self.constant_aggregator.get_alpha_double_prime(),
-            &vector_alpha,
-            &vector_beta,
-        );
-
-        self.funcs_aggregator.calculate_aggr_b(
-            &self.st.b_constraint,
-            &proof.b_ct_aggr,
-            &vector_alpha,
-            &vector_beta,
-        );
-        self.check_aggregated_relation(proof)?;
-
-        // 8. line 19: u_1 ?= \sum(\sum(B_ik * t_i^(k))) + \sum(\sum(C_ijk * g_ij^(k)))
-        self.check_u1(proof)?;
-
-        // 9. line 20: u_2 ?= \sum(\sum(D_ijk * h_ij^(k)))
-        self.check_u2(proof)?;
-
-        Ok(true)
-    }
-
+    /// Validate JL projection bound  (Fig. 2):
+    /// \[
+    ///   \|\vec p\|_2^2 = \sum_{j=1}^{2\lambda} p_j^2 \;\stackrel{?}{\le}\; 128\,\beta^2.
+    /// \]
     fn check_vector_p_norm_bound<S: Sponge>(
         &self,
         proof: &LabradorTranscript<S>,
@@ -175,6 +132,12 @@ impl<'a> LabradorVerifier<'a> {
         Ok(projections)
     }
 
+    /// Validate b'' constant term (Fig. 2):
+    /// For every `k`, verifies
+    /// \[
+    ///   b_{0}^{''(k)} \stackrel{?}{=} \sum_{l=1}^{L} \psi_{l}^{(k)}\,b_{0}^{'(l)}
+    ///                    + \langle\,\vec\omega^{(k)},\vec p\rangle .
+    /// \]
     fn check_b_double_prime_constant<S: Sponge>(
         &self,
         proof: &LabradorTranscript<S>,
@@ -207,6 +170,14 @@ impl<'a> LabradorVerifier<'a> {
         Ok((psi, omega))
     }
 
+    /// Validate consolidated norm bound  (Fig. 3 line 14):
+    /// \[
+    ///  \sum_{\ell=0}^{1}\|\mathbf z^{(\ell)}\|_2^2
+    ///   + \sum_{i=1}^r\sum_{k=0}^{t_1-1}\|\mathbf t_i^{(k)}\|_2^2
+    ///   + \sum_{1\le i\le j\le r}\sum_{k=0}^{t_2-1}\|\mathbf g_{ij}^{(k)}\|_2^2
+    ///   + \sum_{1\le i\le j\le r}\sum_{k=0}^{t_1-1}\|\mathbf h_{ij}^{(k)}\|_2^2
+    ///     \stackrel{?}{\le} (\beta')^2 .
+    ///     \]
     fn check_final_norm_sum<S: Sponge>(
         &self,
         proof: &LabradorTranscript<S>,
@@ -249,6 +220,11 @@ impl<'a> LabradorVerifier<'a> {
         Ok(())
     }
 
+    /// Validate amortised Ajtai relation (Fig. 3 line 15):
+    /// \[
+    ///   \mathbf A\,\mathbf z \stackrel{?}{=} \sum_{i=1}^r c_i\,\tilde\mathbf t_i
+    /// \]
+    /// where the challenges `c_i` are re‑sampled locally from the sponge.
     fn check_az_amortization_correctness<S: Sponge>(
         &self,
         proof: &LabradorTranscript<S>,
@@ -270,6 +246,11 @@ impl<'a> LabradorVerifier<'a> {
         Ok(challenges)
     }
 
+    /// Validate the following (Fig. 3 line 16):
+    /// \[
+    ///   \langle\mathbf z,\mathbf z\rangle \stackrel{?}{=}
+    ///   \sum_{i,j} g_{ij}\,c_i\,c_j .
+    /// \]
     fn check_g_correctness<S: Sponge>(
         &self,
         proof: &LabradorTranscript<S>,
@@ -290,6 +271,11 @@ impl<'a> LabradorVerifier<'a> {
         Ok(())
     }
 
+    /// Validate the following (Fig. 3 line 17):
+    /// \[
+    ///   2\,\sum_{i=1}^r \langle\varphi_i,\mathbf z\rangle c_i
+    ///   \stackrel{?}{=} \sum_{i,j} h_{ij}\,c_i\,c_j .
+    /// \]
     fn check_h_correctness<S: Sponge>(
         &self,
         proof: &LabradorTranscript<S>,
@@ -309,15 +295,10 @@ impl<'a> LabradorVerifier<'a> {
         Ok(())
     }
 
-    /// line 18, page 18: check if \sum(a_{ij} * g_{ij}) + \sum(h_{ii}) - b ?= 0
-    /// in the verifier process, page 18 from the paper.
-    ///
-    /// param: a_primes: a_{ij}^{''(k)}
-    /// param: b_primes: b^{''(k)}
-    /// param: g: g_{ij}
-    /// param: h: h_{ii}
-    ///
-    /// return: true if the relation holds, false otherwise
+    /// Validate the following (Fig. 3 line 18):
+    /// \[
+    ///   2\sum_{i,j} a_{ij} g_{ij} + \sum_i h_{ii}\;\stackrel{?}{=}\; 2b .
+    /// \]
     fn check_aggregated_relation<S: Sponge>(
         &self,
         proof: &LabradorTranscript<S>,
@@ -344,6 +325,11 @@ impl<'a> LabradorVerifier<'a> {
         Ok(())
     }
 
+    /// Validate uter commitment u1 (Fig. 3 line 19):
+    /// \[
+    ///   \mathbf u_1^{\text{re}} = \sum_{i=1}^r\sum_{k=0}^{t_1-1}\mathbf B_{ik}\,\mathbf t_i^{(k)}
+    ///          + \sum_{1\le i\le j\le r}\sum_{k=0}^{t_2-1}\mathbf C_{ijk}\,\mathbf g_{ij}^{(k)}
+    /// \]
     fn check_u1<S: Sponge>(&self, proof: &LabradorTranscript<S>) -> Result<(), VerifierError> {
         let u_1 = &proof.u1;
         let commitment_u1 = outer_commitments::compute_u1(
@@ -363,6 +349,12 @@ impl<'a> LabradorVerifier<'a> {
         Ok(())
     }
 
+    /// Validate outer commitment u2 (Fig. 3 line 20):
+    /// \[
+    ///   \mathbf u_2^{\text{re}} = \sum_{1\le i\le j\le r}\sum_{k=0}^{t_1-1}
+    ///                              \mathbf D_{ijk}\,\mathbf h_{ij}^{(k)}
+    /// \]
+    /// and checks equality with the transcript.
     fn check_u2<S: Sponge>(&self, proof: &LabradorTranscript<S>) -> Result<(), VerifierError> {
         let commitment_u2 = outer_commitments::compute_u2(
             self.crs,
@@ -410,6 +402,82 @@ impl<'a> LabradorVerifier<'a> {
                 .iter()
                 .fold(Zq::ZERO, |acc, p| acc + p.l2_norm_squared())
         })
+    }
+
+    /// Verifies a prover transcript.
+    /// Executes **all** verifier steps (Fig. 2 page 17, Fig. 3 page 18).
+    ///
+    /// Returns `Ok(true)` if *all* checks succeed, otherwise an explanatory
+    /// [`VerifierError`].  The sponge seeded inside this routine **must** be
+    /// identical to the prover’s so that the generated randomizers match.
+    pub fn verify<S: Sponge>(
+        &mut self,
+        proof: &LabradorTranscript<S>,
+    ) -> Result<bool, VerifierError> {
+        // fresh sponge — deterministic (Todo: Add domain separator)
+        let mut transcript = LabradorTranscript::new(S::default());
+
+        // --- Fig. 2: JL Projections Norm Check ------------------------------------------------------------------
+        let projections = self.check_vector_p_norm_bound(proof, &mut transcript)?;
+
+        // --- Fig. 2: Constant of Constant Functions Aggregation Check -------------------------------------------
+        let (psi, omega) = self.check_b_double_prime_constant(proof, &mut transcript)?;
+
+        // --- Fig. 3, Line 14: Check Prover's Last Message Norm --------------------------------------------------
+        self.check_final_norm_sum(proof)?;
+
+        // Generate Randomness for Next Steps
+        let vector_alpha = transcript.generate_rq_vector(self.params.constraint_k);
+        let vector_beta = transcript.generate_rq_vector(usize::div_ceil(
+            env_params::SECURITY_PARAMETER,
+            self.params.log_q,
+        ));
+        transcript.absorb_u2(&proof.u2);
+
+        // --- Fig. 3, Line 15: Check Correctness of Amortization --------------------------------------------------
+        let challenges = self.check_az_amortization_correctness(proof, &mut transcript)?;
+
+        // --- Fig. 3, Line 16: Check Relation of z, g, and challenges ---------------------------------------------
+        self.check_g_correctness(proof, &challenges)?;
+
+        // Generate Randomness for Next Steps
+        self.constant_aggregator.calculate_agg_phi_double_prime(
+            &self.st.phi_ct,
+            &projections.get_conjugated_projection_matrices(),
+            &psi,
+            &omega,
+        );
+        self.funcs_aggregator.calculate_aggr_phi(
+            &self.st.phi_constraint,
+            self.constant_aggregator.get_phi_double_prime(),
+            &vector_alpha,
+            &vector_beta,
+        );
+        // --- Fig. 3, Line 17: Check Relation of z, \varphi, h, and challenges -------------------------------------
+        self.check_h_correctness(proof, &challenges)?;
+
+        self.constant_aggregator
+            .calculate_agg_a_double_prime(&psi, &self.st.a_ct);
+        self.funcs_aggregator.calculate_agg_a(
+            &self.st.a_constraint,
+            self.constant_aggregator.get_alpha_double_prime(),
+            &vector_alpha,
+            &vector_beta,
+        );
+        self.funcs_aggregator.calculate_aggr_b(
+            &self.st.b_constraint,
+            &proof.b_ct_aggr,
+            &vector_alpha,
+            &vector_beta,
+        );
+        // --- Fig. 3, Line 18: Check Aggregated Elements Equal to 0 -----------------------------------------------
+        self.check_aggregated_relation(proof)?;
+
+        // --- Fig. 3, Line 19-20: Check Correntness of u1 and u2---------------------------------------------------
+        self.check_u1(proof)?;
+        self.check_u2(proof)?;
+
+        Ok(true)
     }
 }
 

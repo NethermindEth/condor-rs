@@ -22,7 +22,6 @@ use crate::relation::{
     witness::Witness,
 };
 use crate::ring::{rq_matrix::RqMatrix, rq_vector::RqVector, zq::Zq};
-
 use crate::transcript::{LabradorTranscript, Sponge};
 use thiserror::Error;
 
@@ -43,7 +42,7 @@ pub enum ProverError {
     DecompositionError(#[from] outer_commitments::DecompositionError),
 }
 
-/// Implements the steps executed by \(\mathcal{P}\) in the paper.
+/// Implements the steps executed by the prover \(\mathcal{P}\) in the paper.
 pub struct LabradorProver<'a> {
     /// System‑wide environment parameters like rank and multiplicity.
     params: &'a EnvironmentParameters,
