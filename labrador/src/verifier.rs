@@ -309,16 +309,36 @@ impl<'a> LabradorVerifier<'a> {
         Ok(())
     }
 
+    /// line 18, page 18: check if \sum(a_{ij} * g_{ij}) + \sum(h_{ii}) - b ?= 0
+    /// in the verifier process, page 18 from the paper.
+    ///
+    /// param: a_primes: a_{ij}^{''(k)}
+    /// param: b_primes: b^{''(k)}
+    /// param: g: g_{ij}
+    /// param: h: h_{ii}
+    ///
+    /// return: true if the relation holds, false otherwise
     fn check_aggregated_relation<S: Sponge>(
         &self,
         proof: &LabradorTranscript<S>,
     ) -> Result<(), VerifierError> {
-        if !Self::check_relation(
-            self.funcs_aggregator.get_agg_a(),
-            self.funcs_aggregator.get_aggr_b(),
-            &proof.g,
-            &proof.h,
-        ) {
+        let r = self.funcs_aggregator.get_agg_a().get_elements().len();
+
+        let mut sum_a_primes_g = Rq::zero();
+        // walk only over the stored half: i ≤ j
+        for i in 0..r {
+            for j in 0..r {
+                sum_a_primes_g = &sum_a_primes_g
+                    + &(self.funcs_aggregator.get_agg_a().get_cell(i, j) * proof.g.get_cell(i, j));
+            }
+        }
+
+        let sum_h_ii = (0..r).fold(Rq::zero(), |acc, i| &acc + proof.h.get_cell(i, i));
+
+        let b_primes2 = self.funcs_aggregator.get_aggr_b() * &Zq::TWO;
+        let sum_a_primes_g2 = &sum_a_primes_g * &Zq::TWO;
+
+        if &sum_a_primes_g2 + &sum_h_ii != b_primes2 {
             return Err(VerifierError::RelationCheckFailed);
         }
         Ok(())
@@ -390,34 +410,6 @@ impl<'a> LabradorVerifier<'a> {
                 .iter()
                 .fold(Zq::ZERO, |acc, p| acc + p.l2_norm_squared())
         })
-    }
-
-    /// line 18, page 18: check if \sum(a_{ij} * g_{ij}) + \sum(h_{ii}) - b ?= 0
-    /// in the verifier process, page 18 from the paper.
-    ///
-    /// param: a_primes: a_{ij}^{''(k)}
-    /// param: b_primes: b^{''(k)}
-    /// param: g: g_{ij}
-    /// param: h: h_{ii}
-    ///
-    /// return: true if the relation holds, false otherwise
-    pub fn check_relation(a_primes: &RqMatrix, b_primes: &Rq, g: &RqMatrix, h: &RqMatrix) -> bool {
-        let r = a_primes.get_elements().len();
-
-        let mut sum_a_primes_g = Rq::zero();
-        // walk only over the stored half: i ≤ j
-        for i in 0..r {
-            for j in 0..r {
-                sum_a_primes_g = &sum_a_primes_g + &(a_primes.get_cell(i, j) * g.get_cell(i, j));
-            }
-        }
-
-        let sum_h_ii = (0..r).fold(Rq::zero(), |acc, i| &acc + h.get_cell(i, i));
-
-        let b_primes2 = b_primes * &Zq::TWO;
-        let sum_a_primes_g2 = &sum_a_primes_g * &Zq::TWO;
-
-        &sum_a_primes_g2 + &sum_h_ii == b_primes2
     }
 }
 
