@@ -1,5 +1,5 @@
-use crate::ring::rq::Rq;
 use crate::ring::zq::Zq;
+use crate::ring::{rq::Rq, Norms};
 use core::ops::Mul;
 use rand::{CryptoRng, Rng};
 use std::ops::Add;
@@ -71,14 +71,6 @@ impl RqVector {
         concatenated_coeffs
     }
 
-    // Compute the squared norm of a vector of polynomials
-    pub fn l2_norm_squared(&self) -> Zq {
-        self.elements
-            .iter()
-            .map(|poly| poly.l2_norm_squared()) // Collect coefficients from all polynomials
-            .sum()
-    }
-
     pub fn decompose(&self, b: Zq, parts: usize) -> Vec<RqVector> {
         self.get_elements()
             .iter()
@@ -137,6 +129,44 @@ impl Mul<Zq> for &RqVector {
     // A poly vector multiple by a PolyRing
     fn mul(self, other: Zq) -> RqVector {
         self.get_elements().iter().map(|s| s * &other).collect()
+    }
+}
+
+impl Norms for RqVector {
+    type NormType = Zq;
+
+    // Compute the squared norm of a vector of polynomials
+    fn l2_norm_squared(&self) -> Self::NormType {
+        self.elements
+            .iter()
+            .map(|poly| poly.l2_norm_squared())
+            .sum()
+    }
+}
+
+#[cfg(test)]
+mod norm_tests {
+    use super::*;
+    use crate::ring::{rq::tests::generate_rq_from_zq_vector, Norms};
+
+    // Test the square of the norm
+    #[test]
+    fn test_norm() {
+        let poly1 = generate_rq_from_zq_vector(vec![
+            Zq::ONE,
+            Zq::ZERO,
+            Zq::new(5),
+            Zq::NEG_ONE - Zq::new(1),
+        ]);
+        let poly2 = generate_rq_from_zq_vector(vec![Zq::ZERO, Zq::ZERO, Zq::new(5), Zq::ONE]);
+        let poly_vec1: RqVector = vec![poly1.clone(), poly2.clone()].into();
+        assert_eq!(
+            poly_vec1.l2_norm_squared(),
+            poly1.l2_norm_squared() + poly2.l2_norm_squared()
+        );
+
+        let zero_vec: RqVector = RqVector::zero(4);
+        assert_eq!(zero_vec.l2_norm_squared(), Zq::ZERO);
     }
 }
 
@@ -234,25 +264,5 @@ mod tests {
             Zq::new(2),
         ]);
         assert_eq!(result_2, poly_exp_2);
-    }
-
-    // Test the square of the norm
-    #[test]
-    fn test_norm() {
-        let poly1 = generate_rq_from_zq_vector(vec![
-            Zq::ONE,
-            Zq::ZERO,
-            Zq::new(5),
-            Zq::NEG_ONE - Zq::new(1),
-        ]);
-        let poly2 = generate_rq_from_zq_vector(vec![Zq::ZERO, Zq::ZERO, Zq::new(5), Zq::ONE]);
-        let poly_vec1: RqVector = vec![poly1.clone(), poly2.clone()].into();
-        assert_eq!(
-            poly_vec1.l2_norm_squared(),
-            poly1.l2_norm_squared() + poly2.l2_norm_squared()
-        );
-
-        let zero_vec: RqVector = RqVector::zero(4);
-        assert_eq!(zero_vec.l2_norm_squared(), Zq::ZERO);
     }
 }

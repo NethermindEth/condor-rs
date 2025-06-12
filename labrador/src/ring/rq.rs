@@ -19,6 +19,7 @@
 
 // We use the Zq ring
 use crate::ring::zq::Zq;
+use crate::ring::Norms;
 use core::ops::{Add, Mul, Sub};
 use rand::distr::{Distribution, Uniform};
 use rand::{CryptoRng, Rng};
@@ -75,17 +76,6 @@ impl Rq {
             }
         });
         Self { coeffs }
-    }
-
-    #[allow(clippy::as_conversions)]
-    pub fn l2_norm_squared(&self) -> Zq {
-        self.coeffs
-            .iter()
-            .map(|coeff| {
-                coeff.centered_mod(Zq::new(Zq::Q as u32))
-                    * coeff.centered_mod(Zq::new(Zq::Q as u32))
-            })
-            .sum()
     }
 
     /// Decomposes a polynomial into base-B representation:
@@ -235,6 +225,35 @@ impl Mul<&Zq> for &Rq {
             *elem *= *other;
         }
         Rq::new(copied_coeffs)
+    }
+}
+
+impl Norms for Rq {
+    type NormType = Zq;
+
+    #[allow(clippy::as_conversions)]
+    fn l2_norm_squared(&self) -> Self::NormType {
+        self.coeffs.l2_norm_squared()
+    }
+}
+
+#[cfg(test)]
+mod norm_tests {
+    use super::tests::generate_rq_from_zq_vector;
+    use crate::ring::{rq::Rq, zq::Zq, Norms};
+
+    // Test the square of the norm
+    #[test]
+    fn test_norm() {
+        let poly1 = generate_rq_from_zq_vector(vec![Zq::ONE, Zq::ZERO, Zq::new(5), Zq::NEG_ONE]);
+        let poly2 = generate_rq_from_zq_vector(vec![Zq::ZERO, Zq::ZERO, Zq::new(5), Zq::ONE]);
+        let poly3 = generate_rq_from_zq_vector(vec![Zq::new(5), Zq::ONE, -Zq::new(6), Zq::ZERO]);
+        let poly4 = Rq::zero();
+
+        assert_eq!(poly1.l2_norm_squared(), Zq::new(27));
+        assert_eq!(poly2.l2_norm_squared(), Zq::new(26));
+        assert_eq!(poly3.l2_norm_squared(), Zq::new(62));
+        assert_eq!(poly4.l2_norm_squared(), Zq::ZERO);
     }
 }
 
@@ -770,19 +789,5 @@ pub mod tests {
         // ct<\sigma_{-1}(poly1), poly2> ?= <poly1, poly2>
         let ct_inner_conjugated_12 = inner_conjugated_12.get_coefficients()[0];
         assert_eq!(ct_inner_conjugated_12, inner_12);
-    }
-
-    // Test the square of the norm
-    #[test]
-    fn test_norm() {
-        let poly1 = generate_rq_from_zq_vector(vec![Zq::ONE, Zq::ZERO, Zq::new(5), Zq::NEG_ONE]);
-        let poly2 = generate_rq_from_zq_vector(vec![Zq::ZERO, Zq::ZERO, Zq::new(5), Zq::ONE]);
-        let poly3 = generate_rq_from_zq_vector(vec![Zq::new(5), Zq::ONE, -Zq::new(6), Zq::ZERO]);
-        let poly4 = Rq::zero();
-
-        assert_eq!(poly1.l2_norm_squared(), Zq::new(27));
-        assert_eq!(poly2.l2_norm_squared(), Zq::new(26));
-        assert_eq!(poly3.l2_norm_squared(), Zq::new(62));
-        assert_eq!(poly4.l2_norm_squared(), Zq::ZERO);
     }
 }
