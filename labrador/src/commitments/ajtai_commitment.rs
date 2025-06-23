@@ -1,6 +1,7 @@
 use crate::ring::rq_matrix::RqMatrix;
 use crate::ring::rq_vector::RqVector;
 use crate::ring::zq::Zq;
+use crate::ring::Norms;
 use thiserror::Error;
 
 // Error types with documentation
@@ -142,17 +143,12 @@ impl AjtaiScheme {
         if norm_bound_sq >= q_squared.checked_div(m_cubed).unwrap_or(0) {
             return Err(ParameterError::SecurityBoundViolation);
         }
-
         Ok(())
     }
 
-    /// Checks polynomial coefficients against specified bound
+    /// Checks that l2 norm of the value committing to is less than the norm bound
     fn check_bounds(&self, _polynomials: &RqVector) -> bool {
-        // As now there are no concrete parameters, we return true.
-        true
-        // polynomials
-        //     .iter()
-        //     .all(|p| p.check_bounds(self.norm_bound()))
+        _polynomials.l2_norm_squared() <= self.norm_bound_sq()
     }
 
     /// Returns a reference to the internal matrix
@@ -195,7 +191,7 @@ mod tests {
         pub fn setup_scheme() -> AjtaiScheme {
             let mut rng = rand::rng();
             let random_matrix = RqMatrix::random(&mut rng, TEST_M, TEST_N);
-            AjtaiScheme::new(1, random_matrix).unwrap()
+            AjtaiScheme::new(10000 * 10000, random_matrix).unwrap()
         }
     }
 
@@ -212,7 +208,7 @@ mod tests {
     #[test]
     fn initializes_with_correct_bounds() {
         let scheme = test_utils::setup_scheme();
-        assert_eq!(scheme.norm_bound_sq(), 1);
+        assert_eq!(scheme.norm_bound_sq(), 10000 * 10000);
     }
 
     #[test]

@@ -23,8 +23,10 @@ pub fn compute_g(witness_vector: &[RqVector]) -> RqMatrix {
 /// Calculate the h_{ij} = <φ_i, s_j> + <φ_j, s_i> garbage polynomials
 /// In the paper, h_{ij} is defined with a factor of 1/2 in front
 /// However, since we're using q = 2^32, division by 2 is problematic in Z_q
-/// So we store h'_{ij} = 2*h_{ij} = <φ_i, s_j> + <φ_j, s_i> directly
-/// Exploits symmetry by only calculating for i ≤ j since h_{ij} = h_{ji}
+/// So we store h'_{ij} = 2*h_{ij} = <φ_i, s_j> + <φ_j, s_i> directly.
+/// Therefore the bound for commitment scheme of h_ij should be 4 times larger than the bound specified in the paper.
+///
+/// Exploits symmetry by only calculating for i ≤ j since h_{ij} = h_{ji}.
 pub fn compute_h(witness_vector: &[RqVector], phi: &[RqVector]) -> RqMatrix {
     let r = witness_vector.len();
     let mut h_i = Vec::with_capacity((r * (r + 1)) / 2);

@@ -38,8 +38,10 @@ impl AjtaiInstances {
                 ),
             )
             .expect("Invalid Parameters for commitment scheme C"),
+            // Note: A factor of 4 is applied because each h_ij cell in the implementation is twice the value specified in
+            // the paper (division by 2 is omitted, as we are not operating on a field).
             commitment_scheme_d: AjtaiScheme::new(
-                ep.gamma_2_sq,
+                ep.gamma_2_sq * 4,
                 Self::challenge_rq_matrix(
                     ep.kappa_2,
                     ep.t_1 * ((ep.multiplicity.pow(2)) + ep.multiplicity) / 2,

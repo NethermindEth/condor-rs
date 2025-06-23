@@ -107,7 +107,7 @@ mod tests {
             let projections =
                 transcript.generate_projections(security_parameter, rank, multiplicity);
 
-            let witness_vector = Witness::new(rank, multiplicity, 6400).s;
+            let witness_vector = Witness::new(rank, multiplicity, 6400 * 6400).s;
             let result = projections.compute_projection(0, &witness_vector[0]);
             let beta = witness_vector[0].l2_norm_squared();
             // dbg!(&result);

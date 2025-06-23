@@ -19,7 +19,7 @@ pub struct EnvironmentParameters {
     pub b_2: usize, // g_ij decomposition base
     pub t_2: usize, // g_ij number of parts
 
-    /// Norm Bounds
+    /// Squred values of norm bounds
     pub beta_sq: u128, // Bound for witness s_i
     pub gamma_sq: u128,   // Bound for z
     pub gamma_1_sq: u128, // Bound for t
@@ -171,9 +171,9 @@ impl EnvironmentParameters {
     }
 
     /// β' = √( 2 γ² / b²  +  γ₁²  +  γ₂² )
-    fn compute_beta_prime_sq(b: usize, gamma: u128, gamma1: u128, gamma2: u128) -> u128 {
-        let part_z = 2.0 * (gamma * gamma) as f64 / (b * b) as f64;
-        part_z as u128 + gamma1 * gamma1 + gamma2 * gamma2
+    fn compute_beta_prime_sq(b: usize, gamma_sq: u128, gamma1_sq: u128, gamma2_sq: u128) -> u128 {
+        let part_z = 2.0 * gamma_sq as f64 / (b * b) as f64;
+        part_z as u128 + gamma1_sq + gamma2_sq
     }
 }
 
@@ -265,8 +265,8 @@ mod tests {
     #[test]
     fn test_gamma_functions() {
         let (beta_sq, tau) = (32, 49.0);
-        let gamma = EnvironmentParameters::compute_gamma_sq(beta_sq, tau);
-        assert_eq!(gamma, beta_sq * tau as u128);
+        let gamma_sq = EnvironmentParameters::compute_gamma_sq(beta_sq, tau);
+        assert_eq!(gamma_sq, beta_sq * tau as u128);
 
         // simple numeric spot-check for γ₁, γ₂
         let (b1, t1, r, kappa, b2, t2) = (7, 3, 2, 4, 5, 2);
@@ -283,9 +283,9 @@ mod tests {
 
     #[test]
     fn beta_prime_formula() {
-        let (b, gamma, g1, g2) = (11usize, 3, 7, 2);
-        let expected = ((2 * gamma * gamma) as f64 / (b * b) as f64) as u128 + g1 * g1 + g2 * g2;
-        let result = EnvironmentParameters::compute_beta_prime_sq(b, gamma, g1, g2);
+        let (b, gamma_sq, g1_sq, g2_sq) = (11usize, 3 * 3, 7 * 7, 2 * 2);
+        let expected = ((2 * gamma_sq) as f64 / (b * b) as f64) as u128 + g1_sq + g2_sq;
+        let result = EnvironmentParameters::compute_beta_prime_sq(b, gamma_sq, g1_sq, g2_sq);
         assert_eq!(expected, result);
     }
 
@@ -293,9 +293,9 @@ mod tests {
     fn test_gamma_and_beta_prime_are_positive() {
         let beta_sq = 100 * 100;
         let tau = 64.0;
-        let gamma = EnvironmentParameters::compute_gamma_sq(beta_sq, tau);
-        assert!(gamma > 0);
-        let beta_p = EnvironmentParameters::compute_beta_prime_sq(3, gamma, 2, 1);
+        let gamma_sq = EnvironmentParameters::compute_gamma_sq(beta_sq, tau);
+        assert!(gamma_sq > 0);
+        let beta_p = EnvironmentParameters::compute_beta_prime_sq(3, gamma_sq, 2, 1);
         assert!(beta_p > 0);
     }
 
