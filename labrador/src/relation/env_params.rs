@@ -3,7 +3,7 @@ use crate::ring::{rq::Rq, zq::Zq};
 
 /// Security Parameter
 pub const SECURITY_PARAMETER: usize = 128;
-pub const OPERATOR_NORM: f64 = 15.0;
+pub const OPERATOR_NORM: f64 = 71.0;
 
 // Example Environment parameters used for LaBRADOR, can be expanded as required by testing.
 #[derive(Clone)]
@@ -139,7 +139,7 @@ impl EnvironmentParameters {
 
     /// γ = β·√τ
     fn compute_gamma(beta: f64, tau: f64) -> f64 {
-        beta * (tau).sqrt()
+        beta * (tau.sqrt())
     }
 
     /// γ₁ = √( (b₁² t₁ /12) · r κ d  +  (b₂² t₂ /12) · (r²+r)/2 · d )
@@ -179,7 +179,18 @@ impl EnvironmentParameters {
 
 impl Default for EnvironmentParameters {
     fn default() -> Self {
-        Self::new(5, 3, 65535.0, 4, 5, 5, 5, 5, 65535.0, (1u64 << 32) as usize)
+        Self::new(
+            5,
+            3,
+            65535.0,
+            4,
+            5,
+            5,
+            5,
+            5,
+            OPERATOR_NORM,
+            (1u64 << 32) as usize,
+        )
     }
 }
 

@@ -82,23 +82,17 @@ impl Rq {
     /// p = p⁽⁰⁾ + p⁽¹⁾·B + p⁽²⁾·B² + ... + p⁽ᵗ⁻¹⁾·B^(t-1)
     /// Where each p⁽ⁱ⁾ has small coefficients, using centered representatives
     pub fn decompose(&self, base: Zq, num_parts: usize) -> Vec<Rq> {
-        debug_assert!(num_parts > 0, "num_parts must be positive");
-        let mut parts = Vec::with_capacity(num_parts);
-        let mut initial_coeffs = *self.get_coefficients();
-
-        for _ in 0..num_parts - 1 {
-            // Extract low part (mod base, centered around 0)
-            let mut low_coeffs = [Zq::ZERO; Self::DEGREE];
-
-            for (low_c, coeff) in low_coeffs.iter_mut().zip(initial_coeffs.iter_mut()) {
-                let centered = coeff.centered_mod(base);
-                *low_c = centered;
-                *coeff = (*coeff - centered).scale_by(base);
-            }
-            parts.push(Self::new(low_coeffs));
-        }
-        parts.push(Self::new(initial_coeffs));
-        parts
+        let mut result = vec![Rq::zero(); num_parts];
+        self.coeffs.iter().enumerate().for_each(|(index, coeff)| {
+            coeff
+                .decompose(base, num_parts)
+                .into_iter()
+                .zip(result.iter_mut())
+                .for_each(|(decomposed_coeff, decomposed_vec)| {
+                    decomposed_vec.coeffs[index] = decomposed_coeff;
+                });
+        });
+        result
     }
 
     /// Compute the conjugate automorphism \sigma_{-1} of vector based on B) Constraints..., Page 21.
@@ -229,11 +223,15 @@ impl Mul<&Zq> for &Rq {
 }
 
 impl Norms for Rq {
-    type NormType = Zq;
+    type NormType = u128;
 
     #[allow(clippy::as_conversions)]
     fn l2_norm_squared(&self) -> Self::NormType {
         self.coeffs.l2_norm_squared()
+    }
+
+    fn linf_norm(&self) -> Self::NormType {
+        self.coeffs.linf_norm()
     }
 }
 
@@ -244,16 +242,29 @@ mod norm_tests {
 
     // Test the square of the norm
     #[test]
-    fn test_norm() {
+    fn test_l2_norm() {
         let poly1 = generate_rq_from_zq_vector(vec![Zq::ONE, Zq::ZERO, Zq::new(5), Zq::NEG_ONE]);
         let poly2 = generate_rq_from_zq_vector(vec![Zq::ZERO, Zq::ZERO, Zq::new(5), Zq::ONE]);
         let poly3 = generate_rq_from_zq_vector(vec![Zq::new(5), Zq::ONE, -Zq::new(6), Zq::ZERO]);
         let poly4 = Rq::zero();
 
-        assert_eq!(poly1.l2_norm_squared(), Zq::new(27));
-        assert_eq!(poly2.l2_norm_squared(), Zq::new(26));
-        assert_eq!(poly3.l2_norm_squared(), Zq::new(62));
-        assert_eq!(poly4.l2_norm_squared(), Zq::ZERO);
+        assert_eq!(poly1.l2_norm_squared(), 27);
+        assert_eq!(poly2.l2_norm_squared(), 26);
+        assert_eq!(poly3.l2_norm_squared(), 62);
+        assert_eq!(poly4.l2_norm_squared(), 0);
+    }
+
+    #[test]
+    fn test_linf_norm() {
+        let poly1 = generate_rq_from_zq_vector(vec![Zq::ONE, Zq::ZERO, Zq::new(5), Zq::NEG_ONE]);
+        let poly2 = generate_rq_from_zq_vector(vec![Zq::ZERO, Zq::ZERO, -Zq::new(5), Zq::ONE]);
+        let poly3 = generate_rq_from_zq_vector(vec![Zq::new(5), Zq::ONE, -Zq::new(6), Zq::ZERO]);
+        let poly4 = Rq::zero();
+
+        assert_eq!(poly1.linf_norm(), 5);
+        assert_eq!(poly2.linf_norm(), 5);
+        assert_eq!(poly3.linf_norm(), 6);
+        assert_eq!(poly4.linf_norm(), 0);
     }
 }
 
@@ -277,7 +288,7 @@ pub mod tests {
         Rq::new(temp)
     }
 
-    mod helper {
+    pub mod helper {
         use super::*;
         pub fn padded(prefix: &[Zq]) -> [Zq; Rq::DEGREE] {
             assert!(
@@ -476,11 +487,54 @@ pub mod tests {
     }
 
     #[test]
+    fn test_conjugate_automorphism() {
+        use crate::core::inner_product::compute_linear_combination;
+
+        let poly1 = helper::rq_from(&[Zq::ONE, Zq::TWO, Zq::new(3)]);
+        let poly2 = helper::rq_from(&[Zq::new(4), Zq::new(5), Zq::new(6)]);
+        let inner_12 =
+            compute_linear_combination(poly1.get_coefficients(), poly2.get_coefficients());
+        let conjugated_1 = poly1.conjugate_automorphism();
+        let inner_conjugated_12 = &conjugated_1 * &poly2;
+
+        assert_eq!(inner_conjugated_12.coeffs.len(), Rq::DEGREE);
+        assert_eq!(inner_conjugated_12.get_coefficients()[0], Zq::new(32));
+        assert_eq!(inner_conjugated_12.get_coefficients()[1], Zq::new(17));
+        assert_eq!(inner_conjugated_12.get_coefficients()[2], Zq::new(6));
+
+        // ct<\sigma_{-1}(poly1), poly2> ?= <poly1, poly2>
+        let ct_inner_conjugated_12 = inner_conjugated_12.get_coefficients()[0];
+        assert_eq!(ct_inner_conjugated_12, inner_12);
+    }
+}
+
+#[cfg(test)]
+mod decomposition_tests {
+    use crate::ring::rq::tests::{generate_rq_from_zq_vector, helper};
+
+    use super::*;
+
+    #[test]
+    fn failure_test() {
+        let poly1 =
+            generate_rq_from_zq_vector(vec![-Zq::new(192), -Zq::new(0), -Zq::new(0), -Zq::new(0)]);
+        let decomposed = poly1.decompose(Zq::new(1802), 10);
+
+        let mut result = Rq::zero();
+        let mut exponential_base = Zq::new(1);
+        for elem in decomposed {
+            result = &result + &(&elem * &exponential_base);
+            exponential_base *= Zq::new(24);
+        }
+        assert_eq!(result, poly1);
+    }
+
+    #[test]
     fn test_base2_decomposition() {
         // Test case 1: Base 2 decomposition
         let poly: Rq =
             generate_rq_from_zq_vector(vec![Zq::new(5), Zq::new(3), Zq::new(7), Zq::new(1)]);
-        let parts = poly.decompose(Zq::TWO, 2);
+        let parts = poly.decompose(Zq::TWO, 4);
 
         // Part 0: remainders mod 2 (no centering needed for base 2)
         assert_eq!(
@@ -496,59 +550,28 @@ pub mod tests {
         // Part 1: quotients after division by 2
         assert_eq!(
             parts[1].coeffs,
+            helper::padded(&[Zq::ZERO, Zq::ONE, Zq::ONE, Zq::ZERO,])
+        );
+
+        // Part 2
+        assert_eq!(
+            parts[2].coeffs,
             helper::padded(&[
-                Zq::new(2), // 5 div 2 = 2
-                Zq::ONE,    // 3 div 2 = 1
-                Zq::new(3), // 7 div 2 = 3
-                Zq::ZERO,   // 1 div 2 = 0
+                Zq::ONE,  // 5 div 2 = 2
+                Zq::ZERO, // 3 div 2 = 1
+                Zq::ONE,  // 7 div 2 = 3
+                Zq::ZERO, // 1 div 2 = 0
             ])
         );
 
         // Verify Base 2 reconstruction coefficient by coefficient
-        for i in 0..4 {
-            let expected = poly.coeffs[i];
-            let actual = parts[0].coeffs[i] + parts[1].coeffs[i] * Zq::TWO;
-            assert_eq!(actual, expected, "Base 2: Coefficient {} mismatch", i);
+        let mut result = Rq::zero();
+        let mut expo_base = Zq::ONE;
+        for part in parts {
+            result = &result + &(&part * &expo_base);
+            expo_base *= Zq::TWO;
         }
-    }
-
-    #[test]
-    fn test_base3_decomposition() {
-        // Test case: Base 3 decomposition with centering
-        let specific_poly: Rq =
-            generate_rq_from_zq_vector(vec![Zq::new(8), Zq::new(11), Zq::new(4), Zq::new(15)]);
-        let parts = specific_poly.decompose(Zq::new(3), 2);
-
-        // Part 0: centered remainders mod 3
-        assert_eq!(
-            parts[0].coeffs,
-            helper::padded(&[
-                Zq::NEG_ONE, // 8 mod 3 = 2 -> -1 (centered)
-                Zq::NEG_ONE, // 11 mod 3 = 2 -> -1 (centered)
-                Zq::ONE,     // 4 mod 3 = 1 -> 1 (centered)
-                Zq::ZERO,    // 15 mod 3 = 0 -> 0 (centered)
-            ])
-        );
-
-        // Part 1: quotients
-        assert_eq!(
-            parts[1].coeffs,
-            helper::padded(&[
-                Zq::new(3), // (8 + 1) div 3 = 3
-                Zq::new(4), // (11 + 1) div 3 = 4
-                Zq::ONE,    // 4 div 3 = 1
-                Zq::new(5), // 15 div 3 = 5
-            ])
-        );
-
-        // Verify Base 3 reconstruction coefficient by coefficient
-        for i in 0..4 {
-            let expected = specific_poly.coeffs[i];
-            let p0 = parts[0].coeffs[i];
-            let p1 = parts[1].coeffs[i];
-            let actual = p0 + p1 * Zq::new(3);
-            assert_eq!(actual, expected, "Base 3: Coefficient {} mismatch", i);
-        }
+        assert_eq!(poly, result);
     }
 
     #[test]
@@ -569,225 +592,164 @@ pub mod tests {
             generate_rq_from_zq_vector(vec![Zq::ONE, Zq::new(2), Zq::new(3), Zq::new(4)]);
         let parts = simple_poly.decompose(Zq::TWO, 1);
         assert_eq!(parts.len(), 1, "Single part decomposition length incorrect");
-        assert_eq!(
-            parts[0], simple_poly,
-            "Single part decomposition value incorrect"
-        );
     }
 
     #[test]
-    fn test_large_base_decomposition() {
-        // Test decomposition with larger bases (8 and 16)
-        let poly: Rq =
-            generate_rq_from_zq_vector(vec![Zq::new(120), Zq::new(33), Zq::new(255), Zq::new(19)]);
-
-        // Base 8 decomposition
-        let parts_base8 = poly.decompose(Zq::new(8), 2);
-
-        // Part 0: centered remainders mod 8
-        assert_eq!(
-            parts_base8[0].coeffs,
-            helper::padded(&[
-                Zq::ZERO,    // 120 mod 8 = 0 -> 0 (centered)
-                Zq::ONE,     // 33 mod 8 = 1 -> 1 (centered)
-                Zq::NEG_ONE, // 255 mod 8 = 7 -> -1 (centered)
-                Zq::new(3),  // 19 mod 8 = 3 -> 3 (centered)
-            ])
-        );
-
-        // Part 1: quotients
-        assert_eq!(
-            parts_base8[1].coeffs,
-            helper::padded(&[
-                Zq::new(15), // 120 div 8 = 15
-                Zq::new(4),  // 33 div 8 = 4
-                Zq::new(32), // (255 + 1) div 8 = 32
-                Zq::new(2),  // 19 div 8 = 2
-            ])
-        );
-
-        // Verify reconstruction coefficient by coefficient
-        for i in 0..4 {
-            let expected = poly.coeffs[i];
-            let p0 = parts_base8[0].coeffs[i];
-            let p1 = parts_base8[1].coeffs[i];
-            let actual = p0 + p1 * Zq::new(8);
-            assert_eq!(actual, expected, "Base 8: Coefficient {} mismatch", i);
-        }
-
-        // Base 16 decomposition
-        let parts_base16 = poly.decompose(Zq::new(16), 2);
-
-        // Verify reconstruction for base 16
-        for i in 0..4 {
-            let expected = poly.coeffs[i];
-            let p0 = parts_base16[0].coeffs[i];
-            let p1 = parts_base16[1].coeffs[i];
-            let actual = p0 + p1 * Zq::new(16);
-            assert_eq!(actual, expected, "Base 16: Coefficient {} mismatch", i);
-        }
-    }
-
-    #[test]
-    fn test_multi_part_decomposition() {
-        // Test with more than 2 parts
-        let poly: Rq = generate_rq_from_zq_vector(vec![
-            Zq::new(123),
-            Zq::new(456),
-            Zq::new(789),
-            Zq::new(101112),
-        ]);
-
-        // Decompose into 3 parts with base 4
-        let parts = poly.decompose(Zq::new(4), 3);
-        assert_eq!(parts.len(), 3, "Should have 3 parts");
-
-        // Test reconstruction with all 3 parts
-        let reconstructed =
-            &(&parts[0] + &(&(&parts[1] * &Zq::new(4)) + &(&parts[2] * &Zq::new(16)))); // 4²
-
-        // Verify reconstruction coefficient by coefficient
-        for i in 0..4 {
-            assert_eq!(
-                reconstructed.coeffs[i], poly.coeffs[i],
-                "3-part base 4: Coefficient {} mismatch",
-                i
-            );
-        }
-    }
-
-    #[test]
-    fn test_centering_properties() {
-        // Test that centering works correctly for various values
-        // Using base 5 which has half_base = 2
-        let values = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-        let poly: Rq =
-            generate_rq_from_zq_vector(values.iter().map(|&v| Zq::new(v)).collect::<Vec<Zq>>());
-
-        let parts = poly.decompose(Zq::new(5), 2);
-
-        // Expected centered values for each coefficient:
-        // 0 mod 5 = 0 -> 0
-        // 1 mod 5 = 1 -> 1
-        // 2 mod 5 = 2 -> 2 (at threshold)
-        // 3 mod 5 = 3 -> -2 (centered)
-        // 4 mod 5 = 4 -> -1 (centered)
-        // 5 mod 5 = 0 -> 0
-        // ... and so on
-        let expected_centered = [
-            Zq::ZERO,    // 0 centered
-            Zq::ONE,     // 1 centered
-            Zq::new(2),  // 2 centered (at threshold)
-            -Zq::new(2), // 3 centered to -2
-            -Zq::ONE,    // 4 centered to -1
-            Zq::ZERO,    // 5 centered
-            Zq::ONE,     // 6 centered
-            Zq::new(2),  // 7 centered
-            -Zq::new(2), // 8 centered to -2
-            -Zq::ONE,    // 9 centered to -1
-            Zq::ZERO,    // 10 centered
-        ];
-
-        for (i, &expected) in expected_centered.iter().enumerate() {
-            assert_eq!(
-                parts[0].coeffs[i], expected,
-                "Base 5 centering: Coefficient {} incorrectly centered",
-                i
-            );
-        }
-    }
-
-    #[test]
-    fn test_extreme_values() {
-        // Test with values near the extremes of the Zq range
-        let poly: Rq = generate_rq_from_zq_vector(vec![Zq::ZERO, Zq::NEG_ONE, -Zq::ONE]);
-
-        // Decompose with base 3
-        let parts = poly.decompose(Zq::new(3), 2);
+    fn test_decomposition_real_values() {
+        let poly1 = Rq {
+            coeffs: [
+                Zq::new(23071),
+                Zq::new(4294941461),
+                Zq::new(4084),
+                Zq::new(23413),
+                Zq::new(26902),
+                Zq::new(4294960817),
+                Zq::new(4294957829),
+                Zq::new(18248),
+                Zq::new(15293),
+                Zq::new(45978),
+                Zq::new(27197),
+                Zq::new(11233),
+                Zq::new(4294962536),
+                Zq::new(1196),
+                Zq::new(17083),
+                Zq::new(4294960822),
+                Zq::new(4294967103),
+                Zq::new(4294949429),
+                Zq::new(2926),
+                Zq::new(2742),
+                Zq::new(27552),
+                Zq::new(4294955871),
+                Zq::new(2917),
+                Zq::new(4294938904),
+                Zq::new(2288),
+                Zq::new(4294948781),
+                Zq::new(4294966588),
+                Zq::new(4294951307),
+                Zq::new(4294961210),
+                Zq::new(19355),
+                Zq::new(4294956913),
+                Zq::new(14940),
+                Zq::new(4294934068),
+                Zq::new(4294961161),
+                Zq::new(4294959017),
+                Zq::new(3339),
+                Zq::new(4294932967),
+                Zq::new(4294938251),
+                Zq::new(4294943006),
+                Zq::new(4294965167),
+                Zq::new(4294960800),
+                Zq::new(4161),
+                Zq::new(9213),
+                Zq::new(4294962556),
+                Zq::new(14299),
+                Zq::new(44418),
+                Zq::new(2438),
+                Zq::new(6583),
+                Zq::new(4294957783),
+                Zq::new(16),
+                Zq::new(4294941724),
+                Zq::new(4294966309),
+                Zq::new(4294966984),
+                Zq::new(4294956138),
+                Zq::new(1779),
+                Zq::new(29598),
+                Zq::new(16393),
+                Zq::new(728),
+                Zq::new(4294944371),
+                Zq::new(4294951792),
+                Zq::new(4294943824),
+                Zq::new(4294937618),
+                Zq::new(4294955208),
+                Zq::new(11235),
+            ],
+        };
+        let base = Zq::new(1802);
+        let decomposed = poly1.decompose(base, 2);
 
         // Verify reconstruction
-        let reconstructed = &parts[0] + &(&parts[1] * &Zq::new(3));
+        let reconstructed = &decomposed[0] + &(&decomposed[1] * &base);
 
-        for i in 0..3 {
-            assert_eq!(
-                reconstructed.coeffs[i], poly.coeffs[i],
-                "Extreme values: Coefficient {} mismatch",
-                i
-            );
-        }
-
-        // Corrected test for high value divisibility
-        // u32::MAX = 4294967295, which equals 1431655765 * 3 + 0
-        // So u32::MAX mod 3 = 0, which remains 0 (no centering needed)
-        assert_eq!(parts[0].coeffs[1], -Zq::new(1)); // Remainder after division by 3
-        assert_eq!(parts[1].coeffs[1], Zq::ZERO); // Quotient
-
-        // Check u32::MAX - 1 as well
-        // 4294967294 mod 3 = 1, which remains 1 (no centering needed since 1 <= half_base)
-        assert_eq!(parts[0].coeffs[2], Zq::NEG_ONE); // u32::MAX - 1 is the third coefficient
-        assert_eq!(parts[1].coeffs[2], Zq::ZERO); // Should be same quotient
+        assert_eq!(decomposed.len(), 2);
+        assert_eq!(reconstructed, poly1, "Base {}: Reconstruction failed", base);
     }
 
     #[test]
-    fn test_decomposition_properties() {
-        // Test the algebraic property that all coefficients in first part should be small
-        let poly: Rq = generate_rq_from_zq_vector(vec![
-            Zq::new(100),
-            Zq::new(200),
-            Zq::new(300),
-            Zq::new(400),
-            Zq::new(500),
-            Zq::new(600),
-            Zq::new(700),
-            Zq::new(800),
-        ]);
+    fn test_linf_norm() {
+        let poly1 = Rq {
+            coeffs: [
+                Zq::new(23071),
+                Zq::new(4294941461),
+                Zq::new(4084),
+                Zq::new(23413),
+                Zq::new(26902),
+                Zq::new(4294960817),
+                Zq::new(4294957829),
+                Zq::new(18248),
+                Zq::new(15293),
+                Zq::new(45978),
+                Zq::new(27197),
+                Zq::new(11233),
+                Zq::new(4294962536),
+                Zq::new(1196),
+                Zq::new(17083),
+                Zq::new(4294960822),
+                Zq::new(4294967103),
+                Zq::new(4294949429),
+                Zq::new(2926),
+                Zq::new(2742),
+                Zq::new(27552),
+                Zq::new(4294955871),
+                Zq::new(2917),
+                Zq::new(4294938904),
+                Zq::new(2288),
+                Zq::new(4294948781),
+                Zq::new(4294966588),
+                Zq::new(4294951307),
+                Zq::new(4294961210),
+                Zq::new(19355),
+                Zq::new(4294956913),
+                Zq::new(14940),
+                Zq::new(4294934068),
+                Zq::new(4294961161),
+                Zq::new(4294959017),
+                Zq::new(3339),
+                Zq::new(4294932967),
+                Zq::new(4294938251),
+                Zq::new(4294943006),
+                Zq::new(4294965167),
+                Zq::new(4294960800),
+                Zq::new(4161),
+                Zq::new(9213),
+                Zq::new(4294962556),
+                Zq::new(14299),
+                Zq::new(44418),
+                Zq::new(2438),
+                Zq::new(6583),
+                Zq::new(4294957783),
+                Zq::new(16),
+                Zq::new(4294941724),
+                Zq::new(4294966309),
+                Zq::new(4294966984),
+                Zq::new(4294956138),
+                Zq::new(1779),
+                Zq::new(29598),
+                Zq::new(16393),
+                Zq::new(728),
+                Zq::new(4294944371),
+                Zq::new(4294951792),
+                Zq::new(4294943824),
+                Zq::new(4294937618),
+                Zq::new(4294955208),
+                Zq::new(11235),
+            ],
+        };
+        let base = Zq::new(1802);
+        let decomposed = poly1.decompose(base, 2);
 
-        for base in [2, 3, 4, 5, 8, 10, 16].iter() {
-            let parts = poly.decompose(Zq::new(*base), 2);
-            let half_base = Zq::new(*base).scale_by(Zq::TWO);
-
-            // Check that all coefficients in first part are properly "small"
-            for coeff in parts[0].coeffs.iter() {
-                // In centered representation, all coefficients should be <= half_base
-                let abs_coeff = if *coeff > Zq::new(u32::MAX / 2) {
-                    Zq::ZERO - *coeff // Handle negative values (represented as large positive ones)
-                } else {
-                    *coeff
-                };
-
-                assert!(
-                    abs_coeff <= half_base,
-                    "Base {}: First part coefficient {} exceeds half-base {}",
-                    base,
-                    coeff,
-                    half_base
-                );
-            }
-
-            // Verify reconstruction
-            let reconstructed = &parts[0] + &(&parts[1] * &Zq::new(*base));
-            assert_eq!(reconstructed, poly, "Base {}: Reconstruction failed", base);
+        // Verify reconstruction
+        for decomposed_poly in decomposed {
+            assert!(decomposed_poly.linf_norm() <= 901)
         }
-    }
-
-    #[test]
-    fn test_conjugate_automorphism() {
-        use crate::core::inner_product::compute_linear_combination;
-
-        let poly1 = helper::rq_from(&[Zq::ONE, Zq::TWO, Zq::new(3)]);
-        let poly2 = helper::rq_from(&[Zq::new(4), Zq::new(5), Zq::new(6)]);
-        let inner_12 =
-            compute_linear_combination(poly1.get_coefficients(), poly2.get_coefficients());
-        let conjugated_1 = poly1.conjugate_automorphism();
-        let inner_conjugated_12 = &conjugated_1 * &poly2;
-
-        assert_eq!(inner_conjugated_12.coeffs.len(), Rq::DEGREE);
-        assert_eq!(inner_conjugated_12.get_coefficients()[0], Zq::new(32));
-        assert_eq!(inner_conjugated_12.get_coefficients()[1], Zq::new(17));
-        assert_eq!(inner_conjugated_12.get_coefficients()[2], Zq::new(6));
-
-        // ct<\sigma_{-1}(poly1), poly2> ?= <poly1, poly2>
-        let ct_inner_conjugated_12 = inner_conjugated_12.get_coefficients()[0];
-        assert_eq!(ct_inner_conjugated_12, inner_12);
     }
 }

@@ -24,7 +24,7 @@ impl Witness {
 
     fn validate_l2_norm(candidate: &[RqVector], bound: Zq) -> bool {
         for witness in candidate {
-            if witness.l2_norm_squared() > bound * bound {
+            if witness.l2_norm_squared() > bound.to_u128() * bound.to_u128() {
                 return false;
             }
         }
@@ -47,7 +47,7 @@ mod tests {
         assert_eq!(witness_vector.s[0].get_length(), 40);
         for witness in witness_vector.s.iter() {
             let l2_norm = witness.l2_norm_squared();
-            assert!(l2_norm < bound * bound)
+            assert!(l2_norm < bound.to_u128() * bound.to_u128())
         }
     }
 

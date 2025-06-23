@@ -71,11 +71,40 @@ impl RqVector {
         concatenated_coeffs
     }
 
+    /// Decomposes a polynomial into base-B representation:
+    /// p = p⁽⁰⁾ + p⁽¹⁾·B + p⁽²⁾·B² + ... + p⁽ᵗ⁻¹⁾·B^(t-1)
+    /// Where each p⁽ⁱ⁾ has small coefficients, using centered representatives
+    // pub fn decompose(&self, base: Zq, num_parts: usize) -> Vec<Rq> {
+    //     debug_assert!(num_parts > 0, "num_parts must be positive");
+    //     let mut parts = Vec::with_capacity(num_parts);
+    //     let mut initial_coeffs = *self.get_coefficients();
+    //     for _ in 0..num_parts - 1 {
+    //         // Extract low part (mod base, centered around 0)
+    //         let mut low_coeffs = [Zq::ZERO; Self::DEGREE];
+    //         for (low_c, coeff) in low_coeffs.iter_mut().zip(initial_coeffs.iter_mut()) {
+    //             let centered = coeff.centered_mod(base);
+    //             *low_c = centered;
+    //             *coeff = (*coeff - centered).scale_by(base);
+    //         }
+    //         parts.push(Self::new(low_coeffs));
+    //     }
+    //     parts.push(Self::new(initial_coeffs));
+    //     parts
+    // }
     pub fn decompose(&self, b: Zq, parts: usize) -> Vec<RqVector> {
+        let mut result = vec![RqVector::zero(self.elements.len()); parts];
         self.get_elements()
             .iter()
-            .map(|i| RqVector::new(Rq::decompose(i, b, parts)))
-            .collect()
+            .enumerate()
+            .for_each(|(index, poly)| {
+                poly.decompose(b, parts)
+                    .into_iter()
+                    .zip(result.iter_mut())
+                    .for_each(|(decomposed_poly, decomposed_vec)| {
+                        decomposed_vec.set(index, decomposed_poly)
+                    });
+            });
+        result
     }
 }
 
@@ -133,7 +162,7 @@ impl Mul<Zq> for &RqVector {
 }
 
 impl Norms for RqVector {
-    type NormType = Zq;
+    type NormType = u128;
 
     // Compute the squared norm of a vector of polynomials
     fn l2_norm_squared(&self) -> Self::NormType {
@@ -141,6 +170,14 @@ impl Norms for RqVector {
             .iter()
             .map(|poly| poly.l2_norm_squared())
             .sum()
+    }
+
+    fn linf_norm(&self) -> Self::NormType {
+        self.elements
+            .iter()
+            .map(|poly| poly.linf_norm())
+            .max()
+            .unwrap()
     }
 }
 
@@ -151,7 +188,7 @@ mod norm_tests {
 
     // Test the square of the norm
     #[test]
-    fn test_norm() {
+    fn test_l2_norm() {
         let poly1 = generate_rq_from_zq_vector(vec![
             Zq::ONE,
             Zq::ZERO,
@@ -166,7 +203,26 @@ mod norm_tests {
         );
 
         let zero_vec: RqVector = RqVector::zero(4);
-        assert_eq!(zero_vec.l2_norm_squared(), Zq::ZERO);
+        assert_eq!(zero_vec.l2_norm_squared(), 0);
+    }
+
+    #[test]
+    fn test_linf_norm() {
+        let poly1 = generate_rq_from_zq_vector(vec![
+            Zq::ONE,
+            Zq::new(500),
+            Zq::new(5),
+            Zq::NEG_ONE - Zq::new(1000),
+        ]);
+        let poly2 =
+            generate_rq_from_zq_vector(vec![Zq::new(5), Zq::new(5), Zq::new(5000), Zq::new(5)]);
+        let poly_vec1: RqVector = vec![poly1.clone(), poly2.clone()].into();
+        assert_eq!(poly_vec1.linf_norm(), 5000);
+        let poly_vec2: RqVector = vec![poly2.clone(), poly1.clone()].into();
+        assert_eq!(poly_vec2.linf_norm(), 5000);
+
+        let zero_vec: RqVector = RqVector::zero(4);
+        assert_eq!(zero_vec.linf_norm(), 0);
     }
 }
 
@@ -264,5 +320,60 @@ mod tests {
             Zq::new(2),
         ]);
         assert_eq!(result_2, poly_exp_2);
+    }
+}
+
+#[cfg(test)]
+mod test_decompositions {
+
+    use rand::rng;
+
+    use super::*;
+
+    fn default_base_and_parts() -> (Zq, usize) {
+        let base = Zq::new(2u32.pow(16));
+        let parts = 3; // 32 / 16 + (additional parts)
+        (base, parts)
+    }
+
+    #[test]
+    fn test_decomposition_number_of_parts() {
+        let rq_vector = RqVector::random(&mut rng(), 10);
+        let (base, parts) = default_base_and_parts();
+        let decomposed = rq_vector.decompose(base, parts);
+        assert_eq!(decomposed.len(), parts);
+    }
+
+    #[test]
+    fn test_decompositions_linf_norm() {
+        let rq_vector = RqVector::random(&mut rng(), 10);
+        let (base, parts) = default_base_and_parts();
+        let decomposed_vector = rq_vector.decompose(base, parts);
+
+        for decomposition in decomposed_vector {
+            assert!(
+                decomposition.linf_norm() <= base.scale_by(Zq::TWO).to_u128(),
+                "decomposition.linf_norm(): {} and base.scale_by(Zq::TWO): {}",
+                decomposition.linf_norm(),
+                base.scale_by(Zq::TWO)
+            );
+        }
+    }
+
+    #[test]
+    fn test_decompositions_computation_is_correct() {
+        let rq_vector = RqVector::random(&mut rng(), 10);
+        let (base, parts) = default_base_and_parts();
+        let decomposed_vector = rq_vector.decompose(base, parts);
+
+        let mut combined_vector = RqVector::zero(10);
+
+        let mut exponential_base = Zq::new(1);
+        for element in decomposed_vector {
+            combined_vector = &combined_vector + &(&element * exponential_base);
+            exponential_base *= base;
+        }
+
+        assert_eq!(combined_vector, rq_vector);
     }
 }

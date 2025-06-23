@@ -4,8 +4,8 @@ use crate::ring::zq::Zq;
 use crate::ring::{self, Norms};
 
 // LaBRADOR: Compact Proofs for R1CS from Module-SIS | Page 5 | Proving smallness section
-const UPPER_BOUND_FACTOR: Zq = Zq::new(128);
-const LOWER_BOUND_FACTOR: Zq = Zq::new(30);
+const UPPER_BOUND_FACTOR: u128 = 128;
+const LOWER_BOUND_FACTOR: u128 = 30;
 
 pub struct Projection {
     random_linear_map_vector: Vec<RqMatrix>,
@@ -72,12 +72,12 @@ impl Projection {
     }
 
     // Function to verify upper bound of projection
-    pub fn verify_projection_upper_bound(projection: &[Zq], beta_squared: Zq) -> bool {
-        projection.l2_norm_squared() < (UPPER_BOUND_FACTOR * beta_squared)
+    pub fn verify_projection_upper_bound(projection: &[Zq], beta_squared: u128) -> bool {
+        projection.l2_norm_squared() <= (UPPER_BOUND_FACTOR * beta_squared)
     }
 
     // Function to verify lower bound of projection
-    pub fn verify_projection_lower_bound(projection: &[Zq], beta_squared: Zq) -> bool {
+    pub fn verify_projection_lower_bound(projection: &[Zq], beta_squared: u128) -> bool {
         projection.l2_norm_squared() > (LOWER_BOUND_FACTOR * beta_squared)
     }
 }
@@ -107,10 +107,12 @@ mod tests {
             let projections =
                 transcript.generate_projections(security_parameter, rank, multiplicity);
 
-            let witness = RqVector::random(&mut rand::rng(), rank);
-            let result = projections.compute_projection(0, &witness);
-
-            let beta = witness.l2_norm_squared();
+            let witness_vector = Witness::new(rank, multiplicity, Zq::new(6400)).s;
+            let result = projections.compute_projection(0, &witness_vector[0]);
+            let beta = witness_vector[0].l2_norm_squared();
+            // dbg!(&result);
+            dbg!(result.l2_norm_squared());
+            dbg!(UPPER_BOUND_FACTOR * beta);
             // Check if the norm of the projection is smaller than 128 * (squared norm of the projection of the random polynomial)
             let test: bool = Projection::verify_projection_upper_bound(&result, beta);
             if test {
@@ -140,7 +142,7 @@ mod tests {
 
         // let witness = RqVector::random_ternary(&mut rand::rng(), rank);
         let witness = Witness::new(rank, multiplicity, Zq::new(6400)).s;
-        let witness_norm = (128 * witness[0].l2_norm_squared().to_u128()) as f64;
+        let witness_norm = (128 * witness[0].l2_norm_squared() as u128) as f64;
 
         let mut norm_sum = 0u128;
         // Run the test multiple times to simulate the probability
@@ -151,7 +153,7 @@ mod tests {
             let projections =
                 transcript.generate_projections(security_parameter, rank, multiplicity);
             let result = projections.compute_projection(0, &witness[0]);
-            norm_sum += result.l2_norm_squared().to_u128();
+            norm_sum += result.l2_norm_squared() as u128;
         }
 
         // Calculate the observed probability

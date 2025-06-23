@@ -9,7 +9,7 @@ use crate::ring::Norms;
 /// Uses native u32 operations with automatic modulo reduction through wrapping arithmetic.
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Default)]
 pub struct Zq {
-    /// Stored value is always in [0, q-1] due to u32's wrapping behavior
+    /// Value of the ring Z/qZ. value \in [0, q-1]
     value: u32,
 }
 
@@ -40,6 +40,11 @@ impl Zq {
         self.value == 0
     }
 
+    #[allow(clippy::as_conversions)]
+    pub fn is_small_negative(&self) -> bool {
+        self.value > ((Self::Q - 1) / 2) as u32
+    }
+
     pub fn get_value(&self) -> u32 {
         self.value
     }
@@ -50,19 +55,54 @@ impl Zq {
     /// # Panics
     ///
     /// Panics if `bound` is zero.
-    pub(crate) fn centered_mod(&self, bound: Self) -> Self {
-        assert!(
-            bound != Zq::ZERO,
-            "cannot get centered representative modulo for zero bound"
-        );
-        let bounded_coeff = Self::new(self.value % bound.value);
-        let half_bound = bound.scale_by(Self::TWO);
+    #[allow(clippy::as_conversions)]
+    pub(crate) fn centered_mod(&self) -> i128 {
+        let bound = Zq::Q as i128;
+        let value = self.value as i128;
 
-        if bounded_coeff > half_bound {
-            bounded_coeff - bound
+        if value > (bound - 1) / 2 {
+            value - bound
         } else {
-            bounded_coeff
+            value
         }
+    }
+
+    /// Returns the centered representative modulo the given bound
+    /// Result is guaranteed to be in [-bound/2, bound/2]
+    ///
+    /// # Panics
+    ///
+    /// Panics if `bound` is zero.
+    pub(crate) fn decompose(&self, bound: Self, num_parts: usize) -> Vec<Zq> {
+        debug_assert!(bound >= Zq::TWO,);
+        debug_assert!(num_parts != 0);
+
+        let mut parts = vec![Zq::ZERO; num_parts];
+
+        let half_bound = bound.scale_by(Zq::TWO);
+        let mut abs_self = match self.is_small_negative() {
+            true => -(*self),
+            false => *self,
+        };
+
+        for part in parts.iter_mut() {
+            let mut remainder = Zq::new(abs_self.value % bound.value);
+            if remainder > half_bound {
+                remainder -= bound;
+            }
+            *part = remainder;
+
+            *part = match self.is_small_negative() {
+                true => -*part,
+                false => *part,
+            };
+
+            abs_self = Zq::new((abs_self - remainder).value / bound.value);
+            if abs_self == Zq::ZERO {
+                break;
+            }
+        }
+        parts
     }
 
     /// Scales by other Zq.
@@ -209,16 +249,23 @@ pub fn add_assign_two_zq_vectors(first: &mut [Zq], second: Vec<Zq>) {
 }
 
 impl Norms for [Zq] {
-    type NormType = Zq;
+    type NormType = u128;
 
     #[allow(clippy::as_conversions)]
     fn l2_norm_squared(&self) -> Self::NormType {
         self.iter()
-            .map(|coeff| {
-                coeff.centered_mod(Zq::new(Zq::Q as u32))
-                    * coeff.centered_mod(Zq::new(Zq::Q as u32))
-            })
+            .map(|coeff| (coeff.centered_mod() * coeff.centered_mod()) as u128)
             .sum()
+    }
+
+    #[allow(clippy::as_conversions)]
+    fn linf_norm(&self) -> Self::NormType {
+        let result = self
+            .iter()
+            .map(|coeff| coeff.centered_mod().abs())
+            .max()
+            .unwrap();
+        result as u128
     }
 }
 
@@ -239,7 +286,7 @@ mod norm_tests {
         ];
         let res = zq_vector.l2_norm_squared();
 
-        assert_eq!(res, Zq::new(140));
+        assert_eq!(res, 140);
     }
 
     #[test]
@@ -255,7 +302,47 @@ mod norm_tests {
         ];
         let res = zq_vector.l2_norm_squared();
 
-        assert_eq!(res, Zq::new(140));
+        assert_eq!(res, 140);
+    }
+
+    #[test]
+    fn test_linf_norm() {
+        let zq_vector = [
+            Zq::new(1),
+            Zq::new(200),
+            Zq::new(300),
+            Zq::new(40),
+            -Zq::new(5),
+            -Zq::new(6),
+            -Zq::new(700000),
+        ];
+        let res = zq_vector.linf_norm();
+        assert_eq!(res, 700000);
+
+        let zq_vector = [
+            Zq::new(1000000),
+            Zq::new(200),
+            Zq::new(300),
+            Zq::new(40),
+            -Zq::new(5),
+            -Zq::new(6),
+            -Zq::new(999999),
+        ];
+        let res = zq_vector.linf_norm();
+        assert_eq!(res, 1000000);
+
+        let zq_vector = [
+            Zq::new(1),
+            Zq::new(2),
+            Zq::new(3),
+            -Zq::new(4),
+            Zq::new(0),
+            -Zq::new(3),
+            -Zq::new(2),
+            -Zq::new(1),
+        ];
+        let res = zq_vector.linf_norm();
+        assert_eq!(res, 4);
     }
 }
 
@@ -415,5 +502,101 @@ mod tests {
 
         assert_eq!(neg_a + a, Zq::ZERO);
         assert_eq!(neg_b, Zq::ZERO);
+    }
+
+    #[test]
+    fn test_centered_mod() {
+        let a = -Zq::new(1);
+        assert_eq!(-1, a.centered_mod());
+
+        let a = Zq::new(4294967103);
+        assert_eq!(a, -Zq::new(192));
+        assert_eq!(-192, a.centered_mod());
+    }
+}
+
+#[cfg(test)]
+mod test_decomposition {
+    use crate::ring::{zq::Zq, Norms};
+
+    #[test]
+    fn test_zq_decomposition() {
+        let (base, parts) = (Zq::new(12), 10);
+        let pos_zq = Zq::new(29);
+        let neg_zq = -Zq::new(29);
+
+        let pos_decomposed = pos_zq.decompose(base, parts);
+        let neg_decomposed = neg_zq.decompose(base, parts);
+
+        assert_eq!(
+            pos_decomposed,
+            vec![
+                Zq::new(5),
+                Zq::new(2),
+                Zq::ZERO,
+                Zq::ZERO,
+                Zq::ZERO,
+                Zq::ZERO,
+                Zq::ZERO,
+                Zq::ZERO,
+                Zq::ZERO,
+                Zq::ZERO
+            ]
+        );
+        assert_eq!(
+            neg_decomposed,
+            vec![
+                -Zq::new(5),
+                -Zq::new(2),
+                Zq::ZERO,
+                Zq::ZERO,
+                Zq::ZERO,
+                Zq::ZERO,
+                Zq::ZERO,
+                Zq::ZERO,
+                Zq::ZERO,
+                Zq::ZERO
+            ]
+        );
+    }
+
+    #[test]
+    fn test_zq_recompositoin() {
+        let (base, parts) = (Zq::new(1802), 10);
+        let pos_zq = -Zq::new(16200);
+
+        let pos_decomposed = pos_zq.decompose(base, parts);
+        let mut exponensial_base = Zq::new(1);
+        let mut result = Zq::new(0);
+        for decomposed_part in pos_decomposed {
+            result += decomposed_part * exponensial_base;
+            exponensial_base *= base;
+        }
+        assert_eq!(result, pos_zq)
+    }
+
+    #[test]
+    fn test_zq_recompositoin_positive() {
+        let (base, parts) = (Zq::new(1802), 10);
+        let pos_zq = Zq::new(23071);
+
+        let pos_decomposed = pos_zq.decompose(base, parts);
+        let mut exponensial_base = Zq::new(1);
+        let mut result = Zq::new(0);
+        for decomposed_part in pos_decomposed {
+            result += decomposed_part * exponensial_base;
+            exponensial_base *= base;
+        }
+        assert_eq!(result, pos_zq)
+    }
+
+    #[test]
+    fn test_linf_norm() {
+        let (base, parts) = (Zq::new(1802), 10);
+        let pos_zq = Zq::new(16200);
+
+        let pos_decomposed = pos_zq.decompose(base, parts);
+        dbg!(&pos_decomposed);
+        assert!(pos_decomposed.linf_norm() <= 901);
     }
 }

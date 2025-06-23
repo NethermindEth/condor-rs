@@ -120,11 +120,11 @@ impl<'a> LabradorVerifier<'a> {
             self.params.multiplicity,
         );
         transcript.absorb_vector_p(&proof.vector_p);
-        if proof.vector_p.l2_norm_squared().to_u128()
+        if proof.vector_p.l2_norm_squared()
             > 128 * self.params.beta.to_u128() * self.params.beta.to_u128()
         {
             return Err(VerifierError::NormSumExceeded {
-                norm: proof.vector_p.l2_norm_squared().to_u128(),
+                norm: proof.vector_p.l2_norm_squared(),
                 allowed: 128 * self.params.beta.to_u128() * self.params.beta.to_u128(),
                 step: String::from("vector p norm check"),
             });
@@ -138,6 +138,7 @@ impl<'a> LabradorVerifier<'a> {
     ///   b_{0}^{''(k)} \stackrel{?}{=} \sum_{l=1}^{L} \psi_{l}^{(k)}\,b_{0}^{'(l)}
     ///                    + \langle\,\vec\omega^{(k)},\vec p\rangle .
     /// \]
+    #[allow(clippy::type_complexity)]
     fn check_b_double_prime_constant<S: Sponge>(
         &self,
         proof: &LabradorTranscript<S>,
@@ -183,7 +184,7 @@ impl<'a> LabradorVerifier<'a> {
         proof: &LabradorTranscript<S>,
     ) -> Result<(), VerifierError> {
         // decompose z into z = z^(0) + z^(1) * b, only two parts.
-        let z_ij = RqVector::decompose(&proof.z, self.params.b, 2);
+        let z_ij = proof.z.decompose(self.params.b, 2);
         let t_ij: Vec<Vec<RqVector>> = proof
             .t
             .get_elements()
@@ -202,18 +203,16 @@ impl<'a> LabradorVerifier<'a> {
             .iter()
             .map(|i| RqVector::decompose(i, self.params.b, self.params.t_1))
             .collect();
-        let norm_z_ij = z_ij
-            .iter()
-            .fold(Zq::ZERO, |acc, p| acc + p.l2_norm_squared());
+        let norm_z_ij = z_ij.iter().fold(0, |acc, p| acc + p.l2_norm_squared());
         let norm_t_ij = Self::norm_squared(&t_ij);
         let norm_g_ij = Self::norm_squared(&g_ij);
         let norm_h_ij = Self::norm_squared(&h_ij);
         let norm_sum = norm_z_ij + norm_t_ij + norm_g_ij + norm_h_ij;
 
-        if norm_sum > self.params.beta * self.params.beta {
+        if norm_sum > self.params.beta_prime.to_u128() * self.params.beta_prime.to_u128() {
             return Err(VerifierError::NormSumExceeded {
-                norm: norm_sum.to_u128(),
-                allowed: (self.params.beta * self.params.beta).to_u128(),
+                norm: norm_sum,
+                allowed: self.params.beta_prime.to_u128() * self.params.beta_prime.to_u128(),
                 step: String::from("Step 14 in verification"),
             });
         }
@@ -396,11 +395,9 @@ impl<'a> LabradorVerifier<'a> {
             .fold(Rq::zero(), |acc, x| &acc + &x)
     }
 
-    fn norm_squared(polys: &[Vec<RqVector>]) -> Zq {
-        polys.iter().fold(Zq::ZERO, |acc, poly| {
-            acc + poly
-                .iter()
-                .fold(Zq::ZERO, |acc, p| acc + p.l2_norm_squared())
+    fn norm_squared(polys: &[Vec<RqVector>]) -> u128 {
+        polys.iter().fold(0, |acc, poly| {
+            acc + poly.iter().fold(0, |acc, p| acc + p.l2_norm_squared())
         })
     }
 
