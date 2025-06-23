@@ -1,23 +1,5 @@
-// This file is part of the polynomial ring operations module.
-//
-//
-// Currently implemented functions include:
-// - Polynomial addition:          +
-// - Polynomial multiplication:    *
-// - inner_product/ Dot product:   inner_product()
-// - Polynomial subtraction:       -
-// - Polynomial negation:          neg()
-// - Scalar multiplication:        scalar_mul()
-// - Polynomial evaluation:        eval()
-// - Zero check:                   is_zero()
-// - Polynomial equality check:    is_equal()
-// - Get the Coefficients:         get_coefficients()
-// - Random small norm vector:     random_small_vector()
-// - Squared norm of coefficients: compute_norm_squared()
-//
-// Further operations and optimizations will be added in future versions.
+//! Polynomial ring **R = Z_q[X]/(X^d + 1)** with `d = 64` and `q = u32::MAX`.
 
-// We use the Zq ring
 use crate::ring::zq::Zq;
 use crate::ring::Norms;
 use core::ops::{Add, Mul, Sub};
@@ -37,7 +19,7 @@ impl Rq {
     pub const DEGREE: usize = 64;
     /// Constructor for the polynomial ring
     pub const fn new(coeffs: [Zq; Self::DEGREE]) -> Self {
-        Rq { coeffs }
+        Self { coeffs }
     }
 
     /// Generate zero polynomial
@@ -52,11 +34,11 @@ impl Rq {
     }
 
     /// Get the coefficients as a vector
-    pub fn get_coefficients(&self) -> &[Zq; Self::DEGREE] {
+    pub fn coeffs(&self) -> &[Zq; Self::DEGREE] {
         &self.coeffs
     }
 
-    /// Generate random polynomial with a provided cryptographically secure RNG
+    /// Random coefficients in `(0, Zq::MAX)`.
     pub fn random<R: Rng + CryptoRng>(rng: &mut R) -> Self {
         let uniform = Uniform::new_inclusive(Zq::ZERO, Zq::NEG_ONE).unwrap();
         let mut coeffs = [Zq::ZERO; Self::DEGREE];
@@ -64,7 +46,7 @@ impl Rq {
         Self { coeffs }
     }
 
-    /// Generate random polynomial with a provided cryptographically secure RNG and given bound
+    /// Random coefficients in `(-bound, bound)`.
     pub fn random_with_bound<R: Rng + CryptoRng>(rng: &mut R, bound: u32) -> Self {
         let uniform = Uniform::new_inclusive(Zq::ZERO, Zq::new(bound)).unwrap();
         let mut coeffs = [Zq::ZERO; Self::DEGREE];
@@ -96,10 +78,9 @@ impl Rq {
     }
 
     /// Compute the conjugate automorphism \sigma_{-1} of vector based on B) Constraints..., Page 21.
+    /// σ_{-1}(a_0, a_1, …, a_{n-1}) = (a_0, −a_{n-1}, −a_{n-2}, …, −a_1)
     pub fn conjugate_automorphism(&self) -> Self {
-        let q_minus_1 = Zq::NEG_ONE;
-
-        let original_coefficients = self.get_coefficients();
+        let original_coefficients = self.coeffs();
 
         let mut conjugated_coeffs = [Zq::ZERO; Rq::DEGREE];
         conjugated_coeffs[0] = original_coefficients[0];
@@ -109,7 +90,7 @@ impl Rq {
             .skip(1)
             .zip(original_coefficients.iter().rev())
         {
-            *conj_coeff = original_coeff * q_minus_1;
+            *conj_coeff = original_coeff * Zq::NEG_ONE;
         }
 
         Self::new(conjugated_coeffs)
@@ -124,7 +105,7 @@ impl Rq {
     /// Both party will have access to the same PolyRings through transcript,
     #[allow(clippy::as_conversions)]
     pub fn operator_norm(&self) -> f64 {
-        let coeffs = self.get_coefficients();
+        let coeffs = self.coeffs();
         let n = coeffs.len();
         let mut planner = FftPlanner::new();
         let fft = planner.plan_fft_forward(n);
@@ -133,7 +114,7 @@ impl Rq {
         let mut buffer: Vec<Complex<f64>> = coeffs
             .iter()
             .map(|&x| {
-                let half = Zq::NEG_ONE.scale_by(Zq::TWO);
+                let half = Zq::NEG_ONE.div_floor_by(2);
                 let converted_value = if x > half {
                     x.to_u128() as f64 - Zq::NEG_ONE.to_u128() as f64 - 1.0
                 } else {
@@ -478,12 +459,12 @@ pub mod tests {
     fn test_get_coefficient() {
         let poly: Rq = generate_rq_from_zq_vector(vec![Zq::ONE, Zq::ZERO, Zq::new(5), Zq::NEG_ONE]);
         let vec = helper::padded(&[Zq::ONE, Zq::ZERO, Zq::new(5), Zq::NEG_ONE]).to_vec();
-        assert!(poly.get_coefficients().to_vec() == vec);
+        assert!(poly.coeffs().to_vec() == vec);
 
         let poly_zero: Rq =
             generate_rq_from_zq_vector(vec![Zq::ZERO, Zq::ZERO, Zq::ZERO, Zq::ZERO]);
         let vec_zero = helper::padded(&[Zq::ZERO, Zq::ZERO, Zq::ZERO, Zq::ZERO]).to_vec();
-        assert!(poly_zero.get_coefficients().to_vec() == vec_zero);
+        assert!(poly_zero.coeffs().to_vec() == vec_zero);
     }
 
     #[test]
@@ -492,18 +473,17 @@ pub mod tests {
 
         let poly1 = helper::rq_from(&[Zq::ONE, Zq::TWO, Zq::new(3)]);
         let poly2 = helper::rq_from(&[Zq::new(4), Zq::new(5), Zq::new(6)]);
-        let inner_12 =
-            compute_linear_combination(poly1.get_coefficients(), poly2.get_coefficients());
+        let inner_12 = compute_linear_combination(poly1.coeffs(), poly2.coeffs());
         let conjugated_1 = poly1.conjugate_automorphism();
         let inner_conjugated_12 = &conjugated_1 * &poly2;
 
         assert_eq!(inner_conjugated_12.coeffs.len(), Rq::DEGREE);
-        assert_eq!(inner_conjugated_12.get_coefficients()[0], Zq::new(32));
-        assert_eq!(inner_conjugated_12.get_coefficients()[1], Zq::new(17));
-        assert_eq!(inner_conjugated_12.get_coefficients()[2], Zq::new(6));
+        assert_eq!(inner_conjugated_12.coeffs()[0], Zq::new(32));
+        assert_eq!(inner_conjugated_12.coeffs()[1], Zq::new(17));
+        assert_eq!(inner_conjugated_12.coeffs()[2], Zq::new(6));
 
         // ct<\sigma_{-1}(poly1), poly2> ?= <poly1, poly2>
-        let ct_inner_conjugated_12 = inner_conjugated_12.get_coefficients()[0];
+        let ct_inner_conjugated_12 = inner_conjugated_12.coeffs()[0];
         assert_eq!(ct_inner_conjugated_12, inner_12);
     }
 }
@@ -583,7 +563,7 @@ mod decomposition_tests {
             // Check any polynomial is zero
             parts
                 .iter()
-                .all(|p| p.get_coefficients().iter().all(|&coeff| coeff == Zq::ZERO)),
+                .all(|p| p.coeffs().iter().all(|&coeff| coeff == Zq::ZERO)),
             "Zero polynomial decomposition failed"
         );
 

@@ -44,7 +44,7 @@ mod tests {
         let bound = Zq::new(320000);
         let witness_vector = Witness::new(40, 100, bound);
         assert_eq!(witness_vector.s.len(), 100);
-        assert_eq!(witness_vector.s[0].get_length(), 40);
+        assert_eq!(witness_vector.s[0].len(), 40);
         for witness in witness_vector.s.iter() {
             let l2_norm = witness.l2_norm_squared();
             assert!(l2_norm < bound.to_u128() * bound.to_u128())

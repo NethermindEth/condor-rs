@@ -24,7 +24,7 @@ impl Projection {
         let mut projection = vec![Zq::ZERO; 2 * self.security_level];
         let coefficients = witness.concatenate_coefficients();
         for (i, pi_ij) in self.random_linear_map_vector[index]
-            .get_elements()
+            .elements()
             .iter()
             .enumerate()
         {
@@ -57,11 +57,11 @@ impl Projection {
         self.random_linear_map_vector
             .iter()
             .map(|pi_i| {
-                pi_i.get_elements()
+                pi_i.elements()
                     .iter()
                     .map(|pi_ij| {
                         pi_ij
-                            .get_elements()
+                            .elements()
                             .iter()
                             .map(|polynomial| polynomial.conjugate_automorphism())
                             .collect()

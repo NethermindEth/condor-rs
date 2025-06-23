@@ -1,3 +1,5 @@
+//! Dynamic vector of `Rq` elements.
+
 use crate::ring::zq::Zq;
 use crate::ring::{rq::Rq, Norms};
 use core::ops::Mul;
@@ -15,16 +17,6 @@ impl RqVector {
         Self { elements }
     }
 
-    pub fn new_from_zq_vector(elements: Vec<Zq>) -> Self {
-        let mut result = Vec::new();
-        debug_assert!(elements.len() % Rq::DEGREE == 0);
-        elements.chunks_exact(Rq::DEGREE).for_each(|chunk| {
-            result.push(Rq::new(chunk.try_into().unwrap()));
-        });
-
-        RqVector { elements: result }
-    }
-
     /// Create a zero vector
     pub fn zero(length: usize) -> Self {
         Self {
@@ -36,21 +28,38 @@ impl RqVector {
         self.elements[index] = val;
     }
 
-    pub fn get_length(&self) -> usize {
+    pub fn len(&self) -> usize {
         self.elements.len()
     }
 
-    pub fn get_elements(&self) -> &Vec<Rq> {
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    pub fn elements(&self) -> &Vec<Rq> {
         &self.elements
     }
 
-    /// Create a random vector
+    pub fn from_zq_vector(elements: Vec<Zq>) -> Self {
+        assert!(
+            elements.len() % Rq::DEGREE == 0,
+            "slice length not multiple of DEGREE"
+        );
+        let mut result = Vec::new();
+        elements.chunks_exact(Rq::DEGREE).for_each(|chunk| {
+            result.push(Rq::new(chunk.try_into().unwrap()));
+        });
+        Self { elements: result }
+    }
+
+    /// Random vector of given length with coefficients in `(0, Zq::MAX)`.
     pub fn random<R: Rng + CryptoRng>(rng: &mut R, length: usize) -> Self {
         Self {
             elements: (0..length).map(|_| Rq::random(rng)).collect(),
         }
     }
 
+    /// Random vector of given length with coefficients in `(-bound, bound)`.
     pub fn random_with_bound<R: Rng + CryptoRng>(rng: &mut R, length: usize, bound: u32) -> Self {
         Self {
             elements: (0..length)
@@ -59,41 +68,21 @@ impl RqVector {
         }
     }
 
-    /// Function to concatenate coefficients from multiple Rq into a Vec<Zq>
+    /// Flatten the coefficients of every polynomial **in order**.
     pub fn concatenate_coefficients(&self) -> Vec<Zq> {
-        let total_coeffs = self.elements.len() * Rq::DEGREE;
-        let mut concatenated_coeffs: Vec<Zq> = Vec::with_capacity(total_coeffs);
+        let mut concatenated_coeffs = Vec::with_capacity(self.len() * Rq::DEGREE);
         // Iterate over each Rq, extracting the coefficients and concatenating them
-        for rq in &self.elements {
-            let coeffs = rq.get_coefficients();
-            concatenated_coeffs.extend_from_slice(coeffs);
+        for poly in &self.elements {
+            concatenated_coeffs.extend_from_slice(poly.coeffs());
         }
         concatenated_coeffs
     }
 
-    /// Decomposes a polynomial into base-B representation:
-    /// p = p⁽⁰⁾ + p⁽¹⁾·B + p⁽²⁾·B² + ... + p⁽ᵗ⁻¹⁾·B^(t-1)
-    /// Where each p⁽ⁱ⁾ has small coefficients, using centered representatives
-    // pub fn decompose(&self, base: Zq, num_parts: usize) -> Vec<Rq> {
-    //     debug_assert!(num_parts > 0, "num_parts must be positive");
-    //     let mut parts = Vec::with_capacity(num_parts);
-    //     let mut initial_coeffs = *self.get_coefficients();
-    //     for _ in 0..num_parts - 1 {
-    //         // Extract low part (mod base, centered around 0)
-    //         let mut low_coeffs = [Zq::ZERO; Self::DEGREE];
-    //         for (low_c, coeff) in low_coeffs.iter_mut().zip(initial_coeffs.iter_mut()) {
-    //             let centered = coeff.centered_mod(base);
-    //             *low_c = centered;
-    //             *coeff = (*coeff - centered).scale_by(base);
-    //         }
-    //         parts.push(Self::new(low_coeffs));
-    //     }
-    //     parts.push(Self::new(initial_coeffs));
-    //     parts
-    // }
+    /// Decompose the element to #num_parts number of parts,
+    /// where each part's infinity norm is less than or equal to bound/2
     pub fn decompose(&self, b: Zq, parts: usize) -> Vec<RqVector> {
-        let mut result = vec![RqVector::zero(self.elements.len()); parts];
-        self.get_elements()
+        let mut result = vec![RqVector::zero(self.len()); parts];
+        self.elements()
             .iter()
             .enumerate()
             .for_each(|(index, poly)| {
@@ -112,9 +101,9 @@ impl Add<&RqVector> for &RqVector {
     type Output = RqVector;
     // add two poly vectors
     fn add(self, other: &RqVector) -> RqVector {
-        self.get_elements()
+        self.elements()
             .iter()
-            .zip(other.get_elements())
+            .zip(other.elements())
             .map(|(a, b)| a + b)
             .collect()
     }
@@ -141,7 +130,7 @@ impl Mul<&Rq> for &RqVector {
     type Output = RqVector;
     // A poly vector multiple by a PolyRing
     fn mul(self, other: &Rq) -> RqVector {
-        self.get_elements().iter().map(|s| s * other).collect()
+        self.elements().iter().map(|s| s * other).collect()
     }
 }
 
@@ -149,7 +138,7 @@ impl Mul<&Zq> for &RqVector {
     type Output = RqVector;
     // A poly vector multiple by a PolyRing
     fn mul(self, other: &Zq) -> RqVector {
-        self.get_elements().iter().map(|s| s * other).collect()
+        self.elements().iter().map(|s| s * other).collect()
     }
 }
 
@@ -157,14 +146,14 @@ impl Mul<Zq> for &RqVector {
     type Output = RqVector;
     // A poly vector multiple by a PolyRing
     fn mul(self, other: Zq) -> RqVector {
-        self.get_elements().iter().map(|s| s * &other).collect()
+        self.elements().iter().map(|s| s * &other).collect()
     }
 }
 
 impl Norms for RqVector {
     type NormType = u128;
 
-    // Compute the squared norm of a vector of polynomials
+    // Compute the squared l2 norm of a vector of polynomials
     fn l2_norm_squared(&self) -> Self::NormType {
         self.elements
             .iter()
@@ -243,7 +232,7 @@ mod tests {
         let vector_of_polynomials = expected.clone().into_iter();
         let result: RqVector = vector_of_polynomials.collect();
 
-        assert_eq!(result.get_elements(), &expected);
+        assert_eq!(result.elements(), &expected);
     }
 
     #[test]
@@ -254,22 +243,22 @@ mod tests {
         let result = &rq_vector * Zq::new(3);
 
         assert_eq!(
-            result.get_elements()[0],
+            result.elements()[0],
             generate_rq_from_zq_vector(vec![Zq::new(3), Zq::new(66)])
         );
         assert_eq!(
-            result.get_elements()[1],
+            result.elements()[1],
             generate_rq_from_zq_vector(vec![Zq::new(51), Zq::new(36)])
         );
 
         #[allow(clippy::op_ref)]
         let result2 = &rq_vector * &Zq::new(3);
         assert_eq!(
-            result2.get_elements()[0],
+            result2.elements()[0],
             generate_rq_from_zq_vector(vec![Zq::new(3), Zq::new(66)])
         );
         assert_eq!(
-            result2.get_elements()[1],
+            result2.elements()[1],
             generate_rq_from_zq_vector(vec![Zq::new(51), Zq::new(36)])
         );
     }
@@ -280,8 +269,7 @@ mod tests {
         let poly2: Rq = generate_rq_from_zq_vector(vec![Zq::ONE, Zq::new(4)]);
         let vec_1: RqVector = RqVector::from(vec![poly1]);
         let vec_2: RqVector = RqVector::from(vec![poly2]);
-        let result =
-            inner_product::compute_linear_combination(vec_1.get_elements(), vec_2.get_elements());
+        let result = inner_product::compute_linear_combination(vec_1.elements(), vec_2.elements());
         let poly_exp: Rq = generate_rq_from_zq_vector(vec![Zq::new(1), Zq::new(6), Zq::new(8)]);
         assert_eq!(result, poly_exp);
 
@@ -290,7 +278,7 @@ mod tests {
         let vec_3: RqVector = RqVector::from(vec![poly3]);
         let vec_4: RqVector = RqVector::from(vec![poly4]);
         let result_1 =
-            inner_product::compute_linear_combination(vec_3.get_elements(), vec_4.get_elements());
+            inner_product::compute_linear_combination(vec_3.elements(), vec_4.elements());
         let poly_exp_1: Rq = generate_rq_from_zq_vector(vec![
             Zq::new(1),
             Zq::new(2),
@@ -309,7 +297,7 @@ mod tests {
         let vec_5: RqVector = RqVector::from(vec![poly5, poly6]);
         let vec_6: RqVector = RqVector::from(vec![poly7, poly8]);
         let result_2 =
-            inner_product::compute_linear_combination(vec_5.get_elements(), vec_6.get_elements());
+            inner_product::compute_linear_combination(vec_5.elements(), vec_6.elements());
         let poly_exp_2: Rq = generate_rq_from_zq_vector(vec![
             Zq::new(2),
             Zq::new(4),
@@ -352,10 +340,10 @@ mod test_decompositions {
 
         for decomposition in decomposed_vector {
             assert!(
-                decomposition.linf_norm() <= base.scale_by(Zq::TWO).to_u128(),
-                "decomposition.linf_norm(): {} and base.scale_by(Zq::TWO): {}",
+                decomposition.linf_norm() <= base.div_floor_by(2).to_u128(),
+                "decomposition.linf_norm(): {} and base.div_floor_by(2): {}",
                 decomposition.linf_norm(),
-                base.scale_by(Zq::TWO)
+                base.div_floor_by(2)
             );
         }
     }

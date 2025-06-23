@@ -48,11 +48,7 @@ impl AjtaiScheme {
         if norm_bound.is_zero() {
             return Err(ParameterError::InvalidWitnessBounds(norm_bound));
         }
-        Self::validate_parameters(
-            norm_bound,
-            random_matrix.get_row_len(),
-            random_matrix.get_col_len(),
-        )?;
+        Self::validate_parameters(norm_bound, random_matrix.row_len(), random_matrix.col_len())?;
 
         Ok(Self {
             norm_bound,
@@ -65,7 +61,7 @@ impl AjtaiScheme {
         if !self.check_bounds(witness) {
             return Err(CommitError::InvalidWitnessBounds(self.norm_bound));
         }
-        if witness.get_length() != self.random_matrix.get_col_len() {
+        if witness.len() != self.random_matrix.col_len() {
             return Err(CommitError::InvalidWitnessSize);
         }
         let commitment = &self.random_matrix * witness;
@@ -81,10 +77,10 @@ impl AjtaiScheme {
         if !self.check_bounds(opening) {
             return Err(VerificationError::InvalidWitnessBounds(self.norm_bound));
         }
-        if opening.get_length() != self.random_matrix.get_col_len() {
+        if opening.len() != self.random_matrix.col_len() {
             return Err(VerificationError::InvalidOpeningSize);
         }
-        if commitment.get_length() != self.random_matrix.get_row_len() {
+        if commitment.len() != self.random_matrix.row_len() {
             return Err(VerificationError::InvalidCommitmentSize);
         }
 
@@ -171,7 +167,7 @@ impl AjtaiScheme {
     }
 
     pub fn get_row_size(&self) -> usize {
-        self.random_matrix.get_elements().len()
+        self.random_matrix.elements().len()
     }
 }
 

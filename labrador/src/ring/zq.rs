@@ -1,34 +1,34 @@
+use crate::ring::Norms;
 use core::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 use rand::distr::uniform::{Error, SampleBorrow, SampleUniform, UniformInt, UniformSampler};
 use rand::prelude::*;
 use std::fmt;
 use std::iter::Sum;
 
-use crate::ring::Norms;
-/// Represents an element in the ring Z/qZ where q = 2^32.
+/// Element of the group **Z/(2^32 − 1)**.
 /// Uses native u32 operations with automatic modulo reduction through wrapping arithmetic.
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Default)]
 pub struct Zq {
-    /// Value of the ring Z/qZ. value \in [0, q-1]
+    /// Values in the range `0..u32::MAX−1`.
     value: u32,
 }
 
 impl Zq {
-    /// Modulus q = 2^32 - 1
+    /// Modulus `q = 2^32 − 1`
     #[allow(clippy::as_conversions)]
-    pub const Q: u64 = u32::MAX as u64;
-    /// Zero element (additive identity)
+    pub const Q: u32 = u32::MAX;
+
+    // ------- constants -------
     pub const ZERO: Self = Self::new(0);
-    /// Multiplicative identity
     pub const ONE: Self = Self::new(1);
-    /// Two
     pub const TWO: Self = Self::new(2);
-    /// Maximum element
+    // -1 or Maximum possible value. Equals `q - 1` or ` 2^32 − 2`
     pub const NEG_ONE: Self = Self::new(u32::MAX - 1);
 
     /// Creates a new Zq element from a raw u32 value.
     /// No explicit modulo needed as u32 automatically wraps
     pub const fn new(value: u32) -> Self {
+        debug_assert!(value < Self::Q, "value not reduced modulo q");
         Self { value }
     }
 
@@ -36,28 +36,24 @@ impl Zq {
         u128::from(self.value)
     }
 
-    pub const fn is_zero(&self) -> bool {
-        self.value == 0
-    }
-
-    #[allow(clippy::as_conversions)]
-    pub fn is_small_negative(&self) -> bool {
-        self.value > ((Self::Q - 1) / 2) as u32
-    }
-
     pub fn get_value(&self) -> u32 {
         self.value
     }
 
-    /// Returns the centered representative modulo the given bound
-    /// Result is guaranteed to be in (-bound/2, bound/2]
-    ///
-    /// # Panics
-    ///
-    /// Panics if `bound` is zero.
+    pub const fn is_zero(&self) -> bool {
+        self.value == 0
+    }
+
+    /// Returns `1` iff the element is in `(q-1/2, q)`
+    #[allow(clippy::as_conversions)]
+    pub fn is_larger_than_half(&self) -> bool {
+        self.value > (Self::Q - 1) / 2
+    }
+
+    /// Centered representative in `(-q/2, q/2]`.
     #[allow(clippy::as_conversions)]
     pub(crate) fn centered_mod(&self) -> i128 {
-        let bound = Zq::Q as i128;
+        let bound = Self::Q as i128;
         let value = self.value as i128;
 
         if value > (bound - 1) / 2 {
@@ -67,73 +63,57 @@ impl Zq {
         }
     }
 
-    /// Returns the centered representative modulo the given bound
-    /// Result is guaranteed to be in [-bound/2, bound/2]
-    ///
-    /// # Panics
-    ///
-    /// Panics if `bound` is zero.
+    /// Floor division by another `Zq` value (*not* a field inverse!, just dividing the values).
+    pub(crate) fn div_floor_by(&self, rhs: u32) -> Self {
+        assert_ne!(rhs, 0, "division by zero");
+        Self::new(self.value / rhs)
+    }
+
+    /// Decompose the element to #num_parts number of parts,
+    /// where each part's infinity norm is less than or equal to bound/2
     pub(crate) fn decompose(&self, bound: Self, num_parts: usize) -> Vec<Zq> {
-        debug_assert!(bound >= Zq::TWO,);
-        debug_assert!(num_parts != 0);
+        assert!(bound >= Self::TWO, "base must be ≥ 2");
+        assert_ne!(num_parts, 0, "num_parts cannot be zero");
 
-        let mut parts = vec![Zq::ZERO; num_parts];
-
-        let half_bound = bound.scale_by(Zq::TWO);
-        let mut abs_self = match self.is_small_negative() {
+        let mut parts = vec![Self::ZERO; num_parts];
+        let half_bound = bound.div_floor_by(2);
+        let mut abs_self = match self.is_larger_than_half() {
             true => -(*self),
             false => *self,
         };
 
-        for part in parts.iter_mut() {
-            let mut remainder = Zq::new(abs_self.value % bound.value);
+        for part in &mut parts {
+            let mut remainder = Self::new(abs_self.value % bound.value);
             if remainder > half_bound {
                 remainder -= bound;
             }
-            *part = remainder;
-
-            *part = match self.is_small_negative() {
-                true => -*part,
-                false => *part,
+            *part = match self.is_larger_than_half() {
+                true => -remainder,
+                false => remainder,
             };
-
-            abs_self = Zq::new((abs_self - remainder).value / bound.value);
-            if abs_self == Zq::ZERO {
+            abs_self = Self::new((abs_self - remainder).value / bound.value);
+            if abs_self == Self::ZERO {
                 break;
             }
         }
         parts
     }
 
-    /// Scales by other Zq.
-    ///
-    /// Effectively it is a floor division of internal values.
-    /// But for the ring of integers there is no defined division
-    /// operation.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `bound` is zero.
-    pub(crate) fn scale_by(&self, rhs: Self) -> Self {
-        assert!(rhs != Zq::ZERO, "cannot scale by zero");
-        Self::new(self.value / rhs.value)
-    }
-
     #[allow(clippy::as_conversions)]
     fn add_op(self, rhs: Zq) -> Zq {
-        let sum = (self.value as u64 + rhs.value as u64) % Zq::Q;
+        let sum = (self.value as u64 + rhs.value as u64) % Zq::Q as u64;
         Zq::new(sum as u32)
     }
 
     #[allow(clippy::as_conversions)]
     fn sub_op(self, rhs: Zq) -> Zq {
-        let sub = (self.value as u64 + Zq::Q - rhs.value as u64) % Zq::Q;
+        let sub = (self.value as u64 + Zq::Q as u64 - rhs.value as u64) % Zq::Q as u64;
         Zq::new(sub as u32)
     }
 
     #[allow(clippy::as_conversions)]
     fn mul_op(self, b: Zq) -> Zq {
-        let prod = (self.value as u64 * b.value as u64) % Zq::Q;
+        let prod = (self.value as u64 * b.value as u64) % Zq::Q as u64;
         Zq::new(prod as u32)
     }
 }
@@ -190,7 +170,7 @@ impl Neg for Zq {
             self
         } else {
             #[allow(clippy::as_conversions)]
-            Zq::new(Zq::Q as u32 - self.get_value())
+            Zq::new(Zq::Q - self.get_value())
         }
     }
 }
@@ -241,31 +221,30 @@ impl Sum for Zq {
     }
 }
 
-pub fn add_assign_two_zq_vectors(first: &mut [Zq], second: Vec<Zq>) {
-    first
-        .iter_mut()
-        .zip(second)
-        .for_each(|(first_coeff, second_coeff)| *first_coeff += second_coeff);
+/// Adds `rhs` into `lhs` component‑wise.
+pub fn add_assign_two_zq_vectors(lhs: &mut [Zq], rhs: Vec<Zq>) {
+    debug_assert_eq!(lhs.len(), rhs.len(), "vector length mismatch");
+    lhs.iter_mut().zip(rhs).for_each(|(l, r)| *l += r);
 }
 
+// Implement l2 and infinity norms for a slice of Zq elements
 impl Norms for [Zq] {
     type NormType = u128;
 
     #[allow(clippy::as_conversions)]
     fn l2_norm_squared(&self) -> Self::NormType {
-        self.iter()
-            .map(|coeff| (coeff.centered_mod() * coeff.centered_mod()) as u128)
-            .sum()
+        self.iter().fold(0u128, |acc, coeff| {
+            let c = coeff.centered_mod();
+            acc + (c * c) as u128
+        })
     }
 
     #[allow(clippy::as_conversions)]
     fn linf_norm(&self) -> Self::NormType {
-        let result = self
-            .iter()
-            .map(|coeff| coeff.centered_mod().abs())
+        self.iter()
+            .map(|coeff| coeff.centered_mod().unsigned_abs())
             .max()
-            .unwrap();
-        result as u128
+            .unwrap_or(0)
     }
 }
 

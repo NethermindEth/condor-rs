@@ -151,7 +151,7 @@ impl<'a> LabradorVerifier<'a> {
         transcript.absorb_vector_b_ct_aggr(&proof.b_ct_aggr);
 
         for k in 0..self.params.kappa {
-            let b_0_poly = proof.b_ct_aggr.get_elements()[k].get_coefficients()[0];
+            let b_0_poly = proof.b_ct_aggr.elements()[k].coeffs()[0];
             let mut b_0: Zq = (0..self.params.constraint_l)
                 .map(|l| psi[k][l] * self.st.b_0_ct[l])
                 .sum();
@@ -187,19 +187,19 @@ impl<'a> LabradorVerifier<'a> {
         let z_ij = proof.z.decompose(self.params.b, 2);
         let t_ij: Vec<Vec<RqVector>> = proof
             .t
-            .get_elements()
+            .elements()
             .iter()
             .map(|i| RqVector::decompose(i, self.params.b, self.params.t_1))
             .collect();
         let g_ij: Vec<Vec<RqVector>> = proof
             .g
-            .get_elements()
+            .elements()
             .iter()
             .map(|i| RqVector::decompose(i, self.params.b, self.params.t_2))
             .collect();
         let h_ij: Vec<Vec<RqVector>> = proof
             .h
-            .get_elements()
+            .elements()
             .iter()
             .map(|i| RqVector::decompose(i, self.params.b, self.params.t_1))
             .collect();
@@ -232,10 +232,8 @@ impl<'a> LabradorVerifier<'a> {
         let challenges =
             transcript.generate_challenges(env_params::OPERATOR_NORM, self.params.multiplicity);
         let az = self.crs.commitment_scheme_a.matrix() * &proof.z;
-        let ct_sum = inner_product::compute_linear_combination(
-            proof.t.get_elements(),
-            challenges.get_elements(),
-        );
+        let ct_sum =
+            inner_product::compute_linear_combination(proof.t.elements(), challenges.elements());
         if az != ct_sum {
             return Err(VerifierError::AzError {
                 computed: az,
@@ -255,10 +253,8 @@ impl<'a> LabradorVerifier<'a> {
         proof: &LabradorTranscript<S>,
         challenges: &RqVector,
     ) -> Result<(), VerifierError> {
-        let z_inner = inner_product::compute_linear_combination(
-            proof.z.get_elements(),
-            proof.z.get_elements(),
-        );
+        let z_inner =
+            inner_product::compute_linear_combination(proof.z.elements(), proof.z.elements());
         let sum_gij_cij = Self::calculate_gh_ci_cj(&proof.g, challenges, self.params.multiplicity);
 
         if z_inner != sum_gij_cij {
@@ -302,7 +298,7 @@ impl<'a> LabradorVerifier<'a> {
         &self,
         proof: &LabradorTranscript<S>,
     ) -> Result<(), VerifierError> {
-        let r = self.funcs_aggregator.get_agg_a().get_elements().len();
+        let r = self.funcs_aggregator.get_agg_a().elements().len();
 
         let mut sum_a_primes_g = Rq::zero();
         // walk only over the stored half: i ≤ j
@@ -376,8 +372,7 @@ impl<'a> LabradorVerifier<'a> {
             .map(|i| {
                 (0..r)
                     .map(|j| {
-                        &(x_ij.get_cell(i, j) * &random_c.get_elements()[i])
-                            * &random_c.get_elements()[j]
+                        &(x_ij.get_cell(i, j) * &random_c.elements()[i]) * &random_c.elements()[j]
                     })
                     .fold(Rq::zero(), |acc, x| &acc + &x)
             })
@@ -387,10 +382,9 @@ impl<'a> LabradorVerifier<'a> {
     /// calculate the left hand side of line 17, \sum(<\phi_z, z> * c_i)
     fn calculate_phi_z_c(phi: &[RqVector], c: &RqVector, z: &RqVector) -> Rq {
         phi.iter()
-            .zip(c.get_elements())
+            .zip(c.elements())
             .map(|(phi_i, c_i)| {
-                &(inner_product::compute_linear_combination(phi_i.get_elements(), z.get_elements()))
-                    * c_i
+                &(inner_product::compute_linear_combination(phi_i.elements(), z.elements())) * c_i
             })
             .fold(Rq::zero(), |acc, x| &acc + &x)
     }

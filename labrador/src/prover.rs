@@ -243,8 +243,7 @@ impl<'a> LabradorProver<'a> {
     fn compute_z<S: Sponge>(&mut self, transcript: &mut LabradorTranscript<S>) -> RqVector {
         let challenges =
             transcript.generate_challenges(env_params::OPERATOR_NORM, self.params.multiplicity);
-        let z =
-            inner_product::compute_linear_combination(&self.witness.s, challenges.get_elements());
+        let z = inner_product::compute_linear_combination(&self.witness.s, challenges.elements());
         z
     }
 
