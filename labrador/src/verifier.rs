@@ -120,12 +120,10 @@ impl<'a> LabradorVerifier<'a> {
             self.params.multiplicity,
         );
         transcript.absorb_vector_p(&proof.vector_p);
-        if proof.vector_p.l2_norm_squared()
-            > 128 * self.params.beta.to_u128() * self.params.beta.to_u128()
-        {
+        if proof.vector_p.l2_norm_squared() > 128 * self.params.beta_sq {
             return Err(VerifierError::NormSumExceeded {
                 norm: proof.vector_p.l2_norm_squared(),
-                allowed: 128 * self.params.beta.to_u128() * self.params.beta.to_u128(),
+                allowed: 128 * self.params.beta_sq,
                 step: String::from("vector p norm check"),
             });
         }
@@ -209,10 +207,10 @@ impl<'a> LabradorVerifier<'a> {
         let norm_h_ij = Self::norm_squared(&h_ij);
         let norm_sum = norm_z_ij + norm_t_ij + norm_g_ij + norm_h_ij;
 
-        if norm_sum > self.params.beta_prime.to_u128() * self.params.beta_prime.to_u128() {
+        if norm_sum > self.params.beta_prime_sq {
             return Err(VerifierError::NormSumExceeded {
                 norm: norm_sum,
-                allowed: self.params.beta_prime.to_u128() * self.params.beta_prime.to_u128(),
+                allowed: self.params.beta_prime_sq,
                 step: String::from("Step 14 in verification"),
             });
         }
@@ -483,7 +481,7 @@ mod tests {
     fn test_verify() {
         let ep_1 = EnvironmentParameters::default();
         // generate a random witness based on ep above
-        let witness_1 = Witness::new(ep_1.rank, ep_1.multiplicity, ep_1.beta);
+        let witness_1 = Witness::new(ep_1.rank, ep_1.multiplicity, ep_1.beta_sq);
         // generate public statements based on witness_1
         let st: Statement = Statement::new(&witness_1, &ep_1);
         // generate the common reference string matrices

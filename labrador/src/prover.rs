@@ -287,7 +287,7 @@ mod tests {
         // set up example environment parameters, use default set for testing.
         let ep_1 = EnvironmentParameters::default();
         // generate a random witness based on environment parameters above
-        let witness_1 = Witness::new(ep_1.rank, ep_1.multiplicity, ep_1.beta);
+        let witness_1 = Witness::new(ep_1.rank, ep_1.multiplicity, ep_1.beta_sq);
         // generate public statement based on witness_1
         let st: Statement = Statement::new(&witness_1, &ep_1);
         // generate the common reference string matrices A, B, C, D

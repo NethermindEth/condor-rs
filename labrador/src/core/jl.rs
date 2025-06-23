@@ -107,7 +107,7 @@ mod tests {
             let projections =
                 transcript.generate_projections(security_parameter, rank, multiplicity);
 
-            let witness_vector = Witness::new(rank, multiplicity, Zq::new(6400)).s;
+            let witness_vector = Witness::new(rank, multiplicity, 6400).s;
             let result = projections.compute_projection(0, &witness_vector[0]);
             let beta = witness_vector[0].l2_norm_squared();
             // dbg!(&result);
@@ -141,7 +141,7 @@ mod tests {
         let trials: u128 = 10000;
 
         // let witness = RqVector::random_ternary(&mut rand::rng(), rank);
-        let witness = Witness::new(rank, multiplicity, Zq::new(6400)).s;
+        let witness = Witness::new(rank, multiplicity, 6400).s;
         let witness_norm = (128 * witness[0].l2_norm_squared() as u128) as f64;
 
         let mut norm_sum = 0u128;
@@ -182,7 +182,7 @@ mod tests {
         let mut transcript = LabradorTranscript::new(ShakeSponge::default());
         transcript.set_u1(RqVector::random(&mut rng(), 1));
         let projections = transcript.generate_projections(security_parameter, rank, multiplicity);
-        let witness = Witness::new(rank, multiplicity, Zq::new(6400)).s;
+        let witness = Witness::new(rank, multiplicity, 6400).s;
 
         let beta = witness[0].l2_norm_squared();
         // Check if the norm of the projection is bigger than 30 * (squared norm of the projection of the random polynomial)
