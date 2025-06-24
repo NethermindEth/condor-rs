@@ -98,18 +98,6 @@ impl AjtaiScheme {
         Ok(())
     }
 
-    /// Validates scheme parameters against cryptographic security requirements
-    fn validate_parameters(
-        norm_bound_sq: u128,
-        row_len: usize,
-        col_len: usize,
-    ) -> Result<(), ParameterError> {
-        if [row_len, col_len].contains(&0) {
-            return Err(ParameterError::ZeroParameter);
-        }
-        Self::verify_security_relation(norm_bound_sq, row_len)
-    }
-
     /// Verifies the security relation β²m³ < q² required for Ajtai's commitment scheme.
     ///
     /// This bound ensures the scheme's security by:
@@ -122,16 +110,23 @@ impl AjtaiScheme {
     /// - β bounds the size of witness coefficients
     /// - m is the commitment output length
     /// - q is the modulus of the underlying ring
-    fn verify_security_relation(norm_bound_sq: u128, m: usize) -> Result<(), ParameterError> {
+    fn validate_parameters(
+        norm_bound_sq: u128,
+        row_len: usize,
+        col_len: usize,
+    ) -> Result<(), ParameterError> {
+        if [row_len, col_len].contains(&0) {
+            return Err(ParameterError::ZeroParameter);
+        }
         // Calculate q from Zq properties
         let q: u128 = Zq::NEG_ONE.to_u128() + 1;
 
         // Calculate m³
-        let m_cubed: u128 = m
+        let m_cubed: u128 = row_len
             .checked_pow(3)
             .ok_or(ParameterError::SecurityBoundViolation)?
             .try_into()
-            .map_err(|_| ParameterError::TooLargeCommitmentLength(m))?;
+            .map_err(|_| ParameterError::TooLargeCommitmentLength(row_len))?;
 
         // Calculate q²
         let q_squared = q

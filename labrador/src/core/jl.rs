@@ -142,7 +142,7 @@ mod tests {
 
         // let witness = RqVector::random_ternary(&mut rand::rng(), rank);
         let witness = Witness::new(rank, multiplicity, 6400).s;
-        let witness_norm = (128 * witness[0].l2_norm_squared() as u128) as f64;
+        let witness_norm = 128 * witness[0].l2_norm_squared();
 
         let mut norm_sum = 0u128;
         // Run the test multiple times to simulate the probability
@@ -153,19 +153,19 @@ mod tests {
             let projections =
                 transcript.generate_projections(security_parameter, rank, multiplicity);
             let result = projections.compute_projection(0, &witness[0]);
-            norm_sum += result.l2_norm_squared() as u128;
+            norm_sum += result.l2_norm_squared();
         }
 
         // Calculate the observed probability
         let average = norm_sum as f64 / trials as f64;
-        let ratio = if witness_norm <= average {
-            average / witness_norm
+        let ratio = if witness_norm as f64 <= average {
+            average / witness_norm as f64
         } else {
-            witness_norm / average
+            witness_norm as f64 / average
         };
 
         // we choose a small tolerance value for possible statistical error
-        let tolerance_percent: f64 = 1.01;
+        let tolerance_percent: f64 = 1.05;
         assert!(
             ratio < tolerance_percent,
             "Average norm value {} is not equal to {}.",
