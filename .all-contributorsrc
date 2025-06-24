@@ -64,8 +64,10 @@
       "avatar_url": "https://avatars.githubusercontent.com/u/42227752?v=4",
       "profile": "https://github.com/omibo",
       "contributions": [
+        "doc",
+        "code",
         "review",
-        "doc"
+        "test"
       ]
     },
     {
