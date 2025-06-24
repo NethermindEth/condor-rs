@@ -1,3 +1,7 @@
+//! Dense matrix of `Rq` polynomials with an optional *lower‑triangular (symmetric)*
+//! storage optimisation.  A symmetric matrix stores **only** the lower triangle
+//! (including the diagonal).
+
 use crate::{core::inner_product, ring::rq_vector::RqVector};
 use rand::{CryptoRng, Rng};
 use std::ops::Mul;
@@ -8,13 +12,26 @@ use super::{rq::Rq, zq::Zq};
 #[derive(Debug, Clone)]
 pub struct RqMatrix {
     elements: Vec<RqVector>,
+    /// If `true`, `rows[i]` has length `i+1` and represents the lower triangle.
     is_symmetric: bool,
 }
 
 impl RqMatrix {
     /// Constructor for the Matrix of polynomials in Rq
     pub fn new(elements: Vec<RqVector>, is_symmetric: bool) -> Self {
-        RqMatrix {
+        if is_symmetric {
+            debug_assert!(
+                elements.iter().enumerate().all(|(i, r)| r.len() == i + 1),
+                "symmetric storage must be lower-triangular"
+            );
+        } else {
+            let width = elements.first().map(|r| r.len()).unwrap_or(0);
+            debug_assert!(
+                elements.iter().all(|r| r.len() == width),
+                "row lengths differ"
+            );
+        }
+        Self {
             elements,
             is_symmetric,
         }
@@ -31,20 +48,20 @@ impl RqMatrix {
         }
     }
 
-    pub fn get_row_len(&self) -> usize {
+    pub fn row_len(&self) -> usize {
         self.elements.len()
     }
 
-    pub fn get_col_len(&self) -> usize {
-        let last_row = self.get_row_len() - 1;
-        self.elements[last_row].get_length()
+    pub fn col_len(&self) -> usize {
+        let last_row = self.row_len() - 1;
+        self.elements[last_row].len()
     }
 
     pub fn get_cell(&self, row: usize, col: usize) -> &Rq {
         if !self.is_symmetric || row >= col {
-            &self.elements[row].get_elements()[col]
+            &self.elements[row].elements()[col]
         } else {
-            &self.elements[col].get_elements()[row]
+            &self.elements[col].elements()[row]
         }
     }
 
@@ -72,14 +89,16 @@ impl RqMatrix {
         }
     }
 
-    pub fn get_elements(&self) -> &[RqVector] {
+    pub fn elements(&self) -> &[RqVector] {
         &self.elements
     }
 
+    /// Decompose every cell into `parts` low‑norm digits in base `base` and
+    /// concat all results into **one** long vector.
     pub fn decompose_each_cell(&self, base: Zq, num_parts: usize) -> RqVector {
         let mut decomposed_vec = Vec::new();
-        for ring_vector in self.get_elements() {
-            for ring in ring_vector.get_elements() {
+        for ring_vector in self.elements() {
+            for ring in ring_vector.elements() {
                 decomposed_vec.extend(ring.decompose(base, num_parts));
             }
         }
@@ -102,12 +121,13 @@ impl Mul<&RqVector> for &RqMatrix {
     type Output = RqVector;
 
     fn mul(self, rhs: &RqVector) -> Self::Output {
+        debug_assert_eq!(self.col_len(), rhs.len(), "dimension mismatch");
         let mut result = RqVector::zero(self.elements.len());
 
         for (i, row) in self.elements.iter().enumerate() {
             result.set(
                 i,
-                inner_product::compute_linear_combination(row.get_elements(), rhs.get_elements()),
+                inner_product::compute_linear_combination(row.elements(), rhs.elements()),
             );
         }
         result
@@ -136,8 +156,8 @@ mod tests {
         matrix.set_cell(4, 9, Rq::new([Zq::new(10); Rq::DEGREE]));
         matrix.set_cell(8, 1, Rq::new([Zq::new(3); Rq::DEGREE]));
 
-        for (i, vector) in matrix.get_elements().iter().enumerate() {
-            for (j, poly) in vector.get_elements().iter().enumerate() {
+        for (i, vector) in matrix.elements().iter().enumerate() {
+            for (j, poly) in vector.elements().iter().enumerate() {
                 if (i == 4) && (j == 9) {
                     assert_eq!(poly, &Rq::new([Zq::new(10); Rq::DEGREE]))
                 } else if (i == 8) && (j == 1) {
@@ -152,13 +172,13 @@ mod tests {
     #[test]
     fn test_symmetric_matrix() {
         let symmetric_matrix = RqMatrix::symmetric_random(&mut rng(), 12);
-        assert_eq!(symmetric_matrix.get_row_len(), 12);
-        assert_eq!(symmetric_matrix.get_col_len(), 12);
-        for i in 0..symmetric_matrix.get_row_len() {
-            assert_eq!(symmetric_matrix.get_elements()[i].get_length(), i + 1);
+        assert_eq!(symmetric_matrix.row_len(), 12);
+        assert_eq!(symmetric_matrix.col_len(), 12);
+        for i in 0..symmetric_matrix.row_len() {
+            assert_eq!(symmetric_matrix.elements()[i].len(), i + 1);
         }
-        for i in 0..symmetric_matrix.get_row_len() {
-            for j in 0..symmetric_matrix.get_col_len() {
+        for i in 0..symmetric_matrix.row_len() {
+            for j in 0..symmetric_matrix.col_len() {
                 assert_eq!(
                     symmetric_matrix.get_cell(i, j),
                     symmetric_matrix.get_cell(j, i)
@@ -178,23 +198,21 @@ mod tests {
         let polynomial_matrix = expected.clone().into_iter();
         let result: RqMatrix = polynomial_matrix.collect();
 
-        assert_eq!(result.get_elements(), &expected);
+        assert_eq!(result.elements(), &expected);
     }
 
     #[test]
     fn test_zero_matrix() {
         /// Check if Polynomial == 0
         pub fn is_polynomial_zero(poly: &Rq) -> bool {
-            poly.get_coefficients()
-                .iter()
-                .all(|&coeff| coeff == Zq::ZERO)
+            poly.coeffs().iter().all(|&coeff| coeff == Zq::ZERO)
         }
 
         let matrix = RqMatrix::zero(10, 20);
-        assert_eq!(matrix.get_row_len(), 10);
-        assert_eq!(matrix.get_col_len(), 20);
-        for row in matrix.get_elements() {
-            for cell in row.get_elements() {
+        assert_eq!(matrix.row_len(), 10);
+        assert_eq!(matrix.col_len(), 20);
+        for row in matrix.elements() {
+            for cell in row.elements() {
                 assert!(is_polynomial_zero(cell));
             }
         }

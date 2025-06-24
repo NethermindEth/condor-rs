@@ -27,8 +27,8 @@ impl<S: Sponge> LabradorTranscript<S> {
             u2: RqVector::new(Vec::new()),
             z: RqVector::new(Vec::new()),
             t: RqMatrix::new(vec![RqVector::new(Vec::new())], false),
-            g: RqMatrix::new(vec![RqVector::new(Vec::new())], true),
-            h: RqMatrix::new(vec![RqVector::new(Vec::new())], true),
+            g: RqMatrix::new(vec![RqVector::zero(1)], true),
+            h: RqMatrix::new(vec![RqVector::zero(1)], true),
         }
     }
 
@@ -38,7 +38,7 @@ impl<S: Sponge> LabradorTranscript<S> {
     }
 
     pub fn absorb_u1(&mut self, u1: &RqVector) {
-        self.sponge.absorb_rq(u1.get_elements());
+        self.sponge.absorb_rq(u1.elements());
     }
 
     pub fn set_vector_p(&mut self, p: Vec<Zq>) {
@@ -56,7 +56,7 @@ impl<S: Sponge> LabradorTranscript<S> {
     }
 
     pub fn absorb_vector_b_ct_aggr(&mut self, input: &RqVector) {
-        self.sponge.absorb_rq(input.get_elements());
+        self.sponge.absorb_rq(input.elements());
     }
 
     pub fn set_u2(&mut self, u2: RqVector) {
@@ -65,7 +65,7 @@ impl<S: Sponge> LabradorTranscript<S> {
     }
 
     pub fn absorb_u2(&mut self, u2: &RqVector) {
-        self.sponge.absorb_rq(u2.get_elements());
+        self.sponge.absorb_rq(u2.elements());
     }
 
     pub fn set_recursive_part(&mut self, z: RqVector, t: RqMatrix, g: RqMatrix, h: RqMatrix) {
@@ -103,7 +103,7 @@ impl<S: Sponge> LabradorTranscript<S> {
                                 }
                             })
                             .collect();
-                        RqVector::new_from_zq_vector(coeffs)
+                        RqVector::from_zq_vector(coeffs)
                     })
                     .collect()
             })
@@ -190,10 +190,10 @@ mod tests_generate_pi {
         let projections = transcript.generate_projections(security_parameter, rank, multiplicity);
         assert_eq!(projections.get_projection_matrices().len(), multiplicity); // number_of_project_matrices
         assert_eq!(
-            projections.get_projection_matrices()[0].get_row_len(),
+            projections.get_projection_matrices()[0].row_len(),
             2 * security_parameter
         );
-        assert_eq!(projections.get_projection_matrices()[0].get_col_len(), rank);
+        assert_eq!(projections.get_projection_matrices()[0].col_len(), rank);
     }
 
     // Test the distribution of values in the random matrix
@@ -206,7 +206,7 @@ mod tests_generate_pi {
 
         for projection_matrix in projections.get_projection_matrices() {
             let mut counts = [0.0, 0.0, 0.0]; // -1, 0, 1
-            for row in projection_matrix.get_elements() {
+            for row in projection_matrix.elements() {
                 for cell in row.concatenate_coefficients() {
                     match cell {
                         Zq::ZERO => counts[1] += 1.0,
@@ -278,7 +278,7 @@ mod test_generate_rq {
         let k_range = 20;
         let mut transcript = LabradorTranscript::new(ShakeSponge::default());
         let result = transcript.generate_rq_vector(k_range);
-        assert_eq!(result.get_elements().len(), k_range); // number_of_project_matrices
+        assert_eq!(result.elements().len(), k_range); // number_of_project_matrices
     }
 
     // TODO: Testing randomness of the distribution is needed.
@@ -294,7 +294,7 @@ mod test_generate_challenges {
         let multiplicity = 9;
         let mut transcript = LabradorTranscript::new(ShakeSponge::default());
         let result = transcript.generate_challenges(15.0, multiplicity);
-        assert_eq!(result.get_elements().len(), multiplicity); // number_of_project_matrices
+        assert_eq!(result.elements().len(), multiplicity); // number_of_project_matrices
     }
 
     /// Test Challenge Set:
@@ -314,21 +314,18 @@ mod test_generate_challenges {
             use crate::core::inner_product::compute_linear_combination;
             assert_eq!(
                 compute_linear_combination(
-                    challenge_set.get_elements()[i].get_coefficients(),
-                    challenge_set.get_elements()[i].get_coefficients()
+                    challenge_set.elements()[i].coeffs(),
+                    challenge_set.elements()[i].coeffs()
                 ),
                 Zq::new(71)
             );
-            assert!(challenge_set.get_elements()[i].operator_norm() <= op_norm);
+            assert!(challenge_set.elements()[i].operator_norm() <= op_norm);
         }
 
         for i in 0..multiplicity {
             for j in 0..multiplicity {
                 if i != j {
-                    assert_ne!(
-                        challenge_set.get_elements()[i],
-                        challenge_set.get_elements()[j]
-                    );
+                    assert_ne!(challenge_set.elements()[i], challenge_set.elements()[j]);
                 }
             }
         }
