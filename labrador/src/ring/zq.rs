@@ -249,83 +249,6 @@ impl Norms for [Zq] {
 }
 
 #[cfg(test)]
-mod norm_tests {
-    use super::*;
-
-    #[test]
-    fn test_l2_norm() {
-        let zq_vector = [
-            Zq::new(1),
-            Zq::new(2),
-            Zq::new(3),
-            Zq::new(4),
-            Zq::new(5),
-            Zq::new(6),
-            Zq::new(7),
-        ];
-        let res = zq_vector.l2_norm_squared();
-
-        assert_eq!(res, 140);
-    }
-
-    #[test]
-    fn test_l2_norm_with_negative_values() {
-        let zq_vector = [
-            Zq::new(1),
-            Zq::new(2),
-            Zq::new(3),
-            -Zq::new(4),
-            -Zq::new(5),
-            -Zq::new(6),
-            -Zq::new(7),
-        ];
-        let res = zq_vector.l2_norm_squared();
-
-        assert_eq!(res, 140);
-    }
-
-    #[test]
-    fn test_linf_norm() {
-        let zq_vector = [
-            Zq::new(1),
-            Zq::new(200),
-            Zq::new(300),
-            Zq::new(40),
-            -Zq::new(5),
-            -Zq::new(6),
-            -Zq::new(700000),
-        ];
-        let res = zq_vector.linf_norm();
-        assert_eq!(res, 700000);
-
-        let zq_vector = [
-            Zq::new(1000000),
-            Zq::new(200),
-            Zq::new(300),
-            Zq::new(40),
-            -Zq::new(5),
-            -Zq::new(6),
-            -Zq::new(999999),
-        ];
-        let res = zq_vector.linf_norm();
-        assert_eq!(res, 1000000);
-
-        let zq_vector = [
-            Zq::new(1),
-            Zq::new(2),
-            Zq::new(3),
-            -Zq::new(4),
-            Zq::new(0),
-            -Zq::new(3),
-            -Zq::new(2),
-            -Zq::new(1),
-        ];
-        let res = zq_vector.linf_norm();
-        assert_eq!(res, 4);
-    }
-}
-
-#[cfg(test)]
 mod tests {
     use super::*;
 
@@ -495,7 +418,84 @@ mod tests {
 }
 
 #[cfg(test)]
-mod test_decomposition {
+mod norm_tests {
+    use super::*;
+
+    #[test]
+    fn test_l2_norm() {
+        let zq_vector = [
+            Zq::new(1),
+            Zq::new(2),
+            Zq::new(3),
+            Zq::new(4),
+            Zq::new(5),
+            Zq::new(6),
+            Zq::new(7),
+        ];
+        let res = zq_vector.l2_norm_squared();
+
+        assert_eq!(res, 140);
+    }
+
+    #[test]
+    fn test_l2_norm_with_negative_values() {
+        let zq_vector = [
+            Zq::new(1),
+            Zq::new(2),
+            Zq::new(3),
+            -Zq::new(4),
+            -Zq::new(5),
+            -Zq::new(6),
+            -Zq::new(7),
+        ];
+        let res = zq_vector.l2_norm_squared();
+
+        assert_eq!(res, 140);
+    }
+
+    #[test]
+    fn test_linf_norm() {
+        let zq_vector = [
+            Zq::new(1),
+            Zq::new(200),
+            Zq::new(300),
+            Zq::new(40),
+            -Zq::new(5),
+            -Zq::new(6),
+            -Zq::new(700000),
+        ];
+        let res = zq_vector.linf_norm();
+        assert_eq!(res, 700000);
+
+        let zq_vector = [
+            Zq::new(1000000),
+            Zq::new(200),
+            Zq::new(300),
+            Zq::new(40),
+            -Zq::new(5),
+            -Zq::new(6),
+            -Zq::new(999999),
+        ];
+        let res = zq_vector.linf_norm();
+        assert_eq!(res, 1000000);
+
+        let zq_vector = [
+            Zq::new(1),
+            Zq::new(2),
+            Zq::new(3),
+            -Zq::new(4),
+            Zq::new(0),
+            -Zq::new(3),
+            -Zq::new(2),
+            -Zq::new(1),
+        ];
+        let res = zq_vector.linf_norm();
+        assert_eq!(res, 4);
+    }
+}
+
+#[cfg(test)]
+mod decomposition_tests {
     use crate::ring::{zq::Zq, Norms};
 
     #[test]

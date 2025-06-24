@@ -171,51 +171,6 @@ impl Norms for RqVector {
 }
 
 #[cfg(test)]
-mod norm_tests {
-    use super::*;
-    use crate::ring::{rq::tests::generate_rq_from_zq_vector, Norms};
-
-    // Test the square of the norm
-    #[test]
-    fn test_l2_norm() {
-        let poly1 = generate_rq_from_zq_vector(vec![
-            Zq::ONE,
-            Zq::ZERO,
-            Zq::new(5),
-            Zq::NEG_ONE - Zq::new(1),
-        ]);
-        let poly2 = generate_rq_from_zq_vector(vec![Zq::ZERO, Zq::ZERO, Zq::new(5), Zq::ONE]);
-        let poly_vec1: RqVector = vec![poly1.clone(), poly2.clone()].into();
-        assert_eq!(
-            poly_vec1.l2_norm_squared(),
-            poly1.l2_norm_squared() + poly2.l2_norm_squared()
-        );
-
-        let zero_vec: RqVector = RqVector::zero(4);
-        assert_eq!(zero_vec.l2_norm_squared(), 0);
-    }
-
-    #[test]
-    fn test_linf_norm() {
-        let poly1 = generate_rq_from_zq_vector(vec![
-            Zq::ONE,
-            Zq::new(500),
-            Zq::new(5),
-            Zq::NEG_ONE - Zq::new(1000),
-        ]);
-        let poly2 =
-            generate_rq_from_zq_vector(vec![Zq::new(5), Zq::new(5), Zq::new(5000), Zq::new(5)]);
-        let poly_vec1: RqVector = vec![poly1.clone(), poly2.clone()].into();
-        assert_eq!(poly_vec1.linf_norm(), 5000);
-        let poly_vec2: RqVector = vec![poly2.clone(), poly1.clone()].into();
-        assert_eq!(poly_vec2.linf_norm(), 5000);
-
-        let zero_vec: RqVector = RqVector::zero(4);
-        assert_eq!(zero_vec.linf_norm(), 0);
-    }
-}
-
-#[cfg(test)]
 mod tests {
     use rand::rng;
 
@@ -312,7 +267,52 @@ mod tests {
 }
 
 #[cfg(test)]
-mod test_decompositions {
+mod norm_tests {
+    use super::*;
+    use crate::ring::{rq::tests::generate_rq_from_zq_vector, Norms};
+
+    // Test the square of the norm
+    #[test]
+    fn test_l2_norm() {
+        let poly1 = generate_rq_from_zq_vector(vec![
+            Zq::ONE,
+            Zq::ZERO,
+            Zq::new(5),
+            Zq::NEG_ONE - Zq::new(1),
+        ]);
+        let poly2 = generate_rq_from_zq_vector(vec![Zq::ZERO, Zq::ZERO, Zq::new(5), Zq::ONE]);
+        let poly_vec1: RqVector = vec![poly1.clone(), poly2.clone()].into();
+        assert_eq!(
+            poly_vec1.l2_norm_squared(),
+            poly1.l2_norm_squared() + poly2.l2_norm_squared()
+        );
+
+        let zero_vec: RqVector = RqVector::zero(4);
+        assert_eq!(zero_vec.l2_norm_squared(), 0);
+    }
+
+    #[test]
+    fn test_linf_norm() {
+        let poly1 = generate_rq_from_zq_vector(vec![
+            Zq::ONE,
+            Zq::new(500),
+            Zq::new(5),
+            Zq::NEG_ONE - Zq::new(1000),
+        ]);
+        let poly2 =
+            generate_rq_from_zq_vector(vec![Zq::new(5), Zq::new(5), Zq::new(5000), Zq::new(5)]);
+        let poly_vec1: RqVector = vec![poly1.clone(), poly2.clone()].into();
+        assert_eq!(poly_vec1.linf_norm(), 5000);
+        let poly_vec2: RqVector = vec![poly2.clone(), poly1.clone()].into();
+        assert_eq!(poly_vec2.linf_norm(), 5000);
+
+        let zero_vec: RqVector = RqVector::zero(4);
+        assert_eq!(zero_vec.linf_norm(), 0);
+    }
+}
+
+#[cfg(test)]
+mod decomposition_tests {
 
     use rand::rng;
 

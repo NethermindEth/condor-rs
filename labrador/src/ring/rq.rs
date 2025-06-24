@@ -217,39 +217,6 @@ impl Norms for Rq {
 }
 
 #[cfg(test)]
-mod norm_tests {
-    use super::tests::generate_rq_from_zq_vector;
-    use crate::ring::{rq::Rq, zq::Zq, Norms};
-
-    // Test the square of the norm
-    #[test]
-    fn test_l2_norm() {
-        let poly1 = generate_rq_from_zq_vector(vec![Zq::ONE, Zq::ZERO, Zq::new(5), Zq::NEG_ONE]);
-        let poly2 = generate_rq_from_zq_vector(vec![Zq::ZERO, Zq::ZERO, Zq::new(5), Zq::ONE]);
-        let poly3 = generate_rq_from_zq_vector(vec![Zq::new(5), Zq::ONE, -Zq::new(6), Zq::ZERO]);
-        let poly4 = Rq::zero();
-
-        assert_eq!(poly1.l2_norm_squared(), 27);
-        assert_eq!(poly2.l2_norm_squared(), 26);
-        assert_eq!(poly3.l2_norm_squared(), 62);
-        assert_eq!(poly4.l2_norm_squared(), 0);
-    }
-
-    #[test]
-    fn test_linf_norm() {
-        let poly1 = generate_rq_from_zq_vector(vec![Zq::ONE, Zq::ZERO, Zq::new(5), Zq::NEG_ONE]);
-        let poly2 = generate_rq_from_zq_vector(vec![Zq::ZERO, Zq::ZERO, -Zq::new(5), Zq::ONE]);
-        let poly3 = generate_rq_from_zq_vector(vec![Zq::new(5), Zq::ONE, -Zq::new(6), Zq::ZERO]);
-        let poly4 = Rq::zero();
-
-        assert_eq!(poly1.linf_norm(), 5);
-        assert_eq!(poly2.linf_norm(), 5);
-        assert_eq!(poly3.linf_norm(), 6);
-        assert_eq!(poly4.linf_norm(), 0);
-    }
-}
-
-#[cfg(test)]
 pub mod tests {
     use super::*;
 
@@ -485,6 +452,39 @@ pub mod tests {
         // ct<\sigma_{-1}(poly1), poly2> ?= <poly1, poly2>
         let ct_inner_conjugated_12 = inner_conjugated_12.coeffs()[0];
         assert_eq!(ct_inner_conjugated_12, inner_12);
+    }
+}
+
+#[cfg(test)]
+mod norm_tests {
+    use super::tests::generate_rq_from_zq_vector;
+    use crate::ring::{rq::Rq, zq::Zq, Norms};
+
+    // Test the square of the norm
+    #[test]
+    fn test_l2_norm() {
+        let poly1 = generate_rq_from_zq_vector(vec![Zq::ONE, Zq::ZERO, Zq::new(5), Zq::NEG_ONE]);
+        let poly2 = generate_rq_from_zq_vector(vec![Zq::ZERO, Zq::ZERO, Zq::new(5), Zq::ONE]);
+        let poly3 = generate_rq_from_zq_vector(vec![Zq::new(5), Zq::ONE, -Zq::new(6), Zq::ZERO]);
+        let poly4 = Rq::zero();
+
+        assert_eq!(poly1.l2_norm_squared(), 27);
+        assert_eq!(poly2.l2_norm_squared(), 26);
+        assert_eq!(poly3.l2_norm_squared(), 62);
+        assert_eq!(poly4.l2_norm_squared(), 0);
+    }
+
+    #[test]
+    fn test_linf_norm() {
+        let poly1 = generate_rq_from_zq_vector(vec![Zq::ONE, Zq::ZERO, Zq::new(5), Zq::NEG_ONE]);
+        let poly2 = generate_rq_from_zq_vector(vec![Zq::ZERO, Zq::ZERO, -Zq::new(5), Zq::ONE]);
+        let poly3 = generate_rq_from_zq_vector(vec![Zq::new(5), Zq::ONE, -Zq::new(6), Zq::ZERO]);
+        let poly4 = Rq::zero();
+
+        assert_eq!(poly1.linf_norm(), 5);
+        assert_eq!(poly2.linf_norm(), 5);
+        assert_eq!(poly3.linf_norm(), 6);
+        assert_eq!(poly4.linf_norm(), 0);
     }
 }
 
