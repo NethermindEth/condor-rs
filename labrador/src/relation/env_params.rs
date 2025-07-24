@@ -3,7 +3,7 @@ use crate::ring::{rq::Rq, zq::Zq};
 
 /// Security Parameter
 pub const SECURITY_PARAMETER: usize = 128;
-pub const OPERATOR_NORM: f64 = 15.0;
+pub const OPERATOR_NORM: f64 = 71.0;
 
 // Example Environment parameters used for LaBRADOR, can be expanded as required by testing.
 #[derive(Clone)]
@@ -19,12 +19,12 @@ pub struct EnvironmentParameters {
     pub b_2: usize, // g_ij decomposition base
     pub t_2: usize, // g_ij number of parts
 
-    /// Norm Bounds
-    pub beta: Zq, // Bound for witness s_i
-    pub gamma: Zq,   // Bound for z
-    pub gamma_1: Zq, // Bound for t
-    pub gamma_2: Zq, // Bound for g and h
-    pub beta_prime: Zq,
+    /// Squred values of norm bounds
+    pub beta_sq: u128, // Bound for witness s_i
+    pub gamma_sq: u128,   // Bound for z
+    pub gamma_1_sq: u128, // Bound for t
+    pub gamma_2_sq: u128, // Bound for g and h
+    pub beta_prime_sq: u128,
 
     /// Commitment Matrices Sizes
     pub kappa: usize, // Number of rows in A
@@ -45,7 +45,7 @@ impl EnvironmentParameters {
     pub fn new(
         rank: usize,
         multiplicity: usize,
-        beta: f64,
+        beta_sq: u128,
         kappa: usize,
         kappa_1: usize,
         kappa_2: usize,
@@ -54,7 +54,7 @@ impl EnvironmentParameters {
         tau: f64,
         modulo_q: usize,
     ) -> Self {
-        let std_s = Self::compute_std_s(rank, multiplicity, beta);
+        let std_s = Self::compute_std_s(rank, multiplicity, beta_sq);
 
         // balanced radix for z‑split
         let base_b = Self::compute_base_b(std_s, multiplicity, tau);
@@ -67,11 +67,11 @@ impl EnvironmentParameters {
         let parts_t2 = Self::compute_t2(rank, std_s, base_b);
         let base_b2 = Self::compute_b2(rank, std_s, parts_t2);
 
-        let gamma = Self::compute_gamma(beta, tau);
-        let gamma_1 =
-            Self::compute_gamma1(base_b1, parts_t1, multiplicity, kappa, base_b2, parts_t2);
-        let gamma_2 = Self::compute_gamma2(base_b1, parts_t1, multiplicity);
-        let beta_prime = Self::compute_beta_prime(base_b, gamma, gamma_1, gamma_2);
+        let gamma_sq = Self::compute_gamma_sq(beta_sq, tau);
+        let gamma_1_sq =
+            Self::compute_gamma1_sq(base_b1, parts_t1, multiplicity, kappa, base_b2, parts_t2);
+        let gamma_2_sq = Self::compute_gamma2_sq(base_b1, parts_t1, multiplicity);
+        let beta_prime_sq = Self::compute_beta_prime_sq(base_b, gamma_sq, gamma_1_sq, gamma_2_sq);
         let log_q = (modulo_q as f64).log2() as usize;
         EnvironmentParameters {
             rank,
@@ -81,11 +81,11 @@ impl EnvironmentParameters {
             t_1: parts_t1,
             b_2: base_b2,
             t_2: parts_t2,
-            beta: Zq::new(beta as u32),
-            gamma: Zq::new(gamma as u32),
-            gamma_1: Zq::new(gamma_1 as u32),
-            gamma_2: Zq::new(gamma_2 as u32),
-            beta_prime: Zq::new(beta_prime as u32),
+            beta_sq,
+            gamma_sq,
+            gamma_1_sq,
+            gamma_2_sq,
+            beta_prime_sq,
             kappa,
             kappa_1,
             kappa_2,
@@ -97,8 +97,8 @@ impl EnvironmentParameters {
     }
 
     // s = β / √(r·n·d)
-    fn compute_std_s(n: usize, r: usize, beta: f64) -> f64 {
-        beta / ((r * n * Rq::DEGREE) as f64).sqrt()
+    fn compute_std_s(n: usize, r: usize, beta_sq: u128) -> f64 {
+        ((beta_sq as f64) / ((r * n * Rq::DEGREE) as f64)).sqrt()
     }
 
     /// b = round( √(√(12 r τ) · s) ), but at least 2
@@ -138,48 +138,59 @@ impl EnvironmentParameters {
     }
 
     /// γ = β·√τ
-    fn compute_gamma(beta: f64, tau: f64) -> f64 {
-        beta * (tau).sqrt()
+    fn compute_gamma_sq(beta_sq: u128, tau: f64) -> u128 {
+        beta_sq * (tau as u128)
     }
 
     /// γ₁ = √( (b₁² t₁ /12) · r κ d  +  (b₂² t₂ /12) · (r²+r)/2 · d )
     #[allow(clippy::too_many_arguments)]
-    fn compute_gamma1(
+    fn compute_gamma1_sq(
         b1: usize,
         t1: usize,
         multiplicity: usize,
         kappa: usize,
         b2: usize,
         t2: usize,
-    ) -> f64 {
+    ) -> u128 {
         let term1 =
             (b1.pow(2) * t1) as f64 / 12.0 * multiplicity as f64 * kappa as f64 * Rq::DEGREE as f64;
         let term2 = (b2.pow(2) * t2) as f64 / 12.0
             * ((multiplicity * multiplicity + multiplicity) as f64)
             / 2.0
             * Rq::DEGREE as f64;
-        (term1 + term2).sqrt()
+        (term1 + term2) as u128
     }
 
     /// γ₂ = √( (b₁² t₁ /12) · (r²+r)/2 · d )
-    fn compute_gamma2(b1: usize, t1: usize, multiplicity: usize) -> f64 {
+    fn compute_gamma2_sq(b1: usize, t1: usize, multiplicity: usize) -> u128 {
         let term = (b1.pow(2) * t1) as f64 / 12.0
             * ((multiplicity * multiplicity + multiplicity) as f64)
             / 2.0
             * Rq::DEGREE as f64;
-        term.sqrt()
+        term as u128
     }
 
     /// β' = √( 2 γ² / b²  +  γ₁²  +  γ₂² )
-    fn compute_beta_prime(b: usize, gamma: f64, gamma1: f64, gamma2: f64) -> f64 {
-        let part_z = 2.0 * (gamma * gamma) / (b * b) as f64;
-        (part_z + gamma1 * gamma1 + gamma2 * gamma2).sqrt()
+    fn compute_beta_prime_sq(b: usize, gamma_sq: u128, gamma1_sq: u128, gamma2_sq: u128) -> u128 {
+        let part_z = 2.0 * gamma_sq as f64 / (b * b) as f64;
+        part_z as u128 + gamma1_sq + gamma2_sq
     }
 }
 
 impl Default for EnvironmentParameters {
     fn default() -> Self {
-        Self::new(5, 3, 65535.0, 4, 5, 5, 5, 5, 65535.0, (1u64 << 32) as usize)
+        Self::new(
+            5,
+            3,
+            65535 * 65535,
+            4,
+            5,
+            5,
+            5,
+            5,
+            OPERATOR_NORM,
+            (1u64 << 32) as usize,
+        )
     }
 }
 
@@ -192,9 +203,9 @@ mod tests {
 
     #[test]
     fn test_std_s_matches_formula() {
-        let (n, r, beta) = (12, 5, 42.0);
-        let result = EnvironmentParameters::compute_std_s(n, r, beta);
-        let expected = beta / ((r * n * Rq::DEGREE) as f64).sqrt();
+        let (n, r, beta_sq) = (12, 5, 42 * 42);
+        let result = EnvironmentParameters::compute_std_s(n, r, beta_sq);
+        let expected = (beta_sq as f64 / ((r * n * Rq::DEGREE) as f64)).sqrt();
         assert_eq!(result, expected);
     }
 
@@ -253,41 +264,39 @@ mod tests {
 
     #[test]
     fn test_gamma_functions() {
-        let (beta, tau) = (32.0, 49.0);
-        let gamma = EnvironmentParameters::compute_gamma(beta, tau);
-        assert_eq!(gamma, beta * tau.sqrt());
+        let (beta_sq, tau) = (32, 49.0);
+        let gamma_sq = EnvironmentParameters::compute_gamma_sq(beta_sq, tau);
+        assert_eq!(gamma_sq, beta_sq * tau as u128);
 
         // simple numeric spot-check for γ₁, γ₂
         let (b1, t1, r, kappa, b2, t2) = (7, 3, 2, 4, 5, 2);
-        let manual1 = ((b1 * b1 * t1) as f64 / 12.0 * r as f64 * kappa as f64 * Rq::DEGREE as f64
-            + (b2 * b2 * t2) as f64 / 12.0 * ((r * r + r) as f64) / 2.0 * Rq::DEGREE as f64)
-            .sqrt();
-        let got1 = EnvironmentParameters::compute_gamma1(b1, t1, r, kappa, b2, t2);
-        assert_eq!(got1, manual1);
+        let manual1 = (b1 * b1 * t1) as f64 / 12.0 * r as f64 * kappa as f64 * Rq::DEGREE as f64
+            + (b2 * b2 * t2) as f64 / 12.0 * ((r * r + r) as f64) / 2.0 * Rq::DEGREE as f64;
+        let got1 = EnvironmentParameters::compute_gamma1_sq(b1, t1, r, kappa, b2, t2);
+        assert_eq!(got1, manual1 as u128);
 
-        let manual2 = ((b1.pow(2) * t1) as f64 / 12.0 * ((r * r + r) as f64) / 2.0
-            * Rq::DEGREE as f64)
-            .sqrt();
-        let got2 = EnvironmentParameters::compute_gamma2(b1, t1, r);
-        assert_eq!(got2, manual2);
+        let manual2 =
+            (b1.pow(2) * t1) as f64 / 12.0 * ((r * r + r) as f64) / 2.0 * Rq::DEGREE as f64;
+        let got2 = EnvironmentParameters::compute_gamma2_sq(b1, t1, r);
+        assert_eq!(got2, manual2 as u128);
     }
 
     #[test]
     fn beta_prime_formula() {
-        let (b, gamma, g1, g2) = (11usize, 3.3, 7.7, 2.2);
-        let expected = ((2.0 * gamma * gamma) / (b * b) as f64 + g1 * g1 + g2 * g2).sqrt();
-        let result = EnvironmentParameters::compute_beta_prime(b, gamma, g1, g2);
+        let (b, gamma_sq, g1_sq, g2_sq) = (11usize, 3 * 3, 7 * 7, 2 * 2);
+        let expected = ((2 * gamma_sq) as f64 / (b * b) as f64) as u128 + g1_sq + g2_sq;
+        let result = EnvironmentParameters::compute_beta_prime_sq(b, gamma_sq, g1_sq, g2_sq);
         assert_eq!(expected, result);
     }
 
     #[test]
     fn test_gamma_and_beta_prime_are_positive() {
-        let beta = 100.0;
+        let beta_sq = 100 * 100;
         let tau = 64.0;
-        let gamma = EnvironmentParameters::compute_gamma(beta, tau);
-        assert!(gamma > 0.0);
-        let beta_p = EnvironmentParameters::compute_beta_prime(3, gamma, 2.0, 1.0);
-        assert!(beta_p > 0.0);
+        let gamma_sq = EnvironmentParameters::compute_gamma_sq(beta_sq, tau);
+        assert!(gamma_sq > 0);
+        let beta_p = EnvironmentParameters::compute_beta_prime_sq(3, gamma_sq, 2, 1);
+        assert!(beta_p > 0);
     }
 
     #[test]
@@ -301,8 +310,8 @@ mod tests {
         assert!((p.b_2 as u64).pow(p.t_2 as u32) > 1);
 
         // c)  norm bounds are non-negative
-        assert!(p.gamma > Zq::ZERO && p.gamma_1 > Zq::ZERO && p.gamma_2 > Zq::ZERO);
-        assert!(p.beta_prime >= p.gamma_1.max(p.gamma_2));
+        assert!(p.gamma_sq > 0 && p.gamma_1_sq > 0 && p.gamma_2_sq > 0);
+        assert!(p.beta_prime_sq >= p.gamma_1_sq.max(p.gamma_2_sq));
     }
 
     #[test]
@@ -310,18 +319,18 @@ mod tests {
         for seed in 1..=20 {
             let rank = 2 + seed as usize % 8; // 2..9
             let multiplicity = 1 + seed as usize % 5; // 1..5
-            let beta = 10.0 + seed as f64;
+            let beta_sq = (10 + seed) * (10 + seed);
             let tau = 32.0 + seed as f64;
             let q = (1usize << 20) + (seed as usize * 12345);
             let params =
-                EnvironmentParameters::new(rank, multiplicity, beta, 4, 4, 4, 3, 3, tau, q);
+                EnvironmentParameters::new(rank, multiplicity, beta_sq, 4, 4, 4, 3, 3, tau, q);
 
             // main invariants
             assert!(params.b >= Zq::TWO);
             assert!(params.t_1 >= 1 && params.t_2 >= 1);
             assert!((params.b_1 as u64).pow(params.t_1 as u32) >= q as u64);
-            assert!(params.gamma > Zq::ZERO);
-            assert!(params.beta_prime >= params.gamma_1.max(params.gamma_2));
+            assert!(params.gamma_sq > 0);
+            assert!(params.beta_prime_sq >= params.gamma_1_sq.max(params.gamma_2_sq));
         }
     }
 }

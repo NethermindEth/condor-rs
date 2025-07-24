@@ -67,7 +67,7 @@ impl Statement {
 
         // calculate b_0^l
         let b_0_ct: Vec<Zq> = (0..ep.constraint_l)
-            .map(|l| b_constraint_l.get_elements()[l].get_coefficients()[0])
+            .map(|l| b_constraint_l.elements()[l].coeffs()[0])
             .collect();
 
         Self {
@@ -100,7 +100,7 @@ pub fn calculate_b_constraint(
     let left_side = (0..size_s).map(|i| {
         (0..size_s).map(|j: usize| {
             a_constraint.get_cell(i, j)
-                * &inner_product::compute_linear_combination(s[i].get_elements(), s[j].get_elements())
+                * &inner_product::compute_linear_combination(s[i].elements(), s[j].elements())
         })
         .fold(Rq::zero(), |acc, val| &acc + &val )
     })
@@ -108,7 +108,7 @@ pub fn calculate_b_constraint(
 
     // calculate \sum(<phi_{i}^{k}, s_i>)
     let right_side = (0..size_s).fold(Rq::zero(), |acc, i| {
-        &acc + &inner_product::compute_linear_combination(phi_constraint[i].get_elements(), s[i].get_elements())
+        &acc + &inner_product::compute_linear_combination(phi_constraint[i].elements(), s[i].elements())
     });
 
     &left_side + &right_side

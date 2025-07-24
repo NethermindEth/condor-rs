@@ -82,10 +82,7 @@ impl<'a> ZeroConstantFunctionsAggregation<'a> {
         for (i, pi_i) in conjugated_pi.iter().enumerate() {
             for (k, phi_k) in self.phi_double_prime.iter_mut().enumerate() {
                 phi_k[i] = &phi_k[i]
-                    + &inner_product::compute_linear_combination(
-                        pi_i.get_elements(),
-                        &vector_omega[k],
-                    );
+                    + &inner_product::compute_linear_combination(pi_i.elements(), &vector_omega[k]);
             }
         }
     }
@@ -105,7 +102,7 @@ impl<'a> ZeroConstantFunctionsAggregation<'a> {
                         &(0..self.ep.multiplicity).map(|j| {
                     // calculate a_{ij}^{''(k)} * <s_i, s_j>
                     self.a_double_prime[k].get_cell(i, j)
-                        * &inner_product::compute_linear_combination(witness[i].get_elements(), witness[j].get_elements())
+                        * &inner_product::compute_linear_combination(witness[i].elements(), witness[j].elements())
                 })
                 .fold(
                     // sum over all i,j
@@ -113,7 +110,7 @@ impl<'a> ZeroConstantFunctionsAggregation<'a> {
                     |acc, val| &acc + &val,
                 )
                 // add \phi_{i}^{''(k)} * s[i]
-                + &inner_product::compute_linear_combination(self.phi_double_prime[k][i].get_elements(), witness[i].get_elements())
+                + &inner_product::compute_linear_combination(self.phi_double_prime[k][i].elements(), witness[i].elements())
                     }) // sum over all i,j
                     .fold(Rq::zero(), |acc, val| &acc + &val)
             })
@@ -178,10 +175,10 @@ impl<'a> FunctionsAggregation<'a> {
                     j,
                     &inner_product::compute_linear_combination::<&Rq, Rq, Rq>(
                         &a_constraint_k,
-                        vector_alpha.get_elements(),
+                        vector_alpha.elements(),
                     ) + &inner_product::compute_linear_combination(
                         &a_double_prime_k,
-                        vector_beta.get_elements(),
+                        vector_beta.elements(),
                     ),
                 );
             }
@@ -213,10 +210,10 @@ impl<'a> FunctionsAggregation<'a> {
             self.aggregated_phi[i] =
                 &inner_product::compute_linear_combination::<&RqVector, RqVector, Rq>(
                     &phi_constraint_k,
-                    vector_alpha.get_elements(),
+                    vector_alpha.elements(),
                 ) + &inner_product::compute_linear_combination(
                     &phi_double_prime_k,
-                    vector_beta.get_elements(),
+                    vector_beta.elements(),
                 );
         }
     }
@@ -239,11 +236,11 @@ impl<'a> FunctionsAggregation<'a> {
         vector_beta: &RqVector,
     ) {
         self.aggregated_b = &inner_product::compute_linear_combination(
-            b_constraint.get_elements(),
-            vector_alpha.get_elements(),
+            b_constraint.elements(),
+            vector_alpha.elements(),
         ) + &inner_product::compute_linear_combination(
-            b_double_prime.get_elements(),
-            vector_beta.get_elements(),
+            b_double_prime.elements(),
+            vector_beta.elements(),
         )
     }
 
@@ -405,7 +402,7 @@ mod constant_agg_tests {
                 }
                 let mut lhs = RqVector::zero(params.rank);
                 for j in 0..2 * env_params::SECURITY_PARAMETER {
-                    lhs = &lhs + &(&conjugated_pi[i].get_elements()[j] * vector_omega[k][j]);
+                    lhs = &lhs + &(&conjugated_pi[i].elements()[j] * vector_omega[k][j]);
                 }
                 assert_eq!(aggregator.phi_double_prime[k][i], &rhs + &lhs);
             }
@@ -453,8 +450,8 @@ mod constant_agg_tests {
                     rhs = &rhs
                         + &(aggregator.a_double_prime[k].get_cell(i, j)
                             * &inner_product::compute_linear_combination(
-                                witness_vector[i].get_elements(),
-                                witness_vector[j].get_elements(),
+                                witness_vector[i].elements(),
+                                witness_vector[j].elements(),
                             ));
                 }
             }
@@ -462,11 +459,11 @@ mod constant_agg_tests {
             for i in 0..params.multiplicity {
                 lhs = &lhs
                     + (&inner_product::compute_linear_combination(
-                        aggregator.phi_double_prime[k][i].get_elements(),
-                        witness_vector[i].get_elements(),
+                        aggregator.phi_double_prime[k][i].elements(),
+                        witness_vector[i].elements(),
                     ));
             }
-            assert_eq!(b_double_prime.get_elements()[k], &rhs + &lhs);
+            assert_eq!(b_double_prime.elements()[k], &rhs + &lhs);
         }
     }
 }
@@ -533,12 +530,11 @@ mod func_agg_tests {
             for j in 0..params.multiplicity {
                 let mut rhs = Rq::zero();
                 for k in 0..params.constraint_k {
-                    rhs = &rhs + &(a_constraint[k].get_cell(i, j) * &vector_alpha.get_elements()[k])
+                    rhs = &rhs + &(a_constraint[k].get_cell(i, j) * &vector_alpha.elements()[k])
                 }
                 let mut lhs = Rq::zero();
                 for k in 0..params.const_agg_length {
-                    lhs =
-                        &lhs + &(a_double_prime[k].get_cell(i, j) * &vector_beta.get_elements()[k])
+                    lhs = &lhs + &(a_double_prime[k].get_cell(i, j) * &vector_beta.elements()[k])
                 }
                 assert_eq!(*aggregator.aggregated_a.get_cell(i, j), &rhs + &lhs);
             }
@@ -573,11 +569,11 @@ mod func_agg_tests {
         for i in 0..params.multiplicity {
             let mut rhs = RqVector::zero(params.rank);
             for k in 0..params.constraint_k {
-                rhs = &rhs + &(&phi_constraint[k][i] * &vector_alpha.get_elements()[k])
+                rhs = &rhs + &(&phi_constraint[k][i] * &vector_alpha.elements()[k])
             }
             let mut lhs = RqVector::zero(params.rank);
             for k in 0..params.const_agg_length {
-                lhs = &lhs + &(&phi_double_prime[k][i] * &vector_beta.get_elements()[k])
+                lhs = &lhs + &(&phi_double_prime[k][i] * &vector_beta.elements()[k])
             }
             assert_eq!(aggregator.aggregated_phi[i], &rhs + &lhs);
         }
@@ -597,11 +593,11 @@ mod func_agg_tests {
 
         let mut rhs = Rq::zero();
         for k in 0..params.constraint_k {
-            rhs = &rhs + &(&b_constraint.get_elements()[k] * &vector_alpha.get_elements()[k])
+            rhs = &rhs + &(&b_constraint.elements()[k] * &vector_alpha.elements()[k])
         }
         let mut lhs = Rq::zero();
         for k in 0..params.const_agg_length {
-            lhs = &lhs + &(&b_double_prime.get_elements()[k] * &vector_beta.get_elements()[k])
+            lhs = &lhs + &(&b_double_prime.elements()[k] * &vector_beta.elements()[k])
         }
         assert_eq!(aggregator.aggregated_b, &rhs + &lhs);
     }

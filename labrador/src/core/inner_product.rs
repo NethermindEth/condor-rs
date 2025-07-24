@@ -81,7 +81,7 @@ mod tests {
     fn test_inputs_with_different_lengths_panic() {
         let vector_a = RqVector::random(&mut rng(), 100);
         let vector_b = RqVector::random(&mut rng(), 90);
-        let _ = compute_linear_combination(vector_a.get_elements(), vector_b.get_elements());
+        let _ = compute_linear_combination(vector_a.elements(), vector_b.elements());
     }
 
     #[test]
@@ -89,12 +89,11 @@ mod tests {
         let poly_a = Rq::random(&mut rng());
         let poly_b = Rq::random(&mut rng());
 
-        let result =
-            compute_linear_combination(poly_a.get_coefficients(), poly_b.get_coefficients());
+        let result = compute_linear_combination(poly_a.coeffs(), poly_b.coeffs());
 
         let mut expected = Zq::ZERO;
-        for i in 0..poly_a.get_coefficients().len() {
-            expected += poly_a.get_coefficients()[i] * poly_b.get_coefficients()[i];
+        for i in 0..poly_a.coeffs().len() {
+            expected += poly_a.coeffs()[i] * poly_b.coeffs()[i];
         }
         assert_eq!(result, expected);
     }
@@ -104,12 +103,11 @@ mod tests {
         let poly_vec_a = RqVector::random(&mut rng(), 100);
         let poly_vec_b = RqVector::random(&mut rng(), 100);
 
-        let result =
-            compute_linear_combination(poly_vec_a.get_elements(), poly_vec_b.get_elements());
+        let result = compute_linear_combination(poly_vec_a.elements(), poly_vec_b.elements());
 
         let mut expected = Rq::zero();
-        for i in 0..poly_vec_a.get_elements().len() {
-            expected = &expected + &(&poly_vec_a.get_elements()[i] * &poly_vec_b.get_elements()[i]);
+        for i in 0..poly_vec_a.elements().len() {
+            expected = &expected + &(&poly_vec_a.elements()[i] * &poly_vec_b.elements()[i]);
         }
         assert_eq!(result, expected);
     }
@@ -119,12 +117,11 @@ mod tests {
         let poly_a = Rq::random(&mut rng());
         let poly_vec_b = RqVector::random(&mut rng(), 64);
 
-        let result =
-            compute_linear_combination(poly_vec_b.get_elements(), poly_a.get_coefficients());
+        let result = compute_linear_combination(poly_vec_b.elements(), poly_a.coeffs());
 
         let mut expected = Rq::zero();
-        for i in 0..poly_a.get_coefficients().len() {
-            expected = &expected + &(&poly_vec_b.get_elements()[i] * &poly_a.get_coefficients()[i]);
+        for i in 0..poly_a.coeffs().len() {
+            expected = &expected + &(&poly_vec_b.elements()[i] * &poly_a.coeffs()[i]);
         }
         assert_eq!(result, expected);
     }
@@ -134,12 +131,11 @@ mod tests {
         let poly_a = Rq::random(&mut rng());
         let poly_vec_b = RqMatrix::random(&mut rng(), 64, 100);
 
-        let result =
-            compute_linear_combination(poly_vec_b.get_elements(), poly_a.get_coefficients());
+        let result = compute_linear_combination(poly_vec_b.elements(), poly_a.coeffs());
 
         let mut expected = RqVector::zero(100);
-        for i in 0..poly_a.get_coefficients().len() {
-            expected = &expected + &(&poly_vec_b.get_elements()[i] * poly_a.get_coefficients()[i]);
+        for i in 0..poly_a.coeffs().len() {
+            expected = &expected + &(&poly_vec_b.elements()[i] * poly_a.coeffs()[i]);
         }
         assert_eq!(result, expected);
     }
@@ -149,12 +145,11 @@ mod tests {
         let poly_vec_a = RqVector::random(&mut rng(), 80);
         let poly_vec_b = RqMatrix::random(&mut rng(), 80, 100);
 
-        let result =
-            compute_linear_combination(poly_vec_b.get_elements(), poly_vec_a.get_elements());
+        let result = compute_linear_combination(poly_vec_b.elements(), poly_vec_a.elements());
 
         let mut expected = RqVector::zero(100);
-        for i in 0..poly_vec_a.get_elements().len() {
-            expected = &expected + &(&poly_vec_b.get_elements()[i] * &poly_vec_a.get_elements()[i]);
+        for i in 0..poly_vec_a.elements().len() {
+            expected = &expected + &(&poly_vec_b.elements()[i] * &poly_vec_a.elements()[i]);
         }
         assert_eq!(result, expected);
     }
