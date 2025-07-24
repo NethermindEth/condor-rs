@@ -141,7 +141,7 @@ mod tests {
         let trials: u128 = 10000;
 
         // let witness = RqVector::random_ternary(&mut rand::rng(), rank);
-        let witness = Witness::new(rank, multiplicity, Zq::NEG_ONE).s;
+        let witness = Witness::new(rank, multiplicity, 6400).s;
         let witness_norm = 128 * witness[0].l2_norm_squared();
 
         let mut norm_sum = 0u128;
