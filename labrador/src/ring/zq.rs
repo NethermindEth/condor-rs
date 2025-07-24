@@ -364,8 +364,8 @@ mod tests {
     fn test_display_implementation() {
         let a = Zq::new(5);
         let max = Zq::NEG_ONE;
-        assert_eq!(format!("{}", a), format!("5 (mod {})", Zq::Q));
-        assert_eq!(format!("{}", max), format!("4294967294 (mod {})", Zq::Q));
+        assert_eq!(format!("{a}"), format!("5 (mod {})", Zq::Q));
+        assert_eq!(format!("{max}"), format!("4294967294 (mod {})", Zq::Q));
     }
 
     #[test]

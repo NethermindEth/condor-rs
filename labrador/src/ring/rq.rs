@@ -651,7 +651,7 @@ mod decomposition_tests {
         let reconstructed = &decomposed[0] + &(&decomposed[1] * &base);
 
         assert_eq!(decomposed.len(), 2);
-        assert_eq!(reconstructed, poly1, "Base {}: Reconstruction failed", base);
+        assert_eq!(reconstructed, poly1, "Base {base}: Reconstruction failed");
     }
 
     #[test]
