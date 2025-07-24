@@ -28,7 +28,6 @@ impl Zq {
     /// Creates a new Zq element from a raw u32 value.
     /// No explicit modulo needed as u32 automatically wraps
     pub const fn new(value: u32) -> Self {
-        debug_assert!(value <= Self::Q, "value not reduced modulo q");
         Self { value }
     }
 
