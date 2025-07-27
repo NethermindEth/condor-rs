@@ -1,12 +1,12 @@
 extern crate labrador;
 
-use labrador::verifier::LabradorVerifier;
-use labrador::relation::env_params::EnvironmentParameters;
-use labrador::relation::witness::Witness;
-use labrador::relation::statement::Statement;
 use labrador::commitments::common_instances::AjtaiInstances;
 use labrador::prover::LabradorProver;
+use labrador::relation::env_params::EnvironmentParameters;
+use labrador::relation::statement::Statement;
+use labrador::relation::witness::Witness;
 use labrador::transcript::sponges::shake::ShakeSponge;
+use labrador::verifier::LabradorVerifier;
 
 fn main() {
     let params = EnvironmentParameters::default();
