@@ -9,20 +9,15 @@ use labrador::{
     transcript::sponges::shake::ShakeSponge,
     verifier::LabradorVerifier,
 };
-use labrador::ring::zq::Zq;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Step 1: Set up LABRADOR parameters
     let params = EnvironmentParameters::default();
 
     // Step 2: Encode Falcon signatures as witnesses
-    let rank = 40;
-    let multiplicity = 100;
-    let bound = Zq::new(320000);
-
     let mut witnesses = Vec::new();
-    for _ in 0..3 {
-        let witness = Witness::new(rank, multiplicity, bound);
+    for _ in 0..4 {
+        let witness = Witness::new(params.rank, params.multiplicity, params.beta);
         witnesses.push(witness);
     }
 
