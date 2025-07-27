@@ -219,11 +219,11 @@ mod tests_generate_pi {
             // Number of elements in the matrix as f64 (256x4x1000)
             #[allow(clippy::as_conversions)]
             let total: f64 = (256 * Rq::DEGREE * rank) as f64;
-            println!("this is the total amount of elements{}", total);
+            println!("this is the total amount of elements{total}");
             let expected = [0.25, 0.5, 0.25];
             for i in 0..3 {
                 let actual = counts[i] / total;
-                println!("This is the actual value {}", actual);
+                println!("This is the actual value {actual}");
                 assert!(
                     //Since its a statistical test some small error tolerance is allowed
                     (actual - expected[i]).abs() < 0.005,

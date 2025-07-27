@@ -489,7 +489,7 @@ pub mod tests {
         for i in 0..4 {
             let expected = poly.coeffs[i];
             let actual = parts[0].coeffs[i] + parts[1].coeffs[i] * Zq::TWO;
-            assert_eq!(actual, expected, "Base 2: Coefficient {} mismatch", i);
+            assert_eq!(actual, expected, "Base 2: Coefficient {i} mismatch");
         }
     }
 
@@ -528,7 +528,7 @@ pub mod tests {
             let p0 = parts[0].coeffs[i];
             let p1 = parts[1].coeffs[i];
             let actual = p0 + p1 * Zq::new(3);
-            assert_eq!(actual, expected, "Base 3: Coefficient {} mismatch", i);
+            assert_eq!(actual, expected, "Base 3: Coefficient {i} mismatch");
         }
     }
 
@@ -593,7 +593,7 @@ pub mod tests {
             let p0 = parts_base8[0].coeffs[i];
             let p1 = parts_base8[1].coeffs[i];
             let actual = p0 + p1 * Zq::new(8);
-            assert_eq!(actual, expected, "Base 8: Coefficient {} mismatch", i);
+            assert_eq!(actual, expected, "Base 8: Coefficient {i} mismatch");
         }
 
         // Base 16 decomposition
@@ -605,7 +605,7 @@ pub mod tests {
             let p0 = parts_base16[0].coeffs[i];
             let p1 = parts_base16[1].coeffs[i];
             let actual = p0 + p1 * Zq::new(16);
-            assert_eq!(actual, expected, "Base 16: Coefficient {} mismatch", i);
+            assert_eq!(actual, expected, "Base 16: Coefficient {i} mismatch");
         }
     }
 
@@ -631,8 +631,7 @@ pub mod tests {
         for i in 0..4 {
             assert_eq!(
                 reconstructed.coeffs[i], poly.coeffs[i],
-                "3-part base 4: Coefficient {} mismatch",
-                i
+                "3-part base 4: Coefficient {i} mismatch",
             );
         }
     }
@@ -672,8 +671,7 @@ pub mod tests {
         for (i, &expected) in expected_centered.iter().enumerate() {
             assert_eq!(
                 parts[0].coeffs[i], expected,
-                "Base 5 centering: Coefficient {} incorrectly centered",
-                i
+                "Base 5 centering: Coefficient {i} incorrectly centered",
             );
         }
     }
@@ -692,8 +690,7 @@ pub mod tests {
         for i in 0..3 {
             assert_eq!(
                 reconstructed.coeffs[i], poly.coeffs[i],
-                "Extreme values: Coefficient {} mismatch",
-                i
+                "Extreme values: Coefficient {i} mismatch",
             );
         }
 
@@ -738,16 +735,13 @@ pub mod tests {
 
                 assert!(
                     abs_coeff <= half_base,
-                    "Base {}: First part coefficient {} exceeds half-base {}",
-                    base,
-                    coeff,
-                    half_base
+                    "Base {base}: First part coefficient {coeff} exceeds half-base {half_base}",
                 );
             }
 
             // Verify reconstruction
             let reconstructed = &parts[0] + &(&parts[1] * &Zq::new(*base));
-            assert_eq!(reconstructed, poly, "Base {}: Reconstruction failed", base);
+            assert_eq!(reconstructed, poly, "Base {base}: Reconstruction failed");
         }
     }
 
