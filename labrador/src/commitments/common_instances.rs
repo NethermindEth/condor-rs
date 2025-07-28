@@ -20,26 +20,28 @@ impl AjtaiInstances {
     pub fn new(ep: &EnvironmentParameters) -> Self {
         Self {
             commitment_scheme_a: AjtaiScheme::new(
-                ep.beta,
+                ep.beta_sq,
                 Self::challenge_rq_matrix(ep.kappa, ep.rank),
             )
             .expect("Invalid Parameters for commitment scheme A"),
             commitment_scheme_b: AjtaiScheme::new(
-                ep.gamma_1,
+                ep.gamma_1_sq,
                 Self::challenge_rq_matrix(ep.kappa_1, ep.multiplicity * ep.t_1 * ep.kappa),
             )
             .expect("Invalid Parameters for commitment scheme B"),
             // Todo: gamma_1 should be changed to a valid witness bound
             commitment_scheme_c: AjtaiScheme::new(
-                ep.gamma_1,
+                ep.gamma_1_sq,
                 Self::challenge_rq_matrix(
                     ep.kappa_1,
                     ep.t_2 * ((ep.multiplicity.pow(2)) + ep.multiplicity) / 2,
                 ),
             )
             .expect("Invalid Parameters for commitment scheme C"),
+            // Note: A factor of 4 is applied because each h_ij cell in the implementation is twice the value specified in
+            // the paper (division by 2 is omitted, as we are not operating on a field).
             commitment_scheme_d: AjtaiScheme::new(
-                ep.gamma_2,
+                ep.gamma_2_sq * 4,
                 Self::challenge_rq_matrix(
                     ep.kappa_2,
                     ep.t_1 * ((ep.multiplicity.pow(2)) + ep.multiplicity) / 2,

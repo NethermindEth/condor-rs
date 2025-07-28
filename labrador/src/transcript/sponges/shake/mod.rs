@@ -25,7 +25,7 @@ impl Sponge for ShakeSponge {
         // Convert Rq ector to u8
         let mut u8_version_input: Vec<u8> = Vec::new();
         for rq in input {
-            for coeff in rq.get_coefficients() {
+            for coeff in rq.coeffs() {
                 u8_version_input.extend_from_slice(&coeff.get_value().to_be_bytes());
             }
         }

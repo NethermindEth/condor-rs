@@ -10,7 +10,7 @@ use labrador::verifier::LabradorVerifier;
 
 fn main() {
     let params = EnvironmentParameters::default();
-    let witness = Witness::new(params.rank, params.multiplicity, params.beta);
+    let witness = Witness::new(params.rank, params.multiplicity, params.beta_sq);
     let statement = Statement::new(&witness, &params);
     let crs = AjtaiInstances::new(&params);
 

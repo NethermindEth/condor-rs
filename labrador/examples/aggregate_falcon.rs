@@ -13,7 +13,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Step 2: Encode Falcon signatures as witnesses
     let mut witnesses = Vec::new();
     for _ in 0..4 {
-        let witness = Witness::new(params.rank, params.multiplicity, params.beta);
+        let witness = Witness::new(params.rank, params.multiplicity, params.beta_sq);
         witnesses.push(witness);
     }
 

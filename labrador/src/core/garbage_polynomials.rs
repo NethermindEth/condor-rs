@@ -11,8 +11,8 @@ pub fn compute_g(witness_vector: &[RqVector]) -> RqMatrix {
         for j in 0..=i {
             // Only calculate for j ≤ i (upper triangular)
             g_ij.push(inner_product::compute_linear_combination(
-                witness_vector[i].get_elements(),
-                witness_vector[j].get_elements(),
+                witness_vector[i].elements(),
+                witness_vector[j].elements(),
             ));
         }
         g_i.push(RqVector::new(g_ij));
@@ -23,8 +23,10 @@ pub fn compute_g(witness_vector: &[RqVector]) -> RqMatrix {
 /// Calculate the h_{ij} = <φ_i, s_j> + <φ_j, s_i> garbage polynomials
 /// In the paper, h_{ij} is defined with a factor of 1/2 in front
 /// However, since we're using q = 2^32, division by 2 is problematic in Z_q
-/// So we store h'_{ij} = 2*h_{ij} = <φ_i, s_j> + <φ_j, s_i> directly
-/// Exploits symmetry by only calculating for i ≤ j since h_{ij} = h_{ji}
+/// So we store h'_{ij} = 2*h_{ij} = <φ_i, s_j> + <φ_j, s_i> directly.
+/// Therefore the bound for commitment scheme of h_ij should be 4 times larger than the bound specified in the paper.
+///
+/// Exploits symmetry by only calculating for i ≤ j since h_{ij} = h_{ji}.
 pub fn compute_h(witness_vector: &[RqVector], phi: &[RqVector]) -> RqMatrix {
     let r = witness_vector.len();
     let mut h_i = Vec::with_capacity((r * (r + 1)) / 2);
@@ -34,12 +36,12 @@ pub fn compute_h(witness_vector: &[RqVector], phi: &[RqVector]) -> RqMatrix {
         for j in 0..=i {
             // Only calculate for j ≤ i (upper triangular)
             let inner_phi_i_s_j = inner_product::compute_linear_combination(
-                phi[i].get_elements(),
-                witness_vector[j].get_elements(),
+                phi[i].elements(),
+                witness_vector[j].elements(),
             );
             let inner_phi_j_s_i = inner_product::compute_linear_combination(
-                phi[j].get_elements(),
-                witness_vector[i].get_elements(),
+                phi[j].elements(),
+                witness_vector[i].elements(),
             );
             h_ij.push(&inner_phi_i_s_j + &inner_phi_j_s_i);
         }
@@ -62,7 +64,7 @@ pub fn compute_h(witness_vector: &[RqVector], phi: &[RqVector]) -> RqMatrix {
 //     let g0 = (0..r)
 //         .map(|i| witnesses[i].inner_product_poly_vector(&witnesses[i]))
 //         .fold(
-//             PolyRing::zero(witnesses[0].get_elements()[0].len()),
+//             PolyRing::zero(witnesses[0].elements()[0].len()),
 //             |acc, g| &acc + &g,
 //         );
 
@@ -74,7 +76,7 @@ pub fn compute_h(witness_vector: &[RqVector], phi: &[RqVector]) -> RqMatrix {
 
 //     for _ in 0..r / 2 {
 //         let mut rng = rand::rngs::StdRng::seed_from_u64(current_seed);
-//         let challenge = PolyRing::random(&mut rng, witnesses[0].get_elements()[0].len());
+//         let challenge = PolyRing::random(&mut rng, witnesses[0].elements()[0].len());
 //         challenges.push(challenge);
 
 //         // Update seed for next challenge
@@ -199,10 +201,10 @@ mod tests {
         let (witnesses, _) = create_test_witnesses(multiplicity);
         let g = compute_g(&witnesses);
 
-        assert_eq!(g.get_row_len(), 3);
+        assert_eq!(g.row_len(), 3);
         // Assert that g stores half of the matrix
         for row in 0..multiplicity {
-            assert_eq!(g.get_elements()[row].get_length(), row + 1);
+            assert_eq!(g.elements()[row].len(), row + 1);
         }
     }
 
@@ -214,18 +216,18 @@ mod tests {
 
         // Verify a few specific values
         let expected_g_01 = inner_product::compute_linear_combination(
-            witnesses[0].get_elements(),
-            witnesses[1].get_elements(),
+            witnesses[0].elements(),
+            witnesses[1].elements(),
         );
         let expected_g_10 = inner_product::compute_linear_combination(
-            witnesses[1].get_elements(),
-            witnesses[0].get_elements(),
+            witnesses[1].elements(),
+            witnesses[0].elements(),
         );
         assert_eq!(expected_g_01, expected_g_10);
 
         let expected_g_22 = inner_product::compute_linear_combination(
-            witnesses[2].get_elements(),
-            witnesses[2].get_elements(),
+            witnesses[2].elements(),
+            witnesses[2].elements(),
         );
 
         assert_eq!(*g.get_cell(0, 1), expected_g_01);
@@ -239,10 +241,10 @@ mod tests {
         let (witnesses, phi) = create_test_witnesses(multiplicity);
         let h = compute_h(&witnesses, &phi);
 
-        assert_eq!(h.get_row_len(), 3);
+        assert_eq!(h.row_len(), 3);
         // Assert that g stores half of the matrix
         for row in 0..multiplicity {
-            assert_eq!(h.get_elements()[row].get_length(), row + 1);
+            assert_eq!(h.elements()[row].len(), row + 1);
         }
     }
 
@@ -252,14 +254,10 @@ mod tests {
         let h = compute_h(&witnesses, &phi);
 
         // Verify a specific value
-        let phi_0_s_1 = inner_product::compute_linear_combination(
-            phi[0].get_elements(),
-            witnesses[1].get_elements(),
-        );
-        let phi_1_s_0 = inner_product::compute_linear_combination(
-            phi[1].get_elements(),
-            witnesses[0].get_elements(),
-        );
+        let phi_0_s_1 =
+            inner_product::compute_linear_combination(phi[0].elements(), witnesses[1].elements());
+        let phi_1_s_0 =
+            inner_product::compute_linear_combination(phi[1].elements(), witnesses[0].elements());
         let expected_h_01 = &phi_0_s_1 + &phi_1_s_0;
 
         assert_eq!(h.get_cell(0, 1), h.get_cell(1, 0));
@@ -271,8 +269,8 @@ mod tests {
         let witness_vector = vec![RqVector::zero(100); 50];
         let g = compute_g(&witness_vector);
 
-        for row in g.get_elements() {
-            for cell in row.get_elements() {
+        for row in g.elements() {
+            for cell in row.elements() {
                 assert_eq!(*cell, Rq::zero());
             }
         }
@@ -284,8 +282,8 @@ mod tests {
         let phi = vec![RqVector::zero(100); 50];
         let h = compute_h(&witness_vector, &phi);
 
-        for row in h.get_elements() {
-            for cell in row.get_elements() {
+        for row in h.elements() {
+            for cell in row.elements() {
                 assert_eq!(*cell, Rq::zero());
             }
         }

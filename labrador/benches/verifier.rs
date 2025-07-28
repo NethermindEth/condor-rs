@@ -9,7 +9,7 @@ use labrador::{
 
 pub fn proof_verification_benchmark(c: &mut Criterion) {
     let ep_1 = EnvironmentParameters::default();
-    let witness_1 = Witness::new(ep_1.rank, ep_1.multiplicity, ep_1.beta);
+    let witness_1 = Witness::new(ep_1.rank, ep_1.multiplicity, ep_1.beta_sq);
     let st: Statement = Statement::new(&witness_1, &ep_1);
     let crs: AjtaiInstances = AjtaiInstances::new(&ep_1);
     let mut prover = LabradorProver::new(&ep_1, &crs, &witness_1, &st);
