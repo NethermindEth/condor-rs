@@ -10,5 +10,5 @@ fn main() {
     let witness = Witness::new(params.rank, params.multiplicity, params.beta);
 
     let commitment = scheme.commitment_scheme_a.commit(&witness.s[0]).unwrap();
-    println!("Commitment: {:?}", commitment);
+    println!("Commitment: {commitment:?}");
 }

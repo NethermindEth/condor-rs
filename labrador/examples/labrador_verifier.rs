@@ -22,5 +22,5 @@ fn main() {
     let mut verifier = LabradorVerifier::new(&params, &crs, &statement);
     let result = verifier.verify(&proof);
 
-    println!("Verification result: {:?}", result);
+    println!("Verification result: {result:?}");
 }
