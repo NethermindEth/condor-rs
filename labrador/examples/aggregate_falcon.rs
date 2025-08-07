@@ -11,20 +11,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let params = EnvironmentParameters::default();
 
     // Step 2: Encode Falcon signatures as witnesses
-    let mut witnesses = Vec::new();
-    for _ in 0..4 {
-        let witness = Witness::new(params.rank, params.multiplicity, params.beta_sq);
-        witnesses.push(witness);
-    }
+    // Step 2: Create a single witness instead of multiple
+    let witness = Witness::new(params.rank, params.multiplicity, params.beta_sq);
 
     // Step 3: Formulate verification constraints as a Statement
-    let statement = Statement::new(&witnesses[0], &params);
+    let statement = Statement::new(&witness, &params);
 
     // Step 4: Initialize the Ajtai commitment scheme instances
     let ajtai_instances = AjtaiInstances::new(&params);
 
     // Step 5: Create and run the LABRADOR prover
-    let mut prover = LabradorProver::new(&params, &ajtai_instances, &witnesses[0], &statement);
+    let mut prover = LabradorProver::new(&params, &ajtai_instances, &witness, &statement);
 
     // Generate the proof
     let proof = prover.prove::<ShakeSponge>()?;
