@@ -74,7 +74,8 @@ impl Zq {
         assert!(bound >= Self::TWO, "base must be ≥ 2");
         assert_ne!(num_parts, 0, "num_parts cannot be zero");
 
-    let mut parts = vec![Self::ZERO; num_parts as usize];
+        let mut parts =
+            vec![Self::ZERO; usize::try_from(num_parts).expect("num_parts does not fit in usize")];
         let half_bound = bound.div_floor_by(2);
         let mut abs_self = match self.is_larger_than_half() {
             true => -(*self),

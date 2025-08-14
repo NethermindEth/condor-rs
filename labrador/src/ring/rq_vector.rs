@@ -86,7 +86,7 @@ impl RqVector {
             .iter()
             .enumerate()
             .for_each(|(index, poly)| {
-                poly.decompose(b, parts as u64)
+                poly.decompose(b, u64::try_from(parts).expect("parts does not fit in u64"))
                     .into_iter()
                     .zip(result.iter_mut())
                     .for_each(|(decomposed_poly, decomposed_vec)| {
