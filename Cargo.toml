@@ -1,15 +1,19 @@
-[workspace.package]
-version = "0.1.0"
-edition = "2021"
-repository = "https://github.com/NethermindEth/LaBRADOR-rs"
-license = "Apache-2.0"
-
 [workspace]
 members = [
     "labrador",
 ]
 resolver = "2"
 default-members = ["labrador"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+repository = "https://github.com/NethermindEth/LaBRADOR-rs"
+license = "Apache-2.0"
+exclude = [
+    "Cargo.lock",
+    "labrador/src/main.rs",
+]
 
 [workspace.dependencies]
 # None so far
