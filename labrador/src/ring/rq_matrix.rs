@@ -99,7 +99,7 @@ impl RqMatrix {
         let mut decomposed_vec = Vec::new();
         for ring_vector in self.elements() {
             for ring in ring_vector.elements() {
-                decomposed_vec.extend(ring.decompose(base, num_parts));
+                decomposed_vec.extend(ring.decompose(base, num_parts as u64));
             }
         }
         RqVector::new(decomposed_vec)

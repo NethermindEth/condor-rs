@@ -63,11 +63,11 @@ impl Rq {
     /// Decomposes a polynomial into base-B representation:
     /// p = p⁽⁰⁾ + p⁽¹⁾·B + p⁽²⁾·B² + ... + p⁽ᵗ⁻¹⁾·B^(t-1)
     /// Where each p⁽ⁱ⁾ has small coefficients, using centered representatives
-    pub fn decompose(&self, base: Zq, num_parts: usize) -> Vec<Rq> {
-        let mut result = vec![Rq::zero(); num_parts];
+    pub fn decompose(&self, base: Zq, num_parts: u64) -> Vec<Rq> {
+    let mut result = vec![Rq::zero(); num_parts as usize];
         self.coeffs.iter().enumerate().for_each(|(index, coeff)| {
             coeff
-                .decompose(base, num_parts)
+                .decompose(base, num_parts as u64)
                 .into_iter()
                 .zip(result.iter_mut())
                 .for_each(|(decomposed_coeff, decomposed_vec)| {
@@ -498,7 +498,7 @@ mod decomposition_tests {
     fn failure_test() {
         let poly1 =
             generate_rq_from_zq_vector(vec![-Zq::new(192), -Zq::new(0), -Zq::new(0), -Zq::new(0)]);
-        let decomposed = poly1.decompose(Zq::new(1802), 10);
+    let decomposed = poly1.decompose(Zq::new(1802), 10u64);
 
         let mut result = Rq::zero();
         let mut exponential_base = Zq::new(1);
@@ -514,7 +514,7 @@ mod decomposition_tests {
         // Test case 1: Base 2 decomposition
         let poly: Rq =
             generate_rq_from_zq_vector(vec![Zq::new(5), Zq::new(3), Zq::new(7), Zq::new(1)]);
-        let parts = poly.decompose(Zq::TWO, 4);
+    let parts = poly.decompose(Zq::TWO, 4u64);
 
         // Part 0: remainders mod 2 (no centering needed for base 2)
         assert_eq!(
@@ -558,7 +558,7 @@ mod decomposition_tests {
     fn test_decomposition_edge_cases() {
         // Test zero polynomial
         let zero_poly: Rq = generate_rq_from_zq_vector(vec![Zq::ZERO; 4]);
-        let parts = zero_poly.decompose(Zq::TWO, 2);
+    let parts = zero_poly.decompose(Zq::TWO, 2u64);
         assert!(
             // Check any polynomial is zero
             parts
@@ -570,7 +570,7 @@ mod decomposition_tests {
         // Test single part decomposition
         let simple_poly: Rq =
             generate_rq_from_zq_vector(vec![Zq::ONE, Zq::new(2), Zq::new(3), Zq::new(4)]);
-        let parts = simple_poly.decompose(Zq::TWO, 1);
+    let parts = simple_poly.decompose(Zq::TWO, 1u64);
         assert_eq!(parts.len(), 1, "Single part decomposition length incorrect");
     }
 
@@ -645,7 +645,7 @@ mod decomposition_tests {
             ],
         };
         let base = Zq::new(1802);
-        let decomposed = poly1.decompose(base, 2);
+    let decomposed = poly1.decompose(base, 2u64);
 
         // Verify reconstruction
         let reconstructed = &decomposed[0] + &(&decomposed[1] * &base);
@@ -725,7 +725,7 @@ mod decomposition_tests {
             ],
         };
         let base = Zq::new(1802);
-        let decomposed = poly1.decompose(base, 2);
+    let decomposed = poly1.decompose(base, 2u64);
 
         // Verify reconstruction
         for decomposed_poly in decomposed {

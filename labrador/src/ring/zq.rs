@@ -70,11 +70,11 @@ impl Zq {
 
     /// Decompose the element to #num_parts number of parts,
     /// where each part's infinity norm is less than or equal to bound/2
-    pub(crate) fn decompose(&self, bound: Self, num_parts: usize) -> Vec<Zq> {
+    pub(crate) fn decompose(&self, bound: Self, num_parts: u64) -> Vec<Zq> {
         assert!(bound >= Self::TWO, "base must be ≥ 2");
         assert_ne!(num_parts, 0, "num_parts cannot be zero");
 
-        let mut parts = vec![Self::ZERO; num_parts];
+    let mut parts = vec![Self::ZERO; num_parts as usize];
         let half_bound = bound.div_floor_by(2);
         let mut abs_self = match self.is_larger_than_half() {
             true => -(*self),
