@@ -28,8 +28,8 @@ use crate::core::aggregate::{FunctionsAggregation, ZeroConstantFunctionsAggregat
 use crate::core::{inner_product, jl::Projection};
 use crate::relation::env_params;
 use crate::relation::{env_params::EnvironmentParameters, statement::Statement};
-use crate::ring::{rq::Rq, rq_matrix::RqMatrix, rq_vector::RqVector, Norms};
 use crate::ring::zq::ZqLabrador;
+use crate::ring::{rq::Rq, rq_matrix::RqMatrix, rq_vector::RqVector, Norms};
 type Zq = ZqLabrador;
 use crate::transcript::{LabradorTranscript, Sponge};
 use thiserror::Error;

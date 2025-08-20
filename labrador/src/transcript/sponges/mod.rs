@@ -1,4 +1,4 @@
-use crate::ring::{rq::Rq};
+use crate::ring::rq::Rq;
 use crate::ring::zq::ZqLabrador;
 type Zq = ZqLabrador;
 

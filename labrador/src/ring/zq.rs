@@ -13,38 +13,45 @@ pub trait Mod: 'static + Copy + Clone + Send + Sync + PartialEq + Eq + PartialOr
     const BITS: u32; // number of bits needed for this modulus
     const ROOT_OF_UNITY: Option<u64> = None; // for NTT operations
     const IS_PRIME: bool = true;
-    
+
     /// Optimized modular reduction - can be overridden for specific moduli
     #[inline]
     fn reduce(value: u128) -> u64 {
-        (value % Self::MODULUS as u128) as u64
+        let modulus_u128 = u128::from(Self::MODULUS);
+        (value % modulus_u128)
+            .try_into()
+            .expect("Reduced value should fit in u64")
     }
-    
+
     /// Optimized modular addition
     #[inline]
     fn add_mod(a: u64, b: u64) -> u64 {
-        let sum = a as u128 + b as u128;
+        let sum = u128::from(a) + u128::from(b);
         Self::reduce(sum)
     }
-    
+
     /// Optimized modular subtraction
     #[inline]
     fn sub_mod(a: u64, b: u64) -> u64 {
-        let diff = a as u128 + Self::MODULUS as u128 - b as u128;
+        let diff = u128::from(a) + u128::from(Self::MODULUS) - u128::from(b);
         Self::reduce(diff)
     }
-    
+
     /// Optimized modular multiplication
     #[inline]
     fn mul_mod(a: u64, b: u64) -> u64 {
-        let prod = a as u128 * b as u128;
+        let prod = u128::from(a) * u128::from(b);
         Self::reduce(prod)
     }
-    
+
     /// Modular negation
     #[inline]
     fn neg_mod(a: u64) -> u64 {
-        if a == 0 { 0 } else { Self::MODULUS - a }
+        if a == 0 {
+            0
+        } else {
+            Self::MODULUS - a
+        }
     }
 }
 
@@ -62,12 +69,16 @@ impl<M: Mod> Zq<M> {
     /// Applies modulo M::MODULUS automatically
     #[inline]
     pub const fn new(value: u64) -> Self {
-        Self { 
-            value: if M::MODULUS == 0 { value } else { value % M::MODULUS },
+        Self {
+            value: if M::MODULUS == 0 {
+                value
+            } else {
+                value % M::MODULUS
+            },
             _phantom: PhantomData,
         }
     }
-    
+
     /// Creates a Zq element from a pre-reduced value (unsafe - no modulo check)
     #[inline]
     pub const fn from_raw(value: u64) -> Self {
@@ -107,8 +118,8 @@ impl<M: Mod> Zq<M> {
 
     /// Centered representative in `(-M::MODULUS/2, M::MODULUS/2]`.
     pub(crate) fn centered_mod(&self) -> i128 {
-        let bound = M::MODULUS as i128;
-        let value = self.value as i128;
+        let bound = i128::from(M::MODULUS);
+        let value = i128::from(self.value);
 
         if value > (bound - 1) / 2 {
             value - bound
@@ -221,7 +232,7 @@ impl<M: Mod> MulAssign for Zq<M> {
 // Reference implementations
 impl<M: Mod> Add<Zq<M>> for &Zq<M> {
     type Output = Zq<M>;
-    
+
     #[inline]
     fn add(self, rhs: Zq<M>) -> Self::Output {
         *self + rhs
@@ -230,7 +241,7 @@ impl<M: Mod> Add<Zq<M>> for &Zq<M> {
 
 impl<M: Mod> Add<&Zq<M>> for &Zq<M> {
     type Output = Zq<M>;
-    
+
     #[inline]
     fn add(self, rhs: &Zq<M>) -> Self::Output {
         *self + *rhs
@@ -239,7 +250,7 @@ impl<M: Mod> Add<&Zq<M>> for &Zq<M> {
 
 impl<M: Mod> Sub<Zq<M>> for &Zq<M> {
     type Output = Zq<M>;
-    
+
     #[inline]
     fn sub(self, rhs: Zq<M>) -> Self::Output {
         *self - rhs
@@ -248,7 +259,7 @@ impl<M: Mod> Sub<Zq<M>> for &Zq<M> {
 
 impl<M: Mod> Sub<&Zq<M>> for &Zq<M> {
     type Output = Zq<M>;
-    
+
     #[inline]
     fn sub(self, rhs: &Zq<M>) -> Self::Output {
         *self - *rhs
@@ -257,7 +268,7 @@ impl<M: Mod> Sub<&Zq<M>> for &Zq<M> {
 
 impl<M: Mod> Mul<Zq<M>> for &Zq<M> {
     type Output = Zq<M>;
-    
+
     #[inline]
     fn mul(self, rhs: Zq<M>) -> Self::Output {
         *self * rhs
@@ -266,7 +277,7 @@ impl<M: Mod> Mul<Zq<M>> for &Zq<M> {
 
 impl<M: Mod> Mul<&Zq<M>> for &Zq<M> {
     type Output = Zq<M>;
-    
+
     #[inline]
     fn mul(self, rhs: &Zq<M>) -> Self::Output {
         *self * *rhs
@@ -294,7 +305,7 @@ impl<M: Mod> UniformSampler for UniformZq<M> {
         UniformInt::<u64>::new(low.borrow().value, high.borrow().value)
             .map(|sampler| UniformZq(sampler, PhantomData))
     }
-    
+
     fn new_inclusive<B1, B2>(low: B1, high: B2) -> Result<Self, Error>
     where
         B1: SampleBorrow<Self::X> + Sized,
@@ -303,7 +314,7 @@ impl<M: Mod> UniformSampler for UniformZq<M> {
         UniformInt::<u64>::new_inclusive(low.borrow().value, high.borrow().value)
             .map(|sampler| UniformZq(sampler, PhantomData))
     }
-    
+
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> Self::X {
         Self::X::new(self.0.sample(rng))
     }
@@ -329,15 +340,14 @@ pub fn add_assign_two_zq_vectors<M: Mod>(lhs: &mut [Zq<M>], rhs: Vec<Zq<M>>) {
 impl<M: Mod> Norms for [Zq<M>] {
     type NormType = u128;
 
-    #[allow(clippy::as_conversions)]
     fn l2_norm_squared(&self) -> Self::NormType {
         self.iter().fold(0u128, |acc, coeff| {
             let c = coeff.centered_mod();
-            acc + (c * c) as u128
+            let c_squared = u128::try_from(c * c).expect("c * c should fit in u128");
+            acc + c_squared
         })
     }
 
-    #[allow(clippy::as_conversions)]
     fn linf_norm(&self) -> Self::NormType {
         self.iter()
             .map(|coeff| coeff.centered_mod().unsigned_abs())
@@ -348,11 +358,13 @@ impl<M: Mod> Norms for [Zq<M>] {
 
 // Define specific moduli for different use cases
 
-/// The original u32::MAX modulus from your implementation
+/// The original u32::MAX modulus from your implementation (converted to u64)
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct U32MaxMod;
+
 impl Mod for U32MaxMod {
-    const MODULUS: u64 = u64::MAX;
+    #[allow(clippy::as_conversions)] // Required for const context - widening conversion is safe
+    const MODULUS: u64 = u32::MAX as u64;
     const INV: u64 = 0; // Not used for this modulus
     const BITS: u32 = 32;
     const IS_PRIME: bool = false; // 2^32 - 1 is not prime
@@ -368,20 +380,81 @@ impl Mod for LabradorMod {
     const ROOT_OF_UNITY: Option<u64> = Some(1753);
 }
 
-/// Falcon-512 single signature modulus (41 bits, but truncated to fit u32)
+/// Falcon-512 single signature modulus
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Falcon512Mod;
 impl Mod for Falcon512Mod {
-    const MODULUS: u64 = (1u64 << 31) - 1;
+    const MODULUS: u64 = (1u64 << 41) - 1; // 41 bits for single signature
     const INV: u64 = 0;
-    const BITS: u32 = 31;
-    const IS_PRIME: bool = true; // 2^31 - 1 is a Mersenne prime
+    const BITS: u32 = 41;
+    const IS_PRIME: bool = false; // 2^41 - 1 is not prime
+}
+
+/// Falcon-512 aggregation moduli for different numbers of signatures
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Falcon512Agg2;
+impl Mod for Falcon512Agg2 {
+    const MODULUS: u64 = (1u64 << 42) - 1; // 42 bits for 2 signatures
+    const INV: u64 = 0;
+    const BITS: u32 = 42;
+    const IS_PRIME: bool = false;
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Falcon512Agg4;
+impl Mod for Falcon512Agg4 {
+    const MODULUS: u64 = (1u64 << 43) - 1; // 43 bits for 4 signatures
+    const INV: u64 = 0;
+    const BITS: u32 = 43;
+    const IS_PRIME: bool = false;
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Falcon512Agg8;
+impl Mod for Falcon512Agg8 {
+    const MODULUS: u64 = (1u64 << 44) - 1; // 44 bits for 8 signatures
+    const INV: u64 = 0;
+    const BITS: u32 = 44;
+    const IS_PRIME: bool = false;
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Falcon512Agg16;
+impl Mod for Falcon512Agg16 {
+    const MODULUS: u64 = (1u64 << 45) - 1; // 45 bits for 16 signatures
+    const INV: u64 = 0;
+    const BITS: u32 = 45;
+    const IS_PRIME: bool = false;
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Falcon512Agg32;
+impl Mod for Falcon512Agg32 {
+    const MODULUS: u64 = (1u64 << 46) - 1; // 46 bits for 32 signatures
+    const INV: u64 = 0;
+    const BITS: u32 = 46;
+    const IS_PRIME: bool = false;
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Falcon512Agg64;
+impl Mod for Falcon512Agg64 {
+    const MODULUS: u64 = (1u64 << 47) - 1; // 47 bits for 64 signatures
+    const INV: u64 = 0;
+    const BITS: u32 = 47;
+    const IS_PRIME: bool = false;
 }
 
 // Type aliases for convenience and backward compatibility
 pub type ZqU32Max = Zq<U32MaxMod>;
 pub type ZqLabrador = Zq<LabradorMod>;
 pub type ZqFalcon512 = Zq<Falcon512Mod>;
+pub type ZqFalcon512Agg2 = Zq<Falcon512Agg2>;
+pub type ZqFalcon512Agg4 = Zq<Falcon512Agg4>;
+pub type ZqFalcon512Agg8 = Zq<Falcon512Agg8>;
+pub type ZqFalcon512Agg16 = Zq<Falcon512Agg16>;
+pub type ZqFalcon512Agg32 = Zq<Falcon512Agg32>;
+pub type ZqFalcon512Agg64 = Zq<Falcon512Agg64>;
 
 // For your existing code, you can use ZqU32Max as a drop-in replacement
 // Or create a simple type alias:
@@ -487,7 +560,7 @@ mod tests {
 #[cfg(test)]
 mod norm_tests {
     use super::*;
-    
+
     type TestZq = ZqU32Max;
 
     #[test]
@@ -538,9 +611,7 @@ mod norm_tests {
 
 #[cfg(test)]
 mod decomposition_tests {
-    
     use super::*;
-
     type TestZq = ZqU32Max;
 
     #[test]

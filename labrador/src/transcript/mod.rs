@@ -1,9 +1,9 @@
 pub mod sponges;
+use crate::ring::zq::ZqLabrador;
 use crate::{
     core::jl::Projection,
     ring::{rq::Rq, rq_matrix::RqMatrix, rq_vector::RqVector},
 };
-use crate::ring::zq::ZqLabrador;
 type Zq = ZqLabrador;
 pub use sponges::Sponge;
 
