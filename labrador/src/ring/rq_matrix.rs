@@ -6,7 +6,9 @@ use crate::{core::inner_product, ring::rq_vector::RqVector};
 use rand::{CryptoRng, Rng};
 use std::ops::Mul;
 
-use super::{rq::Rq, zq::Zq};
+use crate::ring::rq::Rq;
+use crate::ring::zq::ZqLabrador;
+type Zq = ZqLabrador;
 
 /// Matrix of polynomials in Rq
 #[derive(Debug, Clone)]

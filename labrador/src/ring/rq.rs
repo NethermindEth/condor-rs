@@ -1,6 +1,7 @@
 //! Polynomial ring **R = Z_q[X]/(X^d + 1)** with `d = 64` and `q = u32::MAX`.
 
-use crate::ring::zq::Zq;
+use crate::ring::zq::ZqLabrador;
+type Zq = ZqLabrador;
 use crate::ring::Norms;
 use core::ops::{Add, Mul, Sub};
 use rand::distr::{Distribution, Uniform};
@@ -47,7 +48,7 @@ impl Rq {
     }
 
     /// Random coefficients in `(-bound, bound)`.
-    pub fn random_with_bound<R: Rng + CryptoRng>(rng: &mut R, bound: u32) -> Self {
+    pub fn random_with_bound<R: Rng + CryptoRng>(rng: &mut R, bound: u64) -> Self {
         let uniform = Uniform::new_inclusive(Zq::ZERO, Zq::new(bound)).unwrap();
         let mut coeffs = [Zq::ZERO; Self::DEGREE];
         coeffs.iter_mut().for_each(|c| {
