@@ -30,7 +30,7 @@ pub trait Mod: 'static + Copy + Clone + Send + Sync + PartialEq + Eq + PartialOr
     /// Optimized modular subtraction
     #[inline]
     fn sub_mod(a: u64, b: u64) -> u64 {
-        let diff = (a as u128 + Self::MODULUS as u128 - b as u128);
+        let diff = a as u128 + Self::MODULUS as u128 - b as u128;
         Self::reduce(diff)
     }
     
@@ -538,7 +538,7 @@ mod norm_tests {
 
 #[cfg(test)]
 mod decomposition_tests {
-    use crate::ring::{zq::Zq, Norms};
+    
     use super::*;
 
     type TestZq = ZqU32Max;
