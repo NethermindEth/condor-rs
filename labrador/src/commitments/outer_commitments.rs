@@ -2,8 +2,11 @@ use thiserror::Error;
 
 use crate::{
     commitments::common_instances::AjtaiInstances,
-    ring::{rq_matrix::RqMatrix, rq_vector::RqVector, zq::Zq},
+    ring::{rq_matrix::RqMatrix, rq_vector::RqVector},
 };
+
+use crate::ring::zq::ZqLabrador;
+type Zq = ZqLabrador;
 
 use super::ajtai_commitment::AjtaiScheme;
 

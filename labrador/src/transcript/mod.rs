@@ -1,8 +1,10 @@
 pub mod sponges;
+use crate::ring::zq::ZqLabrador;
 use crate::{
     core::jl::Projection,
-    ring::{rq::Rq, rq_matrix::RqMatrix, rq_vector::RqVector, zq::Zq},
+    ring::{rq::Rq, rq_matrix::RqMatrix, rq_vector::RqVector},
 };
+type Zq = ZqLabrador;
 pub use sponges::Sponge;
 
 pub struct LabradorTranscript<S: Sponge> {
@@ -94,9 +96,9 @@ impl<S: Sponge> LabradorTranscript<S> {
                         let coeffs = chunk
                             .iter()
                             .map(|elem| {
-                                if elem.get_value() < 2_u32.pow(30) {
+                                if elem.get_value() < 2_u64.pow(30) {
                                     Zq::NEG_ONE
-                                } else if elem.get_value() < 2_u32.pow(31) {
+                                } else if elem.get_value() < 2_u64.pow(31) {
                                     Zq::ONE
                                 } else {
                                     Zq::ZERO

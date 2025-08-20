@@ -3,7 +3,8 @@ use crate::relation::witness::Witness;
 use crate::ring::rq::Rq;
 use crate::ring::rq_matrix::RqMatrix;
 use crate::ring::rq_vector::RqVector;
-use crate::ring::zq::Zq;
+use crate::ring::zq::ZqLabrador;
+type Zq = ZqLabrador;
 
 use crate::core::inner_product;
 

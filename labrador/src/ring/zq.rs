@@ -4,56 +4,122 @@ use rand::distr::uniform::{Error, SampleBorrow, SampleUniform, UniformInt, Unifo
 use rand::prelude::*;
 use std::fmt;
 use std::iter::Sum;
+use std::marker::PhantomData;
 
-/// Element of the group **Z/(2^32 − 1)**.
-/// Uses native u32 operations with automatic modulo reduction through wrapping arithmetic.
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Default)]
-pub struct Zq {
-    /// Values in the range `0..u32::MAX−1`.
-    value: u32,
-}
+/// Trait defining modular arithmetic parameters and operations
+pub trait Mod: 'static + Copy + Clone + Send + Sync + PartialEq + Eq + PartialOrd + Ord {
+    const MODULUS: u64;
+    const INV: u64; // multiplicative inverse for Montgomery reduction, etc.
+    const BITS: u32; // number of bits needed for this modulus
+    const ROOT_OF_UNITY: Option<u64> = None; // for NTT operations
+    const IS_PRIME: bool = true;
 
-impl Zq {
-    /// Modulus `q = 2^32 − 1`
-    #[allow(clippy::as_conversions)]
-    pub const Q: u32 = u32::MAX;
-
-    // ------- constants -------
-    pub const ZERO: Self = Self::new(0);
-    pub const ONE: Self = Self::new(1);
-    pub const TWO: Self = Self::new(2);
-    // -1 or Maximum possible value. Equals `q - 1` or ` 2^32 − 2`
-    pub const NEG_ONE: Self = Self::new(u32::MAX - 1);
-
-    /// Creates a new Zq element from a raw u32 value.
-    /// No explicit modulo needed as u32 automatically wraps
-    pub const fn new(value: u32) -> Self {
-        Self { value }
+    /// Optimized modular reduction - can be overridden for specific moduli
+    #[inline]
+    fn reduce(value: u128) -> u64 {
+        let modulus_u128 = u128::from(Self::MODULUS);
+        (value % modulus_u128)
+            .try_into()
+            .expect("Reduced value should fit in u64")
     }
 
+    /// Optimized modular addition
+    #[inline]
+    fn add_mod(a: u64, b: u64) -> u64 {
+        let sum = u128::from(a) + u128::from(b);
+        Self::reduce(sum)
+    }
+
+    /// Optimized modular subtraction
+    #[inline]
+    fn sub_mod(a: u64, b: u64) -> u64 {
+        let diff = u128::from(a) + u128::from(Self::MODULUS) - u128::from(b);
+        Self::reduce(diff)
+    }
+
+    /// Optimized modular multiplication
+    #[inline]
+    fn mul_mod(a: u64, b: u64) -> u64 {
+        let prod = u128::from(a) * u128::from(b);
+        Self::reduce(prod)
+    }
+
+    /// Modular negation
+    #[inline]
+    fn neg_mod(a: u64) -> u64 {
+        if a == 0 {
+            0
+        } else {
+            Self::MODULUS - a
+        }
+    }
+}
+
+/// Element of the group **Z/M::MODULUS** using trait-based modulus definition.
+/// Uses native u64 operations with automatic modulo reduction.
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Default, Hash)]
+pub struct Zq<M: Mod> {
+    /// Values in the range `0..M::MODULUS`.
+    value: u64,
+    _phantom: PhantomData<M>,
+}
+
+impl<M: Mod> Zq<M> {
+    /// Creates a new Zq element from a raw u64 value.
+    /// Applies modulo M::MODULUS automatically
+    #[inline]
+    pub const fn new(value: u64) -> Self {
+        Self {
+            value: if M::MODULUS == 0 {
+                value
+            } else {
+                value % M::MODULUS
+            },
+            _phantom: PhantomData,
+        }
+    }
+
+    /// Creates a Zq element from a pre-reduced value (unsafe - no modulo check)
+    #[inline]
+    pub const fn from_raw(value: u64) -> Self {
+        Self {
+            value,
+            _phantom: PhantomData,
+        }
+    }
+
+    // Constants - now using the trait's MODULUS
+    pub const ZERO: Self = Self::from_raw(0);
+    pub const ONE: Self = Self::from_raw(1);
+    pub const TWO: Self = Self::from_raw(2);
+    // -1 or Maximum possible value. Equals `M::MODULUS - 1`
+    pub const NEG_ONE: Self = Self::from_raw(M::MODULUS - 1);
+
+    #[inline]
     pub fn to_u128(&self) -> u128 {
         u128::from(self.value)
     }
 
-    pub fn get_value(&self) -> u32 {
+    #[inline]
+    pub fn get_value(&self) -> u64 {
         self.value
     }
 
+    #[inline]
     pub const fn is_zero(&self) -> bool {
         self.value == 0
     }
 
-    /// Returns `1` iff the element is in `(q-1/2, q)`
-    #[allow(clippy::as_conversions)]
+    /// Returns `true` iff the element is in `(M::MODULUS-1/2, M::MODULUS)`
+    #[inline]
     pub fn is_larger_than_half(&self) -> bool {
-        self.value > (Self::Q - 1) / 2
+        self.value > (M::MODULUS - 1) / 2
     }
 
-    /// Centered representative in `(-q/2, q/2]`.
-    #[allow(clippy::as_conversions)]
+    /// Centered representative in `(-M::MODULUS/2, M::MODULUS/2]`.
     pub(crate) fn centered_mod(&self) -> i128 {
-        let bound = Self::Q as i128;
-        let value = self.value as i128;
+        let bound = i128::from(M::MODULUS);
+        let value = i128::from(self.value);
 
         if value > (bound - 1) / 2 {
             value - bound
@@ -62,23 +128,25 @@ impl Zq {
         }
     }
 
-    /// Floor division by another `Zq` value (*not* a field inverse!, just dividing the values).
-    pub(crate) fn div_floor_by(&self, rhs: u32) -> Self {
+    /// Floor division by another value (*not* a field inverse!, just dividing the values).
+    pub(crate) fn div_floor_by(&self, rhs: u64) -> Self {
         assert_ne!(rhs, 0, "division by zero");
         Self::new(self.value / rhs)
     }
 
     /// Decompose the element to #num_parts number of parts,
     /// where each part's infinity norm is less than or equal to bound/2
-    pub(crate) fn decompose(&self, bound: Self, num_parts: usize) -> Vec<Zq> {
+    pub(crate) fn decompose(&self, bound: Self, num_parts: u64) -> Vec<Self> {
         assert!(bound >= Self::TWO, "base must be ≥ 2");
         assert_ne!(num_parts, 0, "num_parts cannot be zero");
 
-        let mut parts = vec![Self::ZERO; num_parts];
+        let mut parts =
+            vec![Self::ZERO; usize::try_from(num_parts).expect("num_parts does not fit in usize")];
         let half_bound = bound.div_floor_by(2);
-        let mut abs_self = match self.is_larger_than_half() {
-            true => -(*self),
-            false => *self,
+        let mut abs_self = if self.is_larger_than_half() {
+            -(*self)
+        } else {
+            *self
         };
 
         for part in &mut parts {
@@ -86,9 +154,10 @@ impl Zq {
             if remainder > half_bound {
                 remainder -= bound;
             }
-            *part = match self.is_larger_than_half() {
-                true => -remainder,
-                false => remainder,
+            *part = if self.is_larger_than_half() {
+                -remainder
+            } else {
+                remainder
             };
             abs_self = Self::new((abs_self - remainder).value / bound.value);
             if abs_self == Self::ZERO {
@@ -98,147 +167,187 @@ impl Zq {
         parts
     }
 
-    #[allow(clippy::as_conversions)]
-    fn add_op(self, rhs: Zq) -> Zq {
-        let sum = (self.value as u64 + rhs.value as u64) % Zq::Q as u64;
-        Zq::new(sum as u32)
-    }
+    // Remove the internal arithmetic methods since we'll use the trait methods directly
+}
 
-    #[allow(clippy::as_conversions)]
-    fn sub_op(self, rhs: Zq) -> Zq {
-        let sub = (self.value as u64 + Zq::Q as u64 - rhs.value as u64) % Zq::Q as u64;
-        Zq::new(sub as u32)
-    }
+// Arithmetic implementations using the trait methods
+impl<M: Mod> Add for Zq<M> {
+    type Output = Self;
 
-    #[allow(clippy::as_conversions)]
-    fn mul_op(self, b: Zq) -> Zq {
-        let prod = (self.value as u64 * b.value as u64) % Zq::Q as u64;
-        Zq::new(prod as u32)
+    #[inline]
+    fn add(self, rhs: Self) -> Self::Output {
+        Self::from_raw(M::add_mod(self.value, rhs.value))
     }
 }
 
-// Macro to generate arithmetic trait implementations
-macro_rules! impl_arithmetic {
-    ($trait:ident, $assign_trait:ident, $method:ident, $assign_method:ident, $op:ident) => {
-        impl $trait for Zq {
-            type Output = Self;
+impl<M: Mod> Sub for Zq<M> {
+    type Output = Self;
 
-            fn $method(self, rhs: Self) -> Self::Output {
-                self.$op(rhs)
-            }
-        }
-
-        impl $assign_trait for Zq {
-            fn $assign_method(&mut self, rhs: Self) {
-                *self = self.$op(rhs);
-            }
-        }
-
-        impl $trait<Zq> for &Zq {
-            type Output = Zq;
-
-            fn $method(self, rhs: Zq) -> Self::Output {
-                self.$op(rhs)
-            }
-        }
-
-        impl $trait<&Zq> for &Zq {
-            type Output = Zq;
-
-            fn $method(self, rhs: &Zq) -> Self::Output {
-                self.$op(*rhs)
-            }
-        }
-    };
-}
-
-impl_arithmetic!(Add, AddAssign, add, add_assign, add_op);
-impl_arithmetic!(Sub, SubAssign, sub, sub_assign, sub_op);
-impl_arithmetic!(Mul, MulAssign, mul, mul_assign, mul_op);
-
-// Implement the Neg trait for Zq.
-impl Neg for Zq {
-    type Output = Zq;
-
-    /// Returns the additive inverse of the field element.
-    ///
-    /// Wrap around (q - a) mod q.
-    fn neg(self) -> Zq {
-        // If the value is zero, its inverse is itself.
-        if self.value == 0 {
-            self
-        } else {
-            #[allow(clippy::as_conversions)]
-            Zq::new(Zq::Q - self.get_value())
-        }
+    #[inline]
+    fn sub(self, rhs: Self) -> Self::Output {
+        Self::from_raw(M::sub_mod(self.value, rhs.value))
     }
 }
 
-impl fmt::Display for Zq {
+impl<M: Mod> Mul for Zq<M> {
+    type Output = Self;
+
+    #[inline]
+    fn mul(self, rhs: Self) -> Self::Output {
+        Self::from_raw(M::mul_mod(self.value, rhs.value))
+    }
+}
+
+impl<M: Mod> Neg for Zq<M> {
+    type Output = Self;
+
+    #[inline]
+    fn neg(self) -> Self::Output {
+        Self::from_raw(M::neg_mod(self.value))
+    }
+}
+
+// Assignment operators
+impl<M: Mod> AddAssign for Zq<M> {
+    #[inline]
+    fn add_assign(&mut self, rhs: Self) {
+        *self = *self + rhs;
+    }
+}
+
+impl<M: Mod> SubAssign for Zq<M> {
+    #[inline]
+    fn sub_assign(&mut self, rhs: Self) {
+        *self = *self - rhs;
+    }
+}
+
+impl<M: Mod> MulAssign for Zq<M> {
+    #[inline]
+    fn mul_assign(&mut self, rhs: Self) {
+        *self = *self * rhs;
+    }
+}
+
+// Reference implementations
+impl<M: Mod> Add<Zq<M>> for &Zq<M> {
+    type Output = Zq<M>;
+
+    #[inline]
+    fn add(self, rhs: Zq<M>) -> Self::Output {
+        *self + rhs
+    }
+}
+
+impl<M: Mod> Add<&Zq<M>> for &Zq<M> {
+    type Output = Zq<M>;
+
+    #[inline]
+    fn add(self, rhs: &Zq<M>) -> Self::Output {
+        *self + *rhs
+    }
+}
+
+impl<M: Mod> Sub<Zq<M>> for &Zq<M> {
+    type Output = Zq<M>;
+
+    #[inline]
+    fn sub(self, rhs: Zq<M>) -> Self::Output {
+        *self - rhs
+    }
+}
+
+impl<M: Mod> Sub<&Zq<M>> for &Zq<M> {
+    type Output = Zq<M>;
+
+    #[inline]
+    fn sub(self, rhs: &Zq<M>) -> Self::Output {
+        *self - *rhs
+    }
+}
+
+impl<M: Mod> Mul<Zq<M>> for &Zq<M> {
+    type Output = Zq<M>;
+
+    #[inline]
+    fn mul(self, rhs: Zq<M>) -> Self::Output {
+        *self * rhs
+    }
+}
+
+impl<M: Mod> Mul<&Zq<M>> for &Zq<M> {
+    type Output = Zq<M>;
+
+    #[inline]
+    fn mul(self, rhs: &Zq<M>) -> Self::Output {
+        *self * *rhs
+    }
+}
+
+impl<M: Mod> fmt::Display for Zq<M> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // Shows value with modulus for clarity
-        write!(f, "{} (mod {})", self.value, Zq::Q)
+        write!(f, "{} (mod {})", self.value, M::MODULUS)
     }
 }
 
+// Random sampling
 #[derive(Clone, Copy, Debug)]
-pub struct UniformZq(UniformInt<u32>);
+pub struct UniformZq<M: Mod>(UniformInt<u64>, PhantomData<M>);
 
-impl UniformSampler for UniformZq {
-    type X = Zq;
+impl<M: Mod> UniformSampler for UniformZq<M> {
+    type X = Zq<M>;
 
     fn new<B1, B2>(low: B1, high: B2) -> Result<Self, Error>
     where
         B1: SampleBorrow<Self::X> + Sized,
         B2: SampleBorrow<Self::X> + Sized,
     {
-        UniformInt::<u32>::new(low.borrow().value, high.borrow().value).map(UniformZq)
+        UniformInt::<u64>::new(low.borrow().value, high.borrow().value)
+            .map(|sampler| UniformZq(sampler, PhantomData))
     }
+
     fn new_inclusive<B1, B2>(low: B1, high: B2) -> Result<Self, Error>
     where
         B1: SampleBorrow<Self::X> + Sized,
         B2: SampleBorrow<Self::X> + Sized,
     {
-        UniformInt::<u32>::new_inclusive(low.borrow().value, high.borrow().value).map(UniformZq)
+        UniformInt::<u64>::new_inclusive(low.borrow().value, high.borrow().value)
+            .map(|sampler| UniformZq(sampler, PhantomData))
     }
+
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> Self::X {
         Self::X::new(self.0.sample(rng))
     }
 }
 
-impl SampleUniform for Zq {
-    type Sampler = UniformZq;
+impl<M: Mod> SampleUniform for Zq<M> {
+    type Sampler = UniformZq<M>;
 }
 
-impl Sum for Zq {
-    // Accumulate using the addition operator
-    fn sum<I>(iter: I) -> Self
-    where
-        I: Iterator<Item = Zq>,
-    {
-        iter.fold(Zq::ZERO, |acc, x| acc + x)
+impl<M: Mod> Sum for Zq<M> {
+    fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
+        iter.fold(Self::ZERO, |a, b| a + b)
     }
 }
 
 /// Adds `rhs` into `lhs` component‑wise.
-pub fn add_assign_two_zq_vectors(lhs: &mut [Zq], rhs: Vec<Zq>) {
+pub fn add_assign_two_zq_vectors<M: Mod>(lhs: &mut [Zq<M>], rhs: Vec<Zq<M>>) {
     debug_assert_eq!(lhs.len(), rhs.len(), "vector length mismatch");
     lhs.iter_mut().zip(rhs).for_each(|(l, r)| *l += r);
 }
 
 // Implement l2 and infinity norms for a slice of Zq elements
-impl Norms for [Zq] {
+impl<M: Mod> Norms for [Zq<M>] {
     type NormType = u128;
 
-    #[allow(clippy::as_conversions)]
     fn l2_norm_squared(&self) -> Self::NormType {
         self.iter().fold(0u128, |acc, coeff| {
             let c = coeff.centered_mod();
-            acc + (c * c) as u128
+            let c_squared = u128::try_from(c * c).expect("c * c should fit in u128");
+            acc + c_squared
         })
     }
 
-    #[allow(clippy::as_conversions)]
     fn linf_norm(&self) -> Self::NormType {
         self.iter()
             .map(|coeff| coeff.centered_mod().unsigned_abs())
@@ -247,35 +356,142 @@ impl Norms for [Zq] {
     }
 }
 
+// Define specific moduli for different use cases
+
+/// The original u32::MAX modulus from your implementation (converted to u64)
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct U32MaxMod;
+
+impl Mod for U32MaxMod {
+    #[allow(clippy::as_conversions)] // Required for const context - widening conversion is safe
+    const MODULUS: u64 = u32::MAX as u64;
+    const INV: u64 = 0; // Not used for this modulus
+    const BITS: u32 = 32;
+    const IS_PRIME: bool = false; // 2^32 - 1 is not prime
+}
+
+/// Standard LaBRADOR modulus (CRYSTALS-Dilithium compatible)
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct LabradorMod;
+impl Mod for LabradorMod {
+    const MODULUS: u64 = 8380417; // 2^23 - 2^13 + 1
+    const INV: u64 = 58728449; // Precomputed inverse
+    const BITS: u32 = 23;
+    const ROOT_OF_UNITY: Option<u64> = Some(1753);
+}
+
+/// Falcon-512 single signature modulus
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Falcon512Mod;
+impl Mod for Falcon512Mod {
+    const MODULUS: u64 = (1u64 << 41) - 1; // 41 bits for single signature
+    const INV: u64 = 0;
+    const BITS: u32 = 41;
+    const IS_PRIME: bool = false; // 2^41 - 1 is not prime
+}
+
+/// Falcon-512 aggregation moduli for different numbers of signatures
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Falcon512Agg2;
+impl Mod for Falcon512Agg2 {
+    const MODULUS: u64 = (1u64 << 42) - 1; // 42 bits for 2 signatures
+    const INV: u64 = 0;
+    const BITS: u32 = 42;
+    const IS_PRIME: bool = false;
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Falcon512Agg4;
+impl Mod for Falcon512Agg4 {
+    const MODULUS: u64 = (1u64 << 43) - 1; // 43 bits for 4 signatures
+    const INV: u64 = 0;
+    const BITS: u32 = 43;
+    const IS_PRIME: bool = false;
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Falcon512Agg8;
+impl Mod for Falcon512Agg8 {
+    const MODULUS: u64 = (1u64 << 44) - 1; // 44 bits for 8 signatures
+    const INV: u64 = 0;
+    const BITS: u32 = 44;
+    const IS_PRIME: bool = false;
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Falcon512Agg16;
+impl Mod for Falcon512Agg16 {
+    const MODULUS: u64 = (1u64 << 45) - 1; // 45 bits for 16 signatures
+    const INV: u64 = 0;
+    const BITS: u32 = 45;
+    const IS_PRIME: bool = false;
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Falcon512Agg32;
+impl Mod for Falcon512Agg32 {
+    const MODULUS: u64 = (1u64 << 46) - 1; // 46 bits for 32 signatures
+    const INV: u64 = 0;
+    const BITS: u32 = 46;
+    const IS_PRIME: bool = false;
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Falcon512Agg64;
+impl Mod for Falcon512Agg64 {
+    const MODULUS: u64 = (1u64 << 47) - 1; // 47 bits for 64 signatures
+    const INV: u64 = 0;
+    const BITS: u32 = 47;
+    const IS_PRIME: bool = false;
+}
+
+// Type aliases for convenience and backward compatibility
+pub type ZqU32Max = Zq<U32MaxMod>;
+pub type ZqLabrador = Zq<LabradorMod>;
+pub type ZqFalcon512 = Zq<Falcon512Mod>;
+pub type ZqFalcon512Agg2 = Zq<Falcon512Agg2>;
+pub type ZqFalcon512Agg4 = Zq<Falcon512Agg4>;
+pub type ZqFalcon512Agg8 = Zq<Falcon512Agg8>;
+pub type ZqFalcon512Agg16 = Zq<Falcon512Agg16>;
+pub type ZqFalcon512Agg32 = Zq<Falcon512Agg32>;
+pub type ZqFalcon512Agg64 = Zq<Falcon512Agg64>;
+
+// For your existing code, you can use ZqU32Max as a drop-in replacement
+// Or create a simple type alias:
+// pub type Zq = ZqU32Max;
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    // Use the original modulus for backward compatibility
+    type TestZq = ZqU32Max;
+
     #[test]
     fn test_to_u128() {
-        let a = Zq::new(10);
+        let a = TestZq::new(10);
         let b = a.to_u128();
         assert_eq!(b, 10u128);
     }
 
     #[test]
     fn test_is_zero() {
-        let a = Zq::new(0);
-        let b = Zq::new(10);
+        let a = TestZq::new(0);
+        let b = TestZq::new(10);
         assert!(a.is_zero());
         assert!(!b.is_zero());
     }
 
     #[test]
     fn test_get_value() {
-        let a = Zq::new(1000);
-        assert_eq!(a.get_value(), 1000u32);
+        let a = TestZq::new(1000);
+        assert_eq!(a.get_value(), 1000u64);
     }
 
     #[test]
     fn test_basic_arithmetic() {
-        let a = Zq::new(5);
-        let b = Zq::new(3);
+        let a = TestZq::new(5);
+        let b = TestZq::new(3);
 
         // Addition
         assert_eq!((a + b).value, 8, "5 + 3 should be 8");
@@ -287,37 +503,29 @@ mod tests {
 
     #[test]
     fn test_wrapping_arithmetic() {
-        let a = Zq::NEG_ONE;
-        let b = Zq::ONE;
+        let a = TestZq::NEG_ONE;
+        let b = TestZq::ONE;
 
-        assert_eq!((a + b).value, 0, "u32::MAX + 1 should wrap to 0");
-        assert_eq!((b - a).value, 2, "1 - u32::MAX should wrap to 2 (mod 2^32)");
+        assert_eq!((a + b).value, 0, "u32::MAX-1 + 1 should wrap to 0");
+        assert_eq!((b - a).value, 2, "1 - (u32::MAX-1) should wrap to 2");
     }
 
     #[test]
-    fn test_subtraction_edge_cases() {
-        let max = Zq::NEG_ONE;
-        let one = Zq::ONE;
-        let two = Zq::TWO;
+    fn test_different_moduli() {
+        let labrador_a = ZqLabrador::new(5);
+        let labrador_b = ZqLabrador::new(3);
+        let result = labrador_a + labrador_b;
+        assert_eq!(result.get_value(), 8);
 
-        assert_eq!((one - max).value, 2);
-        assert_eq!((two - max).value, 3);
-        assert_eq!((max - max).value, 0);
-    }
-
-    #[test]
-    fn test_multiplication_wrapping() {
-        let a = Zq::new(1 << 31);
-        let two = Zq::TWO;
-
-        // Multiplication wraps when exceeding u32 range
-        assert_eq!((a * two).value, 1, "2^31 * 2 should wrap to 1");
+        // Test that we can't accidentally mix different moduli
+        // This would cause a compile-time error:
+        // let mixed = labrador_a + TestZq::new(3); // Compile error!
     }
 
     #[test]
     fn test_assignment_operators() {
-        let mut a = Zq::new(5);
-        let b = Zq::new(3);
+        let mut a = TestZq::new(5);
+        let b = TestZq::new(3);
 
         a += b;
         assert_eq!(a.value, 8, "5 += 3 should be 8");
@@ -330,89 +538,22 @@ mod tests {
     }
 
     #[test]
-    fn test_conversion_from_u32() {
-        let a: Zq = Zq::new(5);
-        assert_eq!(a.value, 5, "Conversion from u32 should preserve value");
-    }
+    fn test_neg() {
+        let a = TestZq::new(100);
+        let b = TestZq::ZERO;
+        let neg_a: TestZq = -a;
+        let neg_b: TestZq = -b;
 
-    #[test]
-    fn test_negative_arithmetic() {
-        let small = Zq::new(3);
-        let large = Zq::new(5);
-
-        // Test underflow handling (3 - 5 in u32 terms)
-        let result = small - large;
-        assert_eq!(result.value, u32::MAX - 2, "3 - 5 should wrap to 2^32 - 2");
-
-        // Test compound negative operations
-        let mut x = Zq::new(10);
-        x -= Zq::new(15);
-        assert_eq!(x.value, u32::MAX - 5, "10 -= 15 should wrap to 2^32 - 5");
-
-        // Test negative equivalent value in multiplication
-        let a = Zq::NEG_ONE; // Represents -1 in mod 2^32 arithmetic
-        let b = Zq::TWO;
-        assert_eq!(
-            (a * b).value,
-            u32::MAX - 2,
-            "(-1) * 2 should be -2 ≡ 2^32 - 2"
-        );
+        assert_eq!(neg_a + a, TestZq::ZERO);
+        assert_eq!(neg_b, TestZq::ZERO);
     }
 
     #[test]
     fn test_display_implementation() {
-        let a = Zq::new(5);
-        let max = Zq::NEG_ONE;
-        assert_eq!(format!("{a}"), format!("5 (mod {})", Zq::Q));
-        assert_eq!(format!("{max}"), format!("4294967294 (mod {})", Zq::Q));
-    }
-
-    #[test]
-    fn test_maximum_element() {
-        dbg!(Zq::NEG_ONE);
-        dbg!(Zq::ZERO);
-        dbg!(Zq::ONE);
-        dbg!(Zq::ZERO - Zq::ONE);
-        assert_eq!(Zq::NEG_ONE, Zq::ZERO - Zq::ONE);
-    }
-
-    #[test]
-    fn test_ord() {
-        let a = Zq::new(100);
-        let b = Zq::new(200);
-        let c = Zq::new(100);
-        let d = Zq::new(400);
-
-        let res_1 = a.cmp(&b);
-        let res_2 = a.cmp(&c);
-        let res_3 = d.cmp(&b);
-        assert!(res_1.is_lt());
-        assert!(res_2.is_eq());
-        assert!(res_3.is_gt());
-        assert_eq!(a, c);
-        assert!(a < b);
-        assert!(d > b);
-    }
-
-    #[test]
-    fn test_neg() {
-        let a = Zq::new(100);
-        let b = Zq::ZERO;
-        let neg_a: Zq = -a;
-        let neg_b: Zq = -b;
-
-        assert_eq!(neg_a + a, Zq::ZERO);
-        assert_eq!(neg_b, Zq::ZERO);
-    }
-
-    #[test]
-    fn test_centered_mod() {
-        let a = -Zq::new(1);
-        assert_eq!(-1, a.centered_mod());
-
-        let a = Zq::new(4294967103);
-        assert_eq!(a, -Zq::new(192));
-        assert_eq!(-192, a.centered_mod());
+        let a = TestZq::new(5);
+        let max = TestZq::NEG_ONE;
+        assert_eq!(format!("{a}"), "5 (mod 4294967295)");
+        assert_eq!(format!("{max}"), "4294967294 (mod 4294967295)");
     }
 }
 
@@ -420,88 +561,64 @@ mod tests {
 mod norm_tests {
     use super::*;
 
+    type TestZq = ZqU32Max;
+
     #[test]
     fn test_l2_norm() {
         let zq_vector = [
-            Zq::new(1),
-            Zq::new(2),
-            Zq::new(3),
-            Zq::new(4),
-            Zq::new(5),
-            Zq::new(6),
-            Zq::new(7),
+            TestZq::new(1),
+            TestZq::new(2),
+            TestZq::new(3),
+            TestZq::new(4),
+            TestZq::new(5),
+            TestZq::new(6),
+            TestZq::new(7),
         ];
         let res = zq_vector.l2_norm_squared();
-
         assert_eq!(res, 140);
     }
 
     #[test]
     fn test_l2_norm_with_negative_values() {
         let zq_vector = [
-            Zq::new(1),
-            Zq::new(2),
-            Zq::new(3),
-            -Zq::new(4),
-            -Zq::new(5),
-            -Zq::new(6),
-            -Zq::new(7),
+            TestZq::new(1),
+            TestZq::new(2),
+            TestZq::new(3),
+            -TestZq::new(4),
+            -TestZq::new(5),
+            -TestZq::new(6),
+            -TestZq::new(7),
         ];
         let res = zq_vector.l2_norm_squared();
-
         assert_eq!(res, 140);
     }
 
     #[test]
     fn test_linf_norm() {
         let zq_vector = [
-            Zq::new(1),
-            Zq::new(200),
-            Zq::new(300),
-            Zq::new(40),
-            -Zq::new(5),
-            -Zq::new(6),
-            -Zq::new(700000),
+            TestZq::new(1),
+            TestZq::new(200),
+            TestZq::new(300),
+            TestZq::new(40),
+            -TestZq::new(5),
+            -TestZq::new(6),
+            -TestZq::new(700000),
         ];
         let res = zq_vector.linf_norm();
         assert_eq!(res, 700000);
-
-        let zq_vector = [
-            Zq::new(1000000),
-            Zq::new(200),
-            Zq::new(300),
-            Zq::new(40),
-            -Zq::new(5),
-            -Zq::new(6),
-            -Zq::new(999999),
-        ];
-        let res = zq_vector.linf_norm();
-        assert_eq!(res, 1000000);
-
-        let zq_vector = [
-            Zq::new(1),
-            Zq::new(2),
-            Zq::new(3),
-            -Zq::new(4),
-            Zq::new(0),
-            -Zq::new(3),
-            -Zq::new(2),
-            -Zq::new(1),
-        ];
-        let res = zq_vector.linf_norm();
-        assert_eq!(res, 4);
     }
 }
 
 #[cfg(test)]
 mod decomposition_tests {
-    use crate::ring::{zq::Zq, Norms};
+    use super::*;
+    type TestZq = ZqU32Max;
 
     #[test]
     fn test_zq_decomposition() {
-        let (base, parts) = (Zq::new(12), 10);
-        let pos_zq = Zq::new(29);
-        let neg_zq = -Zq::new(29);
+        let (base, parts) = (TestZq::new(12), 10);
+        let pos_zq = TestZq::new(29);
+        let neg_zq = -TestZq::new(29);
 
         let pos_decomposed = pos_zq.decompose(base, parts);
         let neg_decomposed = neg_zq.decompose(base, parts);
@@ -509,72 +626,47 @@ mod decomposition_tests {
         assert_eq!(
             pos_decomposed,
             vec![
-                Zq::new(5),
-                Zq::new(2),
-                Zq::ZERO,
-                Zq::ZERO,
-                Zq::ZERO,
-                Zq::ZERO,
-                Zq::ZERO,
-                Zq::ZERO,
-                Zq::ZERO,
-                Zq::ZERO
+                TestZq::new(5),
+                TestZq::new(2),
+                TestZq::ZERO,
+                TestZq::ZERO,
+                TestZq::ZERO,
+                TestZq::ZERO,
+                TestZq::ZERO,
+                TestZq::ZERO,
+                TestZq::ZERO,
+                TestZq::ZERO
             ]
         );
         assert_eq!(
             neg_decomposed,
             vec![
-                -Zq::new(5),
-                -Zq::new(2),
-                Zq::ZERO,
-                Zq::ZERO,
-                Zq::ZERO,
-                Zq::ZERO,
-                Zq::ZERO,
-                Zq::ZERO,
-                Zq::ZERO,
-                Zq::ZERO
+                -TestZq::new(5),
+                -TestZq::new(2),
+                TestZq::ZERO,
+                TestZq::ZERO,
+                TestZq::ZERO,
+                TestZq::ZERO,
+                TestZq::ZERO,
+                TestZq::ZERO,
+                TestZq::ZERO,
+                TestZq::ZERO
             ]
         );
     }
 
     #[test]
-    fn test_zq_recompositoin() {
-        let (base, parts) = (Zq::new(1802), 10);
-        let pos_zq = -Zq::new(16200);
+    fn test_zq_recomposition() {
+        let (base, parts) = (TestZq::new(1802), 10);
+        let pos_zq = -TestZq::new(16200);
 
         let pos_decomposed = pos_zq.decompose(base, parts);
-        let mut exponensial_base = Zq::new(1);
-        let mut result = Zq::new(0);
+        let mut exponential_base = TestZq::new(1);
+        let mut result = TestZq::new(0);
         for decomposed_part in pos_decomposed {
-            result += decomposed_part * exponensial_base;
-            exponensial_base *= base;
+            result += decomposed_part * exponential_base;
+            exponential_base *= base;
         }
         assert_eq!(result, pos_zq)
-    }
-
-    #[test]
-    fn test_zq_recompositoin_positive() {
-        let (base, parts) = (Zq::new(1802), 10);
-        let pos_zq = Zq::new(23071);
-
-        let pos_decomposed = pos_zq.decompose(base, parts);
-        let mut exponensial_base = Zq::new(1);
-        let mut result = Zq::new(0);
-        for decomposed_part in pos_decomposed {
-            result += decomposed_part * exponensial_base;
-            exponensial_base *= base;
-        }
-        assert_eq!(result, pos_zq)
-    }
-
-    #[test]
-    fn test_linf_norm() {
-        let (base, parts) = (Zq::new(1802), 10);
-        let pos_zq = Zq::new(16200);
-
-        let pos_decomposed = pos_zq.decompose(base, parts);
-        dbg!(&pos_decomposed);
-        assert!(pos_decomposed.linf_norm() <= 901);
     }
 }

@@ -3,7 +3,9 @@ use sha3::{
     Shake256,
 };
 
-use crate::ring::{rq::Rq, zq::Zq};
+use crate::ring::rq::Rq;
+use crate::ring::zq::ZqLabrador;
+type Zq = ZqLabrador;
 use crate::transcript::Sponge;
 
 #[derive(Default)]
@@ -61,7 +63,7 @@ impl Sponge for ShakeSponge {
         let zq_values: Vec<Zq> = output_buffer
             .chunks_exact(4)
             .map(|chunk| {
-                u32::from_le_bytes(chunk.try_into().expect("Could not convert 4 u8 to one u32"))
+                u64::from_le_bytes(chunk.try_into().expect("Could not convert 4 u8 to one u64"))
             })
             .map(Zq::new)
             .collect();
@@ -78,7 +80,7 @@ impl Sponge for ShakeSponge {
         let zq_values: Vec<Zq> = output_buffer
             .chunks_exact(4)
             .map(|chunk| {
-                u32::from_le_bytes(chunk.try_into().expect("Could not convert 4 u8 to one u32"))
+                u64::from_le_bytes(chunk.try_into().expect("Could not convert 4 u8 to one u64"))
             })
             .map(Zq::new)
             .collect();
