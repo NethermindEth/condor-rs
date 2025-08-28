@@ -5,6 +5,8 @@
 # Rust/Cargo
 debug/
 target/
+Cargo.lock
+labrador/src/main.rs
 
 # MSVC Windows builds of rustc generate these, which store debugging information
 *.pdb
