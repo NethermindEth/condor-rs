@@ -5,7 +5,7 @@
 # Rust/Cargo
 debug/
 target/
-labrador/Cargo.toml
+Cargo.lock
 labrador/src/main.rs
 
 # MSVC Windows builds of rustc generate these, which store debugging information
