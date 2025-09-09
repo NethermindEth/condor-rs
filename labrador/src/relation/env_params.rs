@@ -1,5 +1,7 @@
 #![allow(clippy::as_conversions)]
-use crate::ring::{rq::Rq, zq::Zq};
+use crate::ring::rq::Rq;
+use crate::ring::zq::ZqLabrador;
+type Zq = ZqLabrador;
 
 /// Security Parameter
 pub const SECURITY_PARAMETER: usize = 128;
@@ -76,7 +78,7 @@ impl EnvironmentParameters {
         EnvironmentParameters {
             rank,
             multiplicity,
-            b: Zq::new(base_b as u32),
+            b: Zq::new(base_b as u64),
             b_1: base_b1,
             t_1: parts_t1,
             b_2: base_b2,

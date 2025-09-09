@@ -21,7 +21,9 @@ use crate::relation::{
     statement::Statement,
     witness::Witness,
 };
-use crate::ring::{rq_matrix::RqMatrix, rq_vector::RqVector, zq::Zq};
+use crate::ring::zq::ZqLabrador;
+use crate::ring::{rq_matrix::RqMatrix, rq_vector::RqVector};
+type Zq = ZqLabrador;
 use crate::transcript::{LabradorTranscript, Sponge};
 use thiserror::Error;
 

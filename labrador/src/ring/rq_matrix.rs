@@ -6,7 +6,9 @@ use crate::{core::inner_product, ring::rq_vector::RqVector};
 use rand::{CryptoRng, Rng};
 use std::ops::Mul;
 
-use super::{rq::Rq, zq::Zq};
+use crate::ring::rq::Rq;
+use crate::ring::zq::ZqLabrador;
+type Zq = ZqLabrador;
 
 /// Matrix of polynomials in Rq
 #[derive(Debug, Clone)]
@@ -99,7 +101,10 @@ impl RqMatrix {
         let mut decomposed_vec = Vec::new();
         for ring_vector in self.elements() {
             for ring in ring_vector.elements() {
-                decomposed_vec.extend(ring.decompose(base, num_parts));
+                decomposed_vec.extend(ring.decompose(
+                    base,
+                    u64::try_from(num_parts).expect("num_parts does not fit in u64"),
+                ));
             }
         }
         RqVector::new(decomposed_vec)

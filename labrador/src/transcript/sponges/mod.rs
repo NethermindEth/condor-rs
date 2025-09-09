@@ -1,4 +1,6 @@
-use crate::ring::{rq::Rq, zq::Zq};
+use crate::ring::rq::Rq;
+use crate::ring::zq::ZqLabrador;
+type Zq = ZqLabrador;
 
 pub trait Sponge: Default {
     fn absorb_zq(&mut self, input: &[Zq]);

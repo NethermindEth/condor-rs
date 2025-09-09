@@ -1,6 +1,7 @@
 use crate::ring::rq_matrix::RqMatrix;
 use crate::ring::rq_vector::RqVector;
-use crate::ring::zq::Zq;
+use crate::ring::zq::ZqLabrador;
+type Zq = ZqLabrador;
 use crate::ring::{self, Norms};
 
 // LaBRADOR: Compact Proofs for R1CS from Module-SIS | Page 5 | Proving smallness section

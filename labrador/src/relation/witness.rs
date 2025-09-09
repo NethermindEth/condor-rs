@@ -11,7 +11,7 @@ impl Witness {
         #[allow(clippy::as_conversions)]
         let std = ((bound_sq as f64) / ((rank * multiplicity * Rq::DEGREE) as f64)).sqrt();
         #[allow(clippy::as_conversions)]
-        let std = std as u32;
+        let std = std as u64;
         loop {
             let s: Vec<RqVector> = (0..multiplicity)
                 .map(|_| RqVector::random_with_bound(&mut rng(), rank, std))

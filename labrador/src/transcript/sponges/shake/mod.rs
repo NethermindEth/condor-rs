@@ -3,7 +3,9 @@ use sha3::{
     Shake256,
 };
 
-use crate::ring::{rq::Rq, zq::Zq};
+use crate::ring::rq::Rq;
+use crate::ring::zq::ZqLabrador;
+type Zq = ZqLabrador;
 use crate::transcript::Sponge;
 
 #[derive(Default)]
@@ -13,20 +15,20 @@ pub struct ShakeSponge {
 
 impl Sponge for ShakeSponge {
     fn absorb_zq(&mut self, input: &[Zq]) {
-        // Convert Rq ector to u8
+        // Convert Zq vector to u8 - using little-endian for consistency
         let mut u8_version_input: Vec<u8> = Vec::new();
         for coeff in input {
-            u8_version_input.extend_from_slice(&coeff.get_value().to_be_bytes());
+            u8_version_input.extend_from_slice(&coeff.get_value().to_le_bytes());
         }
         self.hasher.update(&u8_version_input);
     }
 
     fn absorb_rq(&mut self, input: &[Rq]) {
-        // Convert Rq ector to u8
+        // Convert Rq vector to u8 - using little-endian for consistency
         let mut u8_version_input: Vec<u8> = Vec::new();
         for rq in input {
             for coeff in rq.coeffs() {
-                u8_version_input.extend_from_slice(&coeff.get_value().to_be_bytes());
+                u8_version_input.extend_from_slice(&coeff.get_value().to_le_bytes());
             }
         }
         self.hasher.update(&u8_version_input);
@@ -55,15 +57,16 @@ impl Sponge for ShakeSponge {
 
     fn squeeze_zq(&mut self, output_length: usize) -> Vec<Zq> {
         let mut reader = self.hasher.clone().finalize_xof();
-        let mut output_buffer = vec![u8::default(); output_length * 4];
+        // We need 8 bytes for a u64
+        let mut output_buffer = vec![u8::default(); output_length * 8];
         reader.read(&mut output_buffer);
 
         let zq_values: Vec<Zq> = output_buffer
-            .chunks_exact(4)
+            .chunks_exact(8)
             .map(|chunk| {
-                u32::from_le_bytes(chunk.try_into().expect("Could not convert 4 u8 to one u32"))
+                u64::from_le_bytes(chunk.try_into().expect("Could not convert 8 u8 to one u64"))
             })
-            .map(Zq::new)
+            .map(Zq::new) // This applies modulo automatically
             .collect();
 
         self.absorb_zq(&zq_values);
@@ -72,13 +75,14 @@ impl Sponge for ShakeSponge {
 
     fn squeeze_rq(&mut self, output_length: usize) -> Vec<Rq> {
         let mut reader = self.hasher.clone().finalize_xof();
-        let mut output_buffer = vec![u8::default(); output_length * Rq::DEGREE * 4];
+        // IMPORTANT: We need 8 bytes for a u64, not 4!
+        let mut output_buffer = vec![u8::default(); output_length * Rq::DEGREE * 8];
         reader.read(&mut output_buffer);
 
         let zq_values: Vec<Zq> = output_buffer
-            .chunks_exact(4)
+            .chunks_exact(8) // Changed from 4 to 8
             .map(|chunk| {
-                u32::from_le_bytes(chunk.try_into().expect("Could not convert 4 u8 to one u32"))
+                u64::from_le_bytes(chunk.try_into().expect("Could not convert 8 u8 to one u64"))
             })
             .map(Zq::new)
             .collect();

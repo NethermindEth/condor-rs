@@ -1,6 +1,8 @@
 //! Dynamic vector of `Rq` elements.
 
-use crate::ring::zq::Zq;
+use crate::ring::zq::ZqLabrador;
+type Zq = ZqLabrador;
+
 use crate::ring::{rq::Rq, Norms};
 use core::ops::Mul;
 use rand::{CryptoRng, Rng};
@@ -60,7 +62,7 @@ impl RqVector {
     }
 
     /// Random vector of given length with coefficients in `(-bound, bound)`.
-    pub fn random_with_bound<R: Rng + CryptoRng>(rng: &mut R, length: usize, bound: u32) -> Self {
+    pub fn random_with_bound<R: Rng + CryptoRng>(rng: &mut R, length: usize, bound: u64) -> Self {
         Self {
             elements: (0..length)
                 .map(|_| Rq::random_with_bound(rng, bound))
@@ -86,7 +88,7 @@ impl RqVector {
             .iter()
             .enumerate()
             .for_each(|(index, poly)| {
-                poly.decompose(b, parts)
+                poly.decompose(b, u64::try_from(parts).expect("parts does not fit in u64"))
                     .into_iter()
                     .zip(result.iter_mut())
                     .for_each(|(decomposed_poly, decomposed_vec)| {
@@ -319,7 +321,7 @@ mod decomposition_tests {
     use super::*;
 
     fn default_base_and_parts() -> (Zq, usize) {
-        let base = Zq::new(2u32.pow(16));
+        let base = Zq::new(2u64.pow(16));
         let parts = 3; // 32 / 16 + (additional parts)
         (base, parts)
     }

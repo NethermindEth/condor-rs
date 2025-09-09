@@ -28,7 +28,9 @@ use crate::core::aggregate::{FunctionsAggregation, ZeroConstantFunctionsAggregat
 use crate::core::{inner_product, jl::Projection};
 use crate::relation::env_params;
 use crate::relation::{env_params::EnvironmentParameters, statement::Statement};
-use crate::ring::{rq::Rq, rq_matrix::RqMatrix, rq_vector::RqVector, zq::Zq, Norms};
+use crate::ring::zq::ZqLabrador;
+use crate::ring::{rq::Rq, rq_matrix::RqMatrix, rq_vector::RqVector, Norms};
+type Zq = ZqLabrador;
 use crate::transcript::{LabradorTranscript, Sponge};
 use thiserror::Error;
 
@@ -36,14 +38,14 @@ use thiserror::Error;
 pub enum VerifierError {
     #[error("matrix not symmetric at ({i},{j}): expected {expected:?}, found {found:?}")]
     NotSymmetric {
-        i: usize,
-        j: usize,
+        i: u64,
+        j: u64,
         expected: Rq,
         found: Rq,
     },
     #[error("B0 mismatch at index {index}: expected {expected}, computed {computed}")]
     B0Mismatch {
-        index: usize,
+        index: u64,
         expected: Zq,
         computed: Zq,
     },
@@ -142,20 +144,33 @@ impl<'a> LabradorVerifier<'a> {
         proof: &LabradorTranscript<S>,
         transcript: &mut LabradorTranscript<S>,
     ) -> Result<(Vec<Vec<Zq>>, Vec<Vec<Zq>>), VerifierError> {
-        let size_of_psi = usize::div_ceil(env_params::SECURITY_PARAMETER, self.params.log_q);
+        let size_of_psi = {
+            let sec_param = u64::try_from(env_params::SECURITY_PARAMETER)
+                .expect("SECURITY_PARAMETER does not fit in u64");
+            let log_q = u64::try_from(self.params.log_q).expect("log_q does not fit in u64");
+            usize::try_from(sec_param.div_ceil(log_q))
+                .expect("div_ceil result does not fit in usize")
+        };
         let size_of_omega = size_of_psi;
         let psi = transcript.generate_vector_psi(size_of_psi, self.params.constraint_l);
         let omega = transcript.generate_vector_omega(size_of_omega, env_params::SECURITY_PARAMETER);
         transcript.absorb_vector_b_ct_aggr(&proof.b_ct_aggr);
 
-        for k in 0..self.params.kappa {
-            let b_0_poly = proof.b_ct_aggr.elements()[k].coeffs()[0];
-            let mut b_0: Zq = (0..self.params.constraint_l)
-                .map(|l| psi[k][l] * self.st.b_0_ct[l])
+        let kappa_u64 = u64::try_from(self.params.kappa).expect("kappa does not fit in u64");
+        for k in 0..kappa_u64 {
+            let k_usize = usize::try_from(k).expect("k does not fit in usize");
+            let b_0_poly = proof.b_ct_aggr.elements()[k_usize].coeffs()[0];
+            let constraint_l_u64 =
+                u64::try_from(self.params.constraint_l).expect("constraint_l does not fit in u64");
+            let mut b_0: Zq = (0..constraint_l_u64)
+                .map(|l| {
+                    let l_usize = usize::try_from(l).expect("l does not fit in usize");
+                    psi[k_usize][l_usize] * self.st.b_0_ct[l_usize]
+                })
                 .sum();
 
             let inner_omega_p =
-                inner_product::compute_linear_combination(&omega[k], &proof.vector_p);
+                inner_product::compute_linear_combination(&omega[k_usize], &proof.vector_p);
             b_0 += inner_omega_p;
             if b_0 != b_0_poly {
                 return Err(VerifierError::B0Mismatch {
@@ -366,15 +381,17 @@ impl<'a> LabradorVerifier<'a> {
 
     /// calculate the right hand side of line 16 or line 17, \sum(g_ij * c_i * c_j) or \sum(h_ij * c_i * c_j)
     fn calculate_gh_ci_cj(x_ij: &RqMatrix, random_c: &RqVector, r: usize) -> Rq {
-        (0..r)
-            .map(|i| {
-                (0..r)
-                    .map(|j| {
-                        &(x_ij.get_cell(i, j) * &random_c.elements()[i]) * &random_c.elements()[j]
-                    })
-                    .fold(Rq::zero(), |acc, x| &acc + &x)
-            })
-            .fold(Rq::zero(), |acc, x| &acc + &x)
+        let c_elements = random_c.elements();
+        let mut result = Rq::zero();
+        for i in 0..r {
+            let c_i = &c_elements[i];
+            for (j, c_j) in c_elements.iter().enumerate().take(r) {
+                // x_ij[i,j] * c_i * c_j
+                let term = &(&(x_ij.get_cell(i, j) * c_i) * c_j);
+                result = &result + term;
+            }
+        }
+        result
     }
 
     /// calculate the left hand side of line 17, \sum(<\phi_z, z> * c_i)
@@ -382,9 +399,11 @@ impl<'a> LabradorVerifier<'a> {
         phi.iter()
             .zip(c.elements())
             .map(|(phi_i, c_i)| {
-                &(inner_product::compute_linear_combination(phi_i.elements(), z.elements())) * c_i
+                let inner_prod =
+                    inner_product::compute_linear_combination(phi_i.elements(), z.elements());
+                &inner_prod * c_i
             })
-            .fold(Rq::zero(), |acc, x| &acc + &x)
+            .fold(Rq::zero(), |acc, term| &acc + &term)
     }
 
     fn norm_squared(polys: &[Vec<RqVector>]) -> u128 {
